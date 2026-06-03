@@ -98,6 +98,7 @@ const auth=getAuth(fbApp);
 const db=getFirestore(fbApp);
 const gp=new GoogleAuthProvider();
 const fp=new FacebookAuthProvider();
+fp.addScope('public_profile');
 
 let CU=null,UP={roles:['artist']},CS='feed',MT='groups',CP=[],venues=[],groups=[],lang='en';
 
