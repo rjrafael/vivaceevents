@@ -62,12 +62,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 <div id="app"></div>
-
+ 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, doc, setDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
+ 
 const firebaseConfig = {
   apiKey: "AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
   authDomain: "vivaceevents-1a8ff.firebaseapp.com",
@@ -76,16 +76,16 @@ const firebaseConfig = {
   messagingSenderId: "215295054411",
   appId: "1:215295054411:web:f7ce28486848ec0a1373ce"
 };
-
+ 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
-
+ 
 let currentUser = null;
 let currentScreen = 'feed';
 const availState = [true,true,false,true,true];
-
+ 
 function icon(name){
   const icons = {
     home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -103,14 +103,14 @@ function icon(name){
   };
   return icons[name]||'';
 }
-
+ 
 function ts(msg){
   let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.getElementById('app').appendChild(t);}
   t.textContent=msg;t.classList.add('show');
   clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2500);
 }
-
+ 
 function render(){
   const app=document.getElementById('app');
   if(!currentUser){app.innerHTML=authScreen();bindAuth();return;}
@@ -127,11 +127,11 @@ function render(){
       <button class="ni${currentScreen==='profile'?' on':''}" onclick="go('profile')">${icon('user')}Profile</button>
     </nav>`;
 }
-
+ 
 function go(s){currentScreen=s;document.getElementById('scr').innerHTML=getScreen();}
 window.go=go;
 window.ts=ts;
-
+ 
 function getScreen(){
   if(currentScreen==='feed') return feedScreen();
   if(currentScreen==='discover') return discoverScreen();
@@ -140,7 +140,7 @@ function getScreen(){
   if(currentScreen==='profile') return profileScreen();
   return feedScreen();
 }
-
+ 
 function authScreen(){return`
 <div class="auth-wrap">
   <div class="auth-logo">Vivace<em>Events</em></div>
@@ -158,7 +158,7 @@ function authScreen(){return`
   </div>
   <p style="font-size:11px;color:#bbb;margin-top:24px;text-align:center">By joining you agree to our Terms of Service</p>
 </div>`;}
-
+ 
 function bindAuth(){
   document.getElementById('btn-google').onclick=async()=>{
     try{const r=await signInWithPopup(auth,googleProvider);currentUser=r.user;render();}
@@ -177,7 +177,7 @@ function bindAuth(){
     catch(e){ts(e.message);}
   };
 }
-
+ 
 function feedScreen(){return`
 <div class="hdr"><div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
 <div class="hdr-r">${icon('bell')}${icon('msg')}</div></div>
@@ -196,7 +196,7 @@ ${gigCard('Masterclass','tb','Advanced violin bow technique','Sat Jun 7','Remote
 ${gigCard('Session','tg','Film score recording — 3hr session','Tue Jun 10','Burbank Studio','$280','JO','#FAC775','#633806','James Okafor','4.7','Cello,Violin,Studio')}
 ${gigCard('Gig','ta','Wedding ceremony — string duo','Sat Jun 14','Malibu, CA','$600','MW','#9FE1CB','#085041','Marcus Webb','4.8','Violin,Cello')}
 </div>`;}
-
+ 
 window.filterPill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
 window.respondBroadcast=async function(type){
   try{
@@ -204,14 +204,14 @@ window.respondBroadcast=async function(type){
     ts(type==='available'?'Response sent! Alex will see you are available.':'Maybe sent to Alex!');
   }catch(e){ts('Response sent!');}
 }
-
+ 
 function gigCard(type,cls,title,date,loc,pay,ini,bg,tc,name,rating,tags){return`
 <div class="card" style="cursor:pointer">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span class="tag ${cls}">${type}</span><span style="font-size:14px;font-weight:600;color:#BA7517">${pay}</span></div>
   <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${title}</div>
   <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
-    <span style="display:flex;align-items:center;gap:4px">${icon('calendar')}<svg style="display:none"/>${date}</span>
-    <span style="display:flex;align-items:center;gap:4px">${icon('pin')} ${loc}</span>
+    <span>📅 ${date}</span>
+    <span>📍 ${loc}</span>
   </div>
   <div style="margin-bottom:10px">${tags.split(',').map(t=>`<span class="tag">${t}</span>`).join('')}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
@@ -220,7 +220,7 @@ function gigCard(type,cls,title,date,loc,pay,ini,bg,tc,name,rating,tags){return`
     <button class="bt" onclick="applyGig(event,'${title}')">Apply</button>
   </div>
 </div>`;}
-
+ 
 window.applyGig=async function(e,title){
   e.stopPropagation();
   try{
@@ -228,7 +228,7 @@ window.applyGig=async function(e,title){
     ts('Application sent for: '+title);
   }catch(err){ts('Application submitted!');}
 }
-
+ 
 function discoverScreen(){return`
 <div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div><div class="hdr-r">${icon('bell')}</div></div>
 <div class="pad">
@@ -245,9 +245,9 @@ ${musicianCard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',t
 ${musicianCard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
 </div>
 </div>`;}
-
+ 
 window.filterMusicians=function(val){}
-
+ 
 function musicianCard(ini,bg,tc,name,role,avail,rat,tags){return`
 <div class="card">
   <div style="display:flex;gap:12px;align-items:center">
@@ -269,12 +269,12 @@ function musicianCard(ini,bg,tc,name,role,avail,rat,tags){return`
     </div>
   </div>
 </div>`;}
-
+ 
 window.inviteMusician=async function(name){
   try{await addDoc(collection(db,'invites'),{to:name,from:currentUser.email,timestamp:new Date()});ts('Invite sent to '+name+'!');}
   catch(e){ts('Invite sent to '+name+'!');}
 }
-
+ 
 function postScreen(){return`
 <div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${icon('logout')}</div></div>
 <div class="pad">
@@ -304,7 +304,7 @@ function postScreen(){return`
   <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">Post to Vivace Events</button>
 </div>
 </div>`;}
-
+ 
 window.selType=function(el){document.querySelectorAll('#type-grid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
 window.saveGig=async function(draft){
   const title=document.getElementById('gig-title').value;
@@ -327,7 +327,7 @@ window.saveGig=async function(draft){
     if(!draft)setTimeout(()=>go('feed'),1500);
   }catch(e){ts(draft?'Saved!':'Posted!');}
 }
-
+ 
 function rosterScreen(){return`
 <div class="hdr"><div><div class="logo" style="font-size:15px">My roster</div><div style="font-size:11px;color:#555;margin-top:1px">5 of 14 shown</div></div><div class="hdr-r">${icon('users')}</div></div>
 <div class="pad">
@@ -352,10 +352,10 @@ ${[['SC','#B5D4F4','#0C447C','Sofia Chen','Violin · Grade 8+','$120/hr',0],['MW
   <div class="tgl ${availState[i]?'on':'off'}" id="tg${i}" onclick="togM(${i})"><div class="tdot"></div></div>
 </div>`).join('')}
 </div>`;}
-
+ 
 window.togM=function(i){availState[i]=!availState[i];const b=document.getElementById('bd'+i);const t=document.getElementById('tg'+i);if(b){b.className='tag '+(availState[i]?'tg':'tr');b.textContent=availState[i]?'Available':'Unavailable';}if(t)t.className='tgl '+(availState[i]?'on':'off');const el=document.getElementById('avail-n');if(el)el.innerHTML=availState.filter(Boolean).length+' <span style="font-size:12px;font-weight:400;color:#888">tonight</span>';}
 window.sendBroadcast=async function(){const v=document.getElementById('bci').value.trim();if(!v)return;try{await addDoc(collection(db,'broadcasts'),{message:v,from:currentUser.email,timestamp:new Date()});ts('Broadcast sent to 14 musicians!');}catch(e){ts('Broadcast sent!');}}
-
+ 
 function profileScreen(){
   const name=currentUser.displayName||currentUser.email?.split('@')[0]||'Musician';
   const ini=name.substring(0,2).toUpperCase();
@@ -393,9 +393,9 @@ function profileScreen(){
     <div><span class="tag">Musician</span><span class="tag">Vivace Events</span><span class="tag tg">Active member</span></div>
   </div>
 </div>`;}
-
+ 
 window.doSignOut=async function(){await signOut(auth);currentUser=null;render();}
-
+ 
 onAuthStateChanged(auth,(user)=>{currentUser=user;render();});
 </script>
 </body>
