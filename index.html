@@ -442,7 +442,7 @@ async function loadGigs(){
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
-            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
+            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#1a7fe8" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
             ${filled?`<span style="font-size:12px;color:#888">Closed</span>`:''}
           </div>
@@ -520,7 +520,7 @@ function feedHTML(){
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
   <div class="hdr-r">
-    <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
+    <span style="font-size:11px;color:#fff;cursor:pointer;font-weight:600;background:#1a7fe8;padding:4px 10px;border-radius:20px;border:none" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
     ${ic('bell')}
   </div>
 </div>
