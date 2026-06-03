@@ -386,7 +386,7 @@ function authHTML(){return `
     <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button>
   </div>
   <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap">
-    ${Object.keys(T).map(l=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${{en:'🇺🇸 EN',es:'🇪🇸 ES',it:'🇮🇹 IT',ru:'🇷🇺 RU',fr:'🇫🇷 FR',de:'🇩🇪 DE'}[l]}</button>`).join('')}
+    ${Object.keys(T).map(l=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${{en:'EN English',es:'ES Español',it:'IT Italiano',ru:'RU Русский',fr:'FR Français',de:'DE Deutsch'}[l]}</button>`).join('')}
   </div>
 </div>`;}
 
@@ -520,7 +520,7 @@ function feedHTML(){
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
   <div class="hdr-r">
-    <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600" onclick="showLangPicker()">${{en:'🇺🇸',es:'🇪🇸',it:'🇮🇹',ru:'🇷🇺',fr:'🇫🇷',de:'🇩🇪'}[lang]}</span>
+    <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
     ${ic('bell')}
   </div>
 </div>
@@ -544,7 +544,7 @@ window.showLangPicker=function(){
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">${t('language')}</div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-      ${[['en','🇺🇸 English'],['es','🇪🇸 Español'],['it','🇮🇹 Italiano'],['ru','🇷🇺 Русский'],['fr','🇫🇷 Français'],['de','🇩🇪 Deutsch']].map(([l,label])=>`
+      ${[['en','EN — English'],['es','ES — Español'],['it','IT — Italiano'],['ru','RU — Русский'],['fr','FR — Français'],['de','DE — Deutsch']].map(([l,label])=>`
         <button class="lang-btn${lang===l?' on':''}" style="padding:14px;font-size:14px;text-align:left" onclick="setLang('${l}');document.getElementById('lang-modal').remove()">${label}</button>`).join('')}
     </div>
     <button class="bg" style="width:100%;margin-top:14px;padding:12px" onclick="document.getElementById('lang-modal').remove()">Cancel</button>
@@ -1077,7 +1077,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('language')}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${[['en','🇺🇸 EN'],['es','🇪🇸 ES'],['it','🇮🇹 IT'],['ru','🇷🇺 RU'],['fr','🇫🇷 FR'],['de','🇩🇪 DE']].map(([l,label])=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${label}</button>`).join('')}
+      ${[['en','EN'],['es','ES'],['it','IT'],['ru','RU'],['fr','FR'],['de','DE']].map(([l,label])=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')" style="min-width:48px;text-align:center">${label}</button>`).join('')}
     </div>
   </div>
   <div style="margin-bottom:18px">
