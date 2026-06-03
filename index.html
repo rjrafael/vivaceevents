@@ -27,6 +27,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tr{background:#FCEBEB;color:#791F1F;border-color:#F09595}
 .tb{background:#E6F1FB;color:#0C447C;border-color:#85B7EB}
 .tp{background:#EEEDFE;color:#3C3489;border-color:#AFA9EC}
+.tf{background:#f5f5f5;color:#444;border-color:#ccc}
 .av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
 .bt{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .bg{background:transparent;color:#666;border:1px solid #ddd;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:inherit}
@@ -69,6 +70,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#aaa;cursor:pointer;border-bottom:2px solid transparent}
 .tab.on{color:#1D9E75;border-bottom-color:#1D9E75}
 .dur-badge{font-size:12px;color:#1D9E75;font-weight:600;padding:6px 10px;background:#E1F5EE;border-radius:8px;margin-top:8px}
+.plan-card{border:1px solid #eee;border-radius:16px;padding:20px;margin-bottom:12px;position:relative}
+.plan-card.featured{border:2px solid #1D9E75}
+.plan-badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#1D9E75;color:#fff;font-size:11px;font-weight:600;padding:3px 14px;border-radius:20px;white-space:nowrap}
+.plan-price{font-size:32px;font-weight:700;color:#111}
+.plan-price span{font-size:14px;font-weight:400;color:#888}
+.plan-feature{font-size:13px;color:#555;padding:5px 0;display:flex;align-items:center;gap:8px}
+.plan-feature::before{content:'✓';color:#1D9E75;font-weight:700;flex-shrink:0}
+.status-open{background:#E6F1FB;color:#0C447C;border-color:#85B7EB}
+.status-filled{background:#f5f5f5;color:#666;border-color:#ccc}
+.status-confirmed{background:#E1F5EE;color:#085041;border-color:#5DCAA5}
+.status-pending{background:#FAEEDA;color:#633806;border-color:#EF9F27}
+.lang-btn{padding:8px 14px;border-radius:8px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:13px;cursor:pointer;font-family:inherit}
+.lang-btn.on{border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-weight:600}
 </style>
 </head>
 <body>
@@ -76,31 +90,211 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const FB = {
-  apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
-  authDomain:"vivaceevents-1a8ff.firebaseapp.com",
-  projectId:"vivaceevents-1a8ff",
-  storageBucket:"vivaceevents-1a8ff.firebasestorage.app",
-  messagingSenderId:"215295054411",
-  appId:"1:215295054411:web:f7ce28486848ec0a1373ce"
+const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
+const fbApp=initializeApp(FB);
+const auth=getAuth(fbApp);
+const db=getFirestore(fbApp);
+const gp=new GoogleAuthProvider();
+
+let CU=null,UP={roles:['artist']},CS='feed',MT='groups',CP=[],venues=[],groups=[],lang='en';
+
+// ─── TRANSLATIONS ───────────────────────────────────────────────
+const T={
+  en:{
+    appName:'Vivace Events',tagline:'The global artist network',
+    feed:'Feed',find:'Find',manager:'Manager',profile:'Profile',
+    postGig:'Post opportunity',postedGigs:'Posted opportunities',postNew:'+ Post new',
+    available:'I am available',maybe:'Maybe',cantMakeIt:"Can't make it",
+    applyBtn:'Apply',openGigs:'Open near you',
+    gigFilled:'Position filled',gigOpen:'Open',gigConfirmed:'You\'re confirmed!',gigPending:'Pending',
+    fillPosition:'Fill position',notifyAll:'Notify everyone & close',
+    confirmedMsg:'🎉 You got the job! Check details.',
+    filledMsg:'This position has been filled. Thank you for your interest!',
+    myGroups:'My Groups',venues:'Venues',responses:'Responses',
+    createGroup:'+ Create new group',addVenue:'+ Add new venue',
+    broadcast:'Broadcast',viewRoster:'View roster',
+    myRoles:'My roles',artist:'Artist',agentMgr:'Agent / Manager',
+    free:'Free',pro:'Pro',studio:'Studio',agency:'Agency',
+    perMonth:'/month',startFree:'Start free',getStarted:'Get started',upgrade:'Upgrade',
+    currentPlan:'Current plan',
+    language:'Language',
+    titlePlaceholder:'e.g. String quartet — corporate gala',
+    saveGig:'Save draft',postToVivace:'Post to Vivace Events',
+    gigPosted:'Posted! 🎉',gigDraft:'Saved as draft!',
+    enableMgr:'Enable Agent / Manager role',
+    signOut:'Sign out',
+    noGigsYet:'No opportunities yet — post the first one!',
+    loading:'Loading...',
+    type:'Type',date:'Date',startTime:'Start time',endTime:'End time',
+    multiDay:'Multi-day',duration:'Duration',
+    pay:'Pay / Compensation',venue:'Venue / Location',
+    instruments:'Instruments / Skills needed',notes:'Notes',
+    musiciansNeeded:'Artists needed',level:'Level',anyLevel:'Any level',
+    gigType1:'🎵 Performance / Gig',gigType2:'🎓 Masterclass',gigType3:'🎙 Recording session',gigType4:'💬 Consultation',gigType5:'🎭 Audition',gigType6:'🎨 Exhibition',
+    paidGig:'Paid — enter amount',freeVol:'Free / Volunteer',freeDoor:'Free entry — door deal',revShare:'Revenue share',tbd:'To be discussed',
+  },
+  es:{
+    appName:'Vivace Events',tagline:'La red global de artistas',
+    feed:'Inicio',find:'Buscar',manager:'Agente',profile:'Perfil',
+    postGig:'Publicar oportunidad',postedGigs:'Oportunidades publicadas',postNew:'+ Publicar',
+    available:'Estoy disponible',maybe:'Quizás',cantMakeIt:'No puedo',
+    applyBtn:'Aplicar',openGigs:'Oportunidades cercanas',
+    gigFilled:'Posición llena',gigOpen:'Abierto',gigConfirmed:'¡Confirmado!',gigPending:'Pendiente',
+    fillPosition:'Llenar posición',notifyAll:'Notificar a todos y cerrar',
+    confirmedMsg:'🎉 ¡Obtuviste el trabajo! Revisa los detalles.',
+    filledMsg:'Esta posición ya fue llenada. ¡Gracias por tu interés!',
+    myGroups:'Mis Grupos',venues:'Lugares',responses:'Respuestas',
+    createGroup:'+ Crear nuevo grupo',addVenue:'+ Añadir lugar',
+    broadcast:'Difundir',viewRoster:'Ver lista',
+    myRoles:'Mis roles',artist:'Artista',agentMgr:'Agente / Manager',
+    free:'Gratis',pro:'Pro',studio:'Studio',agency:'Agencia',
+    perMonth:'/mes',startFree:'Empezar gratis',getStarted:'Comenzar',upgrade:'Mejorar',
+    currentPlan:'Plan actual',language:'Idioma',
+    titlePlaceholder:'p.ej. Cuarteto de cuerdas — gala corporativa',
+    saveGig:'Guardar borrador',postToVivace:'Publicar en Vivace Events',
+    gigPosted:'¡Publicado! 🎉',gigDraft:'¡Guardado como borrador!',
+    enableMgr:'Activar rol de Agente / Manager',
+    signOut:'Cerrar sesión',noGigsYet:'Sin oportunidades aún — ¡publica la primera!',
+    loading:'Cargando...',
+    type:'Tipo',date:'Fecha',startTime:'Hora inicio',endTime:'Hora fin',
+    multiDay:'Varios días',duration:'Duración',
+    pay:'Pago / Compensación',venue:'Lugar / Ubicación',
+    instruments:'Instrumentos / Habilidades',notes:'Notas',
+    musiciansNeeded:'Artistas necesarios',level:'Nivel',anyLevel:'Cualquier nivel',
+    gigType1:'🎵 Actuación / Concierto',gigType2:'🎓 Clase magistral',gigType3:'🎙 Sesión de grabación',gigType4:'💬 Consulta',gigType5:'🎭 Audición',gigType6:'🎨 Exposición',
+    paidGig:'Pagado — ingresa monto',freeVol:'Gratis / Voluntario',freeDoor:'Entrada gratis',revShare:'Reparto de ingresos',tbd:'A discutir',
+  },
+  it:{
+    appName:'Vivace Events',tagline:'La rete globale degli artisti',
+    feed:'Feed',find:'Cerca',manager:'Agente',profile:'Profilo',
+    postGig:'Pubblica opportunità',postedGigs:'Opportunità pubblicate',postNew:'+ Pubblica',
+    available:'Sono disponibile',maybe:'Forse',cantMakeIt:'Non posso',
+    applyBtn:'Candidati',openGigs:'Opportunità vicine',
+    gigFilled:'Posizione occupata',gigOpen:'Aperto',gigConfirmed:'Confermato!',gigPending:'In attesa',
+    fillPosition:'Riempi posizione',notifyAll:'Notifica tutti e chiudi',
+    confirmedMsg:'🎉 Hai ottenuto il lavoro!',
+    filledMsg:'Questa posizione è stata occupata. Grazie per il tuo interesse!',
+    myGroups:'I miei gruppi',venues:'Luoghi',responses:'Risposte',
+    createGroup:'+ Crea nuovo gruppo',addVenue:'+ Aggiungi luogo',
+    broadcast:'Trasmetti',viewRoster:'Vedi lista',
+    myRoles:'I miei ruoli',artist:'Artista',agentMgr:'Agente / Manager',
+    free:'Gratuito',pro:'Pro',studio:'Studio',agency:'Agenzia',
+    perMonth:'/mese',startFree:'Inizia gratis',getStarted:'Inizia',upgrade:'Aggiorna',
+    currentPlan:'Piano attuale',language:'Lingua',
+    titlePlaceholder:'es. Quartetto d\'archi — gala aziendale',
+    saveGig:'Salva bozza',postToVivace:'Pubblica su Vivace Events',
+    gigPosted:'Pubblicato! 🎉',gigDraft:'Salvato come bozza!',
+    enableMgr:'Attiva ruolo Agente / Manager',
+    signOut:'Esci',noGigsYet:'Nessuna opportunità ancora — pubblica la prima!',
+    loading:'Caricamento...',
+    type:'Tipo',date:'Data',startTime:'Ora inizio',endTime:'Ora fine',
+    multiDay:'Più giorni',duration:'Durata',
+    pay:'Compenso',venue:'Luogo',
+    instruments:'Strumenti / Competenze',notes:'Note',
+    musiciansNeeded:'Artisti necessari',level:'Livello',anyLevel:'Qualsiasi livello',
+    gigType1:'🎵 Esibizione',gigType2:'🎓 Masterclass',gigType3:'🎙 Registrazione',gigType4:'💬 Consulenza',gigType5:'🎭 Audizione',gigType6:'🎨 Mostra',
+    paidGig:'Pagato — inserisci importo',freeVol:'Gratis / Volontariato',freeDoor:'Ingresso gratuito',revShare:'Condivisione ricavi',tbd:'Da discutere',
+  },
+  ru:{
+    appName:'Vivace Events',tagline:'Глобальная сеть артистов',
+    feed:'Лента',find:'Поиск',manager:'Агент',profile:'Профиль',
+    postGig:'Разместить вакансию',postedGigs:'Мои вакансии',postNew:'+ Разместить',
+    available:'Я доступен',maybe:'Возможно',cantMakeIt:'Не смогу',
+    applyBtn:'Откликнуться',openGigs:'Вакансии рядом',
+    gigFilled:'Место занято',gigOpen:'Открыто',gigConfirmed:'Подтверждено!',gigPending:'Ожидание',
+    fillPosition:'Заполнить место',notifyAll:'Уведомить всех и закрыть',
+    confirmedMsg:'🎉 Вы получили работу!',
+    filledMsg:'Это место уже занято. Спасибо за интерес!',
+    myGroups:'Мои группы',venues:'Площадки',responses:'Ответы',
+    createGroup:'+ Создать группу',addVenue:'+ Добавить площадку',
+    broadcast:'Рассылка',viewRoster:'Список участников',
+    myRoles:'Мои роли',artist:'Артист',agentMgr:'Агент / Менеджер',
+    free:'Бесплатно',pro:'Про',studio:'Студио',agency:'Агентство',
+    perMonth:'/мес',startFree:'Начать бесплатно',getStarted:'Начать',upgrade:'Улучшить',
+    currentPlan:'Текущий план',language:'Язык',
+    titlePlaceholder:'напр. Струнный квартет — корпоратив',
+    saveGig:'Сохранить черновик',postToVivace:'Опубликовать в Vivace Events',
+    gigPosted:'Опубликовано! 🎉',gigDraft:'Сохранено как черновик!',
+    enableMgr:'Включить роль Агента / Менеджера',
+    signOut:'Выйти',noGigsYet:'Пока нет вакансий — разместите первую!',
+    loading:'Загрузка...',
+    type:'Тип',date:'Дата',startTime:'Начало',endTime:'Конец',
+    multiDay:'Многодневный',duration:'Длительность',
+    pay:'Оплата',venue:'Место',
+    instruments:'Инструменты / Навыки',notes:'Примечания',
+    musiciansNeeded:'Нужно артистов',level:'Уровень',anyLevel:'Любой уровень',
+    gigType1:'🎵 Выступление',gigType2:'🎓 Мастер-класс',gigType3:'🎙 Запись',gigType4:'💬 Консультация',gigType5:'🎭 Прослушивание',gigType6:'🎨 Выставка',
+    paidGig:'Оплачивается',freeVol:'Бесплатно / Волонтёрство',freeDoor:'Бесплатный вход',revShare:'Разделение дохода',tbd:'Обсуждается',
+  },
+  fr:{
+    appName:'Vivace Events',tagline:'Le réseau mondial des artistes',
+    feed:'Fil',find:'Chercher',manager:'Agent',profile:'Profil',
+    postGig:'Publier opportunité',postedGigs:'Opportunités publiées',postNew:'+ Publier',
+    available:'Je suis disponible',maybe:'Peut-être',cantMakeIt:'Je ne peux pas',
+    applyBtn:'Postuler',openGigs:'Opportunités proches',
+    gigFilled:'Poste pourvu',gigOpen:'Ouvert',gigConfirmed:'Confirmé!',gigPending:'En attente',
+    fillPosition:'Pourvoir le poste',notifyAll:'Notifier tous et fermer',
+    confirmedMsg:'🎉 Vous avez obtenu le poste!',
+    filledMsg:'Ce poste a été pourvu. Merci de votre intérêt!',
+    myGroups:'Mes Groupes',venues:'Lieux',responses:'Réponses',
+    createGroup:'+ Créer un groupe',addVenue:'+ Ajouter un lieu',
+    broadcast:'Diffuser',viewRoster:'Voir liste',
+    myRoles:'Mes rôles',artist:'Artiste',agentMgr:'Agent / Manager',
+    free:'Gratuit',pro:'Pro',studio:'Studio',agency:'Agence',
+    perMonth:'/mois',startFree:'Commencer gratuitement',getStarted:'Commencer',upgrade:'Améliorer',
+    currentPlan:'Plan actuel',language:'Langue',
+    titlePlaceholder:'ex. Quatuor à cordes — gala d\'entreprise',
+    saveGig:'Sauvegarder brouillon',postToVivace:'Publier sur Vivace Events',
+    gigPosted:'Publié! 🎉',gigDraft:'Sauvegardé comme brouillon!',
+    enableMgr:'Activer rôle Agent / Manager',
+    signOut:'Déconnexion',noGigsYet:'Pas encore d\'opportunités — publiez la première!',
+    loading:'Chargement...',
+    type:'Type',date:'Date',startTime:'Heure début',endTime:'Heure fin',
+    multiDay:'Plusieurs jours',duration:'Durée',
+    pay:'Rémunération',venue:'Lieu',
+    instruments:'Instruments / Compétences',notes:'Notes',
+    musiciansNeeded:'Artistes nécessaires',level:'Niveau',anyLevel:'Tout niveau',
+    gigType1:'🎵 Performance',gigType2:'🎓 Masterclass',gigType3:'🎙 Enregistrement',gigType4:'💬 Consultation',gigType5:'🎭 Audition',gigType6:'🎨 Exposition',
+    paidGig:'Payé — entrez le montant',freeVol:'Gratuit / Bénévolat',freeDoor:'Entrée gratuite',revShare:'Partage des revenus',tbd:'À discuter',
+  },
+  de:{
+    appName:'Vivace Events',tagline:'Das globale Künstlernetzwerk',
+    feed:'Feed',find:'Suchen',manager:'Agent',profile:'Profil',
+    postGig:'Auftritt veröffentlichen',postedGigs:'Meine Auftritte',postNew:'+ Neu',
+    available:'Ich bin verfügbar',maybe:'Vielleicht',cantMakeIt:'Kann nicht',
+    applyBtn:'Bewerben',openGigs:'Auftritte in der Nähe',
+    gigFilled:'Stelle besetzt',gigOpen:'Offen',gigConfirmed:'Bestätigt!',gigPending:'Ausstehend',
+    fillPosition:'Stelle besetzen',notifyAll:'Alle benachrichtigen und schließen',
+    confirmedMsg:'🎉 Sie haben die Stelle bekommen!',
+    filledMsg:'Diese Stelle wurde besetzt. Danke für Ihr Interesse!',
+    myGroups:'Meine Gruppen',venues:'Veranstaltungsorte',responses:'Antworten',
+    createGroup:'+ Neue Gruppe erstellen',addVenue:'+ Ort hinzufügen',
+    broadcast:'Senden',viewRoster:'Liste ansehen',
+    myRoles:'Meine Rollen',artist:'Künstler',agentMgr:'Agent / Manager',
+    free:'Kostenlos',pro:'Pro',studio:'Studio',agency:'Agentur',
+    perMonth:'/Monat',startFree:'Kostenlos starten',getStarted:'Loslegen',upgrade:'Upgraden',
+    currentPlan:'Aktueller Plan',language:'Sprache',
+    titlePlaceholder:'z.B. Streichquartett — Firmengala',
+    saveGig:'Entwurf speichern',postToVivace:'Auf Vivace Events veröffentlichen',
+    gigPosted:'Veröffentlicht! 🎉',gigDraft:'Als Entwurf gespeichert!',
+    enableMgr:'Agent / Manager-Rolle aktivieren',
+    signOut:'Abmelden',noGigsYet:'Noch keine Auftritte — veröffentlichen Sie den ersten!',
+    loading:'Laden...',
+    type:'Typ',date:'Datum',startTime:'Startzeit',endTime:'Endzeit',
+    multiDay:'Mehrtägig',duration:'Dauer',
+    pay:'Vergütung',venue:'Veranstaltungsort',
+    instruments:'Instrumente / Fähigkeiten',notes:'Notizen',
+    musiciansNeeded:'Benötigte Künstler',level:'Niveau',anyLevel:'Jedes Niveau',
+    gigType1:'🎵 Auftritt',gigType2:'🎓 Meisterkurs',gigType3:'🎙 Aufnahme',gigType4:'💬 Beratung',gigType5:'🎭 Vorsprechen',gigType6:'🎨 Ausstellung',
+    paidGig:'Bezahlt — Betrag eingeben',freeVol:'Kostenlos / Ehrenamtlich',freeDoor:'Freier Eintritt',revShare:'Umsatzbeteiligung',tbd:'Zu besprechen',
+  }
 };
 
-const app = initializeApp(FB);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const gp = new GoogleAuthProvider();
+function t(k){return (T[lang]&&T[lang][k])||T['en'][k]||k;}
 
-let CU = null;
-let UP = {roles:['musician']};
-let CS = 'feed';
-let MT = 'groups';
-let CP = [];
-let venues = [];
-let groups = [];
-
-const SVG = {
+const SVG={
   home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
   search:`<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
   plus:`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
@@ -111,16 +305,17 @@ const SVG = {
   out:`<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
   trash:`<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
   mgr:`<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>`,
-  chk:`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`
+  chk:`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
+  star:`<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
 };
 
 function ic(n){return SVG[n]||'';}
 
 function ts(m){
-  let t=document.getElementById('toast');
-  if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.getElementById('app').appendChild(t);}
-  t.textContent=m;t.classList.add('show');
-  clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove('show'),2500);
+  let el=document.getElementById('toast');
+  if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.getElementById('app').appendChild(el);}
+  el.textContent=m;el.classList.add('show');
+  clearTimeout(window._tt);window._tt=setTimeout(()=>el.classList.remove('show'),2800);
 }
 
 function isMgr(){return UP.roles&&UP.roles.includes('manager');}
@@ -128,24 +323,24 @@ function isMgr(){return UP.roles&&UP.roles.includes('manager');}
 async function loadUP(){
   try{
     const d=await getDoc(doc(db,'users',CU.uid));
-    if(d.exists()) UP={...UP,...d.data()};
-    else await setDoc(doc(db,'users',CU.uid),{roles:['musician'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],created:new Date()});
+    if(d.exists()){UP={...UP,...d.data()};lang=UP.lang||detectLang();}
+    else{lang=detectLang();await setDoc(doc(db,'users',CU.uid),{roles:['artist'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});}
   }catch(e){}
 }
-async function saveUP(){try{await setDoc(doc(db,'users',CU.uid),{...UP,email:CU.email},{merge:true});}catch(e){}}
 
-async function loadGroups(){
-  try{
-    const s=await getDocs(query(collection(db,'groups'),where('managerId','==',CU.uid)));
-    groups=s.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){}
+function detectLang(){
+  const bl=navigator.language||'en';
+  if(bl.startsWith('es'))return 'es';
+  if(bl.startsWith('it'))return 'it';
+  if(bl.startsWith('ru'))return 'ru';
+  if(bl.startsWith('fr'))return 'fr';
+  if(bl.startsWith('de'))return 'de';
+  return 'en';
 }
-async function loadVenues(){
-  try{
-    const s=await getDocs(query(collection(db,'venues'),where('managerId','==',CU.uid)));
-    venues=s.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){}
-}
+
+async function saveUP(){try{await setDoc(doc(db,'users',CU.uid),{...UP,email:CU.email},{merge:true});}catch(e){}}
+async function loadGroups(){try{const s=await getDocs(query(collection(db,'groups'),where('managerId','==',CU.uid)));groups=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}}
+async function loadVenues(){try{const s=await getDocs(query(collection(db,'venues'),where('managerId','==',CU.uid)));venues=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}}
 
 function render(){
   const el=document.getElementById('app');
@@ -154,30 +349,31 @@ function render(){
     <div class="scr" id="scr">${getScr()}</div>
     <div id="toast" class="toast"></div>
     <nav class="bnav">
-      <button class="ni${CS==='feed'?' on':''}" onclick="go('feed')">${ic('home')}Feed</button>
-      <button class="ni${CS==='discover'?' on':''}" onclick="go('discover')">${ic('search')}Find</button>
+      <button class="ni${CS==='feed'?' on':''}" onclick="go('feed')">${ic('home')}${t('feed')}</button>
+      <button class="ni${CS==='discover'?' on':''}" onclick="go('discover')">${ic('search')}${t('find')}</button>
       <button class="ni" onclick="go('post')" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:4px 0;border:none;background:none;cursor:pointer"><div class="pc">${ic('plus')}</div></button>
-      <button class="ni${CS==='manager'?' on':''}" onclick="go('manager')">${ic('mgr')}Manager</button>
-      <button class="ni${CS==='profile'?' on':''}" onclick="go('profile')">${ic('user')}Profile</button>
+      <button class="ni${CS==='manager'?' on':''}" onclick="go('manager')">${ic('mgr')}${t('manager')}</button>
+      <button class="ni${CS==='profile'?' on':''}" onclick="go('profile')">${ic('user')}${t('profile')}</button>
     </nav>`;
 }
 
 function go(s){CS=s;document.getElementById('scr').innerHTML=getScr();}
-window.go=go; window.ts=ts;
+window.go=go;window.ts=ts;
 
 function getScr(){
-  if(CS==='feed') return feedHTML();
-  if(CS==='discover') return discoverHTML();
-  if(CS==='post') return postHTML();
-  if(CS==='manager') return mgrHTML();
-  if(CS==='profile') return profileHTML();
+  if(CS==='feed')return feedHTML();
+  if(CS==='discover')return discoverHTML();
+  if(CS==='post')return postHTML();
+  if(CS==='manager')return mgrHTML();
+  if(CS==='profile')return profileHTML();
+  if(CS==='billing')return billingHTML();
   return feedHTML();
 }
 
 function authHTML(){return `
 <div class="auth-wrap">
   <div class="auth-logo">Vivace<em>Events</em></div>
-  <div class="auth-sub">The musician network — gigs, rosters, masterclasses</div>
+  <div class="auth-sub">${t('tagline')}</div>
   <button class="auth-btn auth-google" id="btn-google">
     <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
     Continue with Google
@@ -188,6 +384,9 @@ function authHTML(){return `
     <input class="finp" id="ap" type="password" placeholder="Password (min 6 chars)"/>
     <button class="auth-btn auth-email-btn" id="btn-signup">Create free account</button>
     <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap">
+    ${Object.keys(T).map(l=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${{en:'🇺🇸 EN',es:'🇪🇸 ES',it:'🇮🇹 IT',ru:'🇷🇺 RU',fr:'🇫🇷 FR',de:'🇩🇪 DE'}[l]}</button>`).join('')}
   </div>
 </div>`;}
 
@@ -206,88 +405,180 @@ function bindAuth(){
   };
 }
 
+window.setLang=function(l){lang=l;if(CU){UP.lang=l;saveUP();}render();}
+
+// ─── GIG STATUS SYSTEM ──────────────────────────────────────────
+function gigStatusBadge(status){
+  if(status==='filled') return `<span class="tag status-filled">⚫ ${t('gigFilled')}</span>`;
+  if(status==='confirmed') return `<span class="tag status-confirmed">✅ ${t('gigConfirmed')}</span>`;
+  if(status==='pending') return `<span class="tag status-pending">⏳ ${t('gigPending')}</span>`;
+  return `<span class="tag status-open">🟢 ${t('gigOpen')}</span>`;
+}
+
 async function loadGigs(){
   try{
     const s=await getDocs(query(collection(db,'gigs'),orderBy('timestamp','desc')));
-    const el=document.getElementById('gig-list');
-    if(!el)return;
-    if(s.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No gigs yet — post the first one!</p>';return;}
+    const el=document.getElementById('gig-list');if(!el)return;
+    if(s.empty){el.innerHTML=`<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('noGigsYet')}</p>`;return;}
     el.innerHTML=s.docs.map(d=>{
-      const g=d.data();
-      const free=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer'));
+      const g=d.data();const gid=d.id;
+      const free=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer')||g.pay.toLowerCase().includes('gratis')||g.pay.toLowerCase().includes('bесплатно'));
       const multiday=g.dateEnd&&g.dateEnd!==g.date&&g.dateEnd!=='';
-      return `<div class="card">
+      const isMine=g.userId===CU.uid;
+      const filled=g.status==='filled';
+      return `<div class="card" style="${filled?'opacity:0.7':''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <span class="tag tg">${g.type||'Gig'}</span>
           <span style="font-size:14px;font-weight:600;color:${free?'#1D9E75':'#BA7517'}">${g.pay||'TBD'}</span>
         </div>
-        <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${g.title||'Untitled'}</div>
+        <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:6px">${g.title||'Untitled'}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${gigStatusBadge(g.status)}</div>
         <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
-          ${g.date?`<span>📅 ${g.date}${g.time?' at '+g.time:''}${multiday?' — '+g.dateEnd+(g.timeEnd?' at '+g.timeEnd:''):''}</span>`:''}
+          ${g.date?`<span>📅 ${g.date}${g.time?' at '+g.time:''}${multiday?' → '+g.dateEnd+(g.timeEnd?' at '+g.timeEnd:''):''}</span>`:''}
           ${g.duration?`<span>⏱ ${g.duration}</span>`:''}
           ${g.location?`<span>📍 ${g.location}</span>`:''}
         </div>
         ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}</div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
-          <button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}')">Apply</button>
+          <div style="display:flex;gap:6px">
+            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
+            ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
+            ${filled?`<span style="font-size:12px;color:#888">Closed</span>`:''}
+          </div>
         </div>
       </div>`;
     }).join('');
   }catch(e){console.log(e);}
 }
 
+window.showFillGig=async function(gigId,gigTitle){
+  try{
+    const s=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+    const apps=s.docs.map(d=>({id:d.id,...d.data()}));
+    const rSnap=await getDocs(query(collection(db,'responses')));
+    const m=document.createElement('div');m.className='modal-bg';m.id='fill-modal';
+    m.innerHTML=`<div class="modal">
+      <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Fill position: ${gigTitle}</div>
+      <div style="font-size:13px;color:#888;margin-bottom:16px">Select who got the job — everyone else will be notified automatically</div>
+      ${apps.length>0?apps.map(a=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
+          <div class="member-check" id="sel-${a.id}" onclick="toggleSel('${a.id}')"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${a.userEmail||'Applicant'}</div></div>
+          <span class="tag tg">Applied</span>
+        </div>`).join(''):`<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No applications yet. You can still close this position.</p>`}
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="bg" style="flex:1;padding:12px" onclick="document.getElementById('fill-modal').remove()">Cancel</button>
+        <button class="bt" style="flex:2;padding:12px;font-size:13px;font-weight:600" onclick="confirmFill('${gigId}','${gigTitle.replace(/'/g,"\\'")}')">Notify everyone & close</button>
+      </div>
+    </div>`;
+    document.getElementById('app').appendChild(m);
+  }catch(e){ts('Error loading applications');}
+}
+
+window.toggleSel=function(id){
+  const el=document.getElementById('sel-'+id);
+  if(el)el.classList.toggle('on');
+}
+
+window.confirmFill=async function(gigId,gigTitle){
+  try{
+    const selected=[];
+    document.querySelectorAll('.member-check.on').forEach(el=>{
+      const id=el.id.replace('sel-','');
+      selected.push(id);
+    });
+    await updateDoc(doc(db,'gigs',gigId),{status:'filled',filledAt:new Date(),confirmedApplicants:selected});
+    const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+    for(const a of apps.docs){
+      const isConfirmed=selected.includes(a.id);
+      await addDoc(collection(db,'notifications'),{
+        toUserId:a.data().userId,toEmail:a.data().userEmail,
+        gigId,gigTitle,
+        type:isConfirmed?'confirmed':'filled',
+        message:isConfirmed?t('confirmedMsg'):t('filledMsg'),
+        read:false,timestamp:new Date()
+      });
+    }
+    document.getElementById('fill-modal')?.remove();
+    ts('Position filled! Everyone has been notified. ✅');
+    setTimeout(loadGigs,500);
+  }catch(e){ts('Done!');}
+}
+
+window.applyGig=async function(e,title,gigId){
+  e.stopPropagation();
+  try{
+    await addDoc(collection(db,'applications'),{gig:title,gigId:gigId||'',userId:CU.uid,userEmail:CU.email,status:'pending',timestamp:new Date()});
+    ts('Application sent! You\'ll be notified when a decision is made. 👍');
+  }catch(e){ts('Application submitted!');}
+}
+
 function feedHTML(){
   setTimeout(loadGigs,100);
   return `
-<div class="hdr"><div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
-<div class="hdr-r">${ic('bell')}</div></div>
+<div class="hdr">
+  <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
+  <div class="hdr-r">
+    <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600" onclick="showLangPicker()">${{en:'🇺🇸',es:'🇪🇸',it:'🇮🇹',ru:'🇷🇺',fr:'🇫🇷',de:'🇩🇪'}[lang]}</span>
+    ${ic('bell')}
+  </div>
+</div>
 <div class="pad">
 <div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Gigs</span><span class="pl" onclick="fpill(this)">Masterclasses</span><span class="pl" onclick="fpill(this)">Sessions</span><span class="pl" onclick="fpill(this)">Free</span></div>
 <div class="dc">
   <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
   <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respond('available')">I am available</button>
-    <button style="background:#FFD700;color:#7A5800;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('maybe')">Maybe</button>
-    <button style="background:#FF3B30;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('no')">Can't make it</button>
+    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respond('available')">${t('available')}</button>
+    <button style="background:#FFD700;color:#7A5800;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('maybe')">${t('maybe')}</button>
+    <button style="background:#FF3B30;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('no')">${t('cantMakeIt')}</button>
   </div>
 </div>
-<div class="sh"><span class="st">Posted gigs</span><span class="sl" onclick="go('post')">+ Post new</span></div>
-<div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>
+<div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
+<div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
+
+window.showLangPicker=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='lang-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">${t('language')}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      ${[['en','🇺🇸 English'],['es','🇪🇸 Español'],['it','🇮🇹 Italiano'],['ru','🇷🇺 Русский'],['fr','🇫🇷 Français'],['de','🇩🇪 Deutsch']].map(([l,label])=>`
+        <button class="lang-btn${lang===l?' on':''}" style="padding:14px;font-size:14px;text-align:left" onclick="setLang('${l}');document.getElementById('lang-modal').remove()">${label}</button>`).join('')}
+    </div>
+    <button class="bg" style="width:100%;margin-top:14px;padding:12px" onclick="document.getElementById('lang-modal').remove()">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
 
 window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
 window.respond=async function(type){
   try{await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
-  ts(type==='available'?'✅ Sent! Alex will see you.':type==='maybe'?'⚡ Maybe sent!':'Response sent!');}
+  ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'Response sent!');}
   catch(e){ts('Sent!');}
 }
-window.applyGig=async function(e,title){
-  e.stopPropagation();
-  try{await addDoc(collection(db,'applications'),{gig:title,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});ts('Application sent for: '+title);}
-  catch(e){ts('Application submitted!');}
-}
 
-function discoverHTML(){
-  return `
-<div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div></div>
+function discoverHTML(){return `
+<div class="hdr"><div class="logo" style="font-size:15px">${t('find')}</div></div>
 <div class="pad">
 <div style="position:relative;margin-bottom:14px">
   <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, genre…"/>
+  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, discipline…"/>
 </div>
-<div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Violin</span><span class="pl" onclick="fpill(this)">Cello</span><span class="pl" onclick="fpill(this)">Viola</span><span class="pl" onclick="fpill(this)">Bass</span><span class="pl" onclick="fpill(this)">Educator</span></div>
-${isMgr()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="flex:1;font-size:13px;color:#666">Cherry-pick mode: tap ○ to select musicians</div><span class="tag tp">${CP.length} selected</span></div>`:''}
-${mcard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Grade 8+',true,'4.9','Violin,Bow technique,Classical')}
-${mcard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
-${mcard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber ensemble',false,'5.0','Viola,Quartet,Educator')}
-${mcard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
-${mcard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
-${CP.length>0?`<div style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0d0d0d;color:#fff;font-size:13px;padding:12px 20px;border-radius:20px;z-index:100;display:flex;align-items:center;gap:12px;max-width:380px;width:calc(100% - 32px)"><span style="flex:1">${CP.length} musician${CP.length>1?'s':''} selected</span><button onclick="sendCP()" style="background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Invite to group</button><button onclick="clearCP()" style="background:transparent;border:none;color:#888;font-size:18px;cursor:pointer">✕</button></div>`:''}
+<div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Violin</span><span class="pl" onclick="fpill(this)">Cello</span><span class="pl" onclick="fpill(this)">Voice</span><span class="pl" onclick="fpill(this)">Dance</span><span class="pl" onclick="fpill(this)">Acting</span><span class="pl" onclick="fpill(this)">Photo</span></div>
+${isMgr()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="flex:1;font-size:13px;color:#666">Cherry-pick: tap ○ to select artists</div><span class="tag tp">${CP.length} selected</span></div>`:''}
+${acard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Classical',true,'4.9','Violin,Bow technique,Classical')}
+${acard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
+${acard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber',false,'5.0','Viola,Quartet,Educator')}
+${acard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
+${acard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
+${acard('MK','#9FE1CB','#085041','Maria Kovács','Soprano · Opera',true,'4.9','Voice,Opera,Concerts')}
+${acard('DL','#FAC775','#633806','Diego Lima','Contemporary Dancer',true,'4.8','Dance,Contemporary,Teaching')}
+${CP.length>0?`<div style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0d0d0d;color:#fff;font-size:13px;padding:12px 20px;border-radius:20px;z-index:100;display:flex;align-items:center;gap:12px;max-width:380px;width:calc(100% - 32px)"><span style="flex:1">${CP.length} artist${CP.length>1?'s':''} selected</span><button onclick="sendCP()" style="background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Invite to group</button><button onclick="clearCP()" style="background:transparent;border:none;color:#888;font-size:18px;cursor:pointer">✕</button></div>`:''}
 </div>`;}
 
-function mcard(ini,bg,tc,name,role,avail,rat,tags){
+function acard(ini,bg,tc,name,role,avail,rat,tags){
   const sel=CP.includes(name);
   return `<div class="card">
   <div style="display:flex;gap:12px;align-items:center">
@@ -299,7 +590,7 @@ function mcard(ini,bg,tc,name,role,avail,rat,tags){
         <span class="tag ${avail?'tg':'tr'}">${avail?'Available':'Unavailable'}</span>
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:6px">${role}</div>
-      <div>${tags.split(',').map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div>${tags.split(',').map(x=>`<span class="tag">${x}</span>`).join('')}</div>
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
@@ -311,20 +602,10 @@ function mcard(ini,bg,tc,name,role,avail,rat,tags){
   </div>
 </div>`;}
 
-window.toggleCP=function(name){
-  const idx=CP.indexOf(name);
-  if(idx>-1)CP.splice(idx,1); else CP.push(name);
-  document.getElementById('scr').innerHTML=discoverHTML();
-}
+window.toggleCP=function(n){const i=CP.indexOf(n);if(i>-1)CP.splice(i,1);else CP.push(n);document.getElementById('scr').innerHTML=discoverHTML();}
 window.clearCP=function(){CP=[];document.getElementById('scr').innerHTML=discoverHTML();}
-window.sendCP=function(){
-  if(groups.length===0){ts('Create a group first in Manager tab!');return;}
-  showGPicker(CP);
-}
-window.inviteOne=function(name){
-  if(groups.length===0){ts('Create a group first in Manager tab!');return;}
-  showGPicker([name]);
-}
+window.sendCP=function(){if(groups.length===0){ts('Create a group first!');return;}showGPicker(CP);}
+window.inviteOne=function(n){if(groups.length===0){ts('Create a group first!');return;}showGPicker([n]);}
 
 function showGPicker(names){
   const m=document.createElement('div');m.className='modal-bg';m.id='gpick';
@@ -343,9 +624,8 @@ function showGPicker(names){
 window.doInvite=async function(gid,gname,names){
   try{
     for(const n of names) await addDoc(collection(db,'invites'),{groupId:gid,groupName:gname,toName:n,fromId:CU.uid,fromEmail:CU.email,status:'pending',timestamp:new Date()});
-    ts('Invites sent to '+names.length+' musician'+(names.length>1?'s':'')+' for '+gname+'!');
-    document.getElementById('gpick')?.remove();
-    CP=[];
+    ts('Invites sent to '+names.length+' artist'+(names.length>1?'s':'')+' for '+gname+'!');
+    document.getElementById('gpick')?.remove();CP=[];
   }catch(e){ts('Invites sent!');}
 }
 
@@ -353,67 +633,61 @@ function postHTML(){
   const vopts=venues.map(v=>`<option value="${v.name} — ${v.address}">${v.name}</option>`).join('');
   const gopts=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
   return `
-<div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${ic('out')}</div></div>
+<div class="hdr"><div class="logo" style="font-size:15px">${t('postGig')}</div><div class="hdr-r" onclick="go('feed')">${ic('out')}</div></div>
 <div class="pad">
 <div style="margin-bottom:14px">
-  <span class="flbl">Type</span>
+  <span class="flbl">${t('type')}</span>
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="tgrid">
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-size:13px" onclick="selT(this)">🎵 Gig / Performance</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">🎓 Masterclass</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">🎙 Recording session</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">💬 Consultation</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-size:13px" onclick="selT(this)">${t('gigType1')}</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType2')}</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType3')}</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType4')}</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType5')}</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType6')}</div>
   </div>
 </div>
-<div style="margin-bottom:12px"><span class="flbl">Title</span><input class="finp" id="g-title" placeholder="e.g. String quartet — corporate gala"/></div>
-
+<div style="margin-bottom:12px"><span class="flbl">${t('type')} title</span><input class="finp" id="g-title" placeholder="${t('titlePlaceholder')}"/></div>
 <div style="margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span class="flbl" style="margin:0">Date & time</span>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:11px;color:#888">Multi-day event</span>
-      <div class="tgl off" id="md-tgl" onclick="toggleMD()"><div class="tdot"></div></div>
-    </div>
+    <span class="flbl" style="margin:0">${t('date')} & ${t('startTime').toLowerCase()}</span>
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#888">${t('multiDay')}</span><div class="tgl off" id="md-tgl" onclick="toggleMD()"><div class="tdot"></div></div></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div><span class="flbl">Start date</span><input class="finp" id="g-date" type="date" oninput="calcDur()"/></div>
-    <div><span class="flbl">Start time</span><input class="finp" id="g-time" type="time" oninput="calcDur()"/></div>
+    <div><span class="flbl">${t('date')}</span><input class="finp" id="g-date" type="date" oninput="calcDur()"/></div>
+    <div><span class="flbl">${t('startTime')}</span><input class="finp" id="g-time" type="time" oninput="calcDur()"/></div>
   </div>
   <div id="end-row" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div><span class="flbl">End date</span><input class="finp" id="g-date-end" type="date" oninput="calcDur()"/></div>
-    <div><span class="flbl">End time</span><input class="finp" id="g-time-end" type="time" oninput="calcDur()"/></div>
+    <div><span class="flbl">End ${t('date').toLowerCase()}</span><input class="finp" id="g-date-end" type="date" oninput="calcDur()"/></div>
+    <div><span class="flbl">${t('endTime')}</span><input class="finp" id="g-time-end" type="time" oninput="calcDur()"/></div>
   </div>
   <div id="g-dur" style="display:none" class="dur-badge"></div>
 </div>
-
 <div style="margin-bottom:12px">
-  <span class="flbl">Pay / Compensation</span>
+  <span class="flbl">${t('pay')}</span>
   <select class="finp" id="g-pay-type" onchange="setPayType(this.value)" style="margin-bottom:6px">
-    <option value="paid">Paid gig — enter amount below</option>
-    <option value="free">Free / Volunteer</option>
-    <option value="entry">Free entry — door deal</option>
-    <option value="revenue">Revenue share</option>
-    <option value="tbd">To be discussed</option>
+    <option value="paid">${t('paidGig')}</option>
+    <option value="free">${t('freeVol')}</option>
+    <option value="entry">${t('freeDoor')}</option>
+    <option value="revenue">${t('revShare')}</option>
+    <option value="tbd">${t('tbd')}</option>
   </select>
   <input class="finp" id="g-pay" placeholder="e.g. $300 flat or $100/hr"/>
 </div>
-
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-  <div><span class="flbl">Musicians needed</span><input class="finp" id="g-count" placeholder="2"/></div>
-  <div><span class="flbl">Level</span><select class="finp" id="g-level"><option>Any level</option><option>Beginner</option><option>Intermediate</option><option>Professional</option></select></div>
+  <div><span class="flbl">${t('musiciansNeeded')}</span><input class="finp" id="g-count" placeholder="2"/></div>
+  <div><span class="flbl">${t('level')}</span><select class="finp" id="g-level"><option>${t('anyLevel')}</option><option>Beginner</option><option>Intermediate</option><option>Professional</option></select></div>
 </div>
-
 <div style="margin-bottom:12px">
-  <span class="flbl">Venue / Location</span>
+  <span class="flbl">${t('venue')}</span>
   ${venues.length>0?`<select class="finp" id="g-vsel" onchange="fillV(this.value)" style="margin-bottom:6px"><option value="">— Select saved venue —</option>${vopts}</select>`:''}
   <input class="finp" id="g-loc" placeholder="Address or Remote"/>
 </div>
-
-<div style="margin-bottom:12px"><span class="flbl">Instruments needed</span><input class="finp" id="g-inst" placeholder="Violin, Cello, Viola…"/></div>
-<div style="margin-bottom:14px"><span class="flbl">Notes</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
+<div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…"/></div>
+<div style="margin-bottom:14px"><span class="flbl">${t('notes')}</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
 ${isMgr()&&groups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="g-group"><option value="">— Don't notify a group —</option>${gopts}</select></div>`:''}
 <div style="display:flex;gap:8px">
-  <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="saveGig(true)">Save draft</button>
-  <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">Post to Vivace Events</button>
+  <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="saveGig(true)">${t('saveGig')}</button>
+  <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">${t('postToVivace')}</button>
 </div>
 </div>`;}
 
@@ -422,14 +696,9 @@ window.toggleMD=function(){
   const row=document.getElementById('end-row');
   const isOn=tgl.classList.contains('on');
   if(isOn){tgl.classList.replace('on','off');row.style.display='none';}
-  else{
-    tgl.classList.replace('off','on');row.style.display='grid';
-    const sd=document.getElementById('g-date').value;
-    if(sd)document.getElementById('g-date-end').value=sd;
-  }
+  else{tgl.classList.replace('off','on');row.style.display='grid';const sd=document.getElementById('g-date').value;if(sd)document.getElementById('g-date-end').value=sd;}
   calcDur();
 }
-
 window.calcDur=function(){
   const sd=document.getElementById('g-date')?.value;
   const st=document.getElementById('g-time')?.value;
@@ -445,25 +714,22 @@ window.calcDur=function(){
   const hrs=Math.floor((mins%1440)/60);
   const m=mins%60;
   let label='';
-  if(days>0) label+=days+' day'+(days>1?'s':'');
-  if(hrs>0) label+=(label?' ':'')+hrs+' hr'+(hrs>1?'s':'');
-  if(m>0&&days===0) label+=(label?' ':'')+m+' min';
-  if(label){disp.style.display='block';disp.textContent='⏱ Duration: '+label;}
+  if(days>0)label+=days+' day'+(days>1?'s':'');
+  if(hrs>0)label+=(label?' ':'')+hrs+' hr'+(hrs>1?'s':'');
+  if(m>0&&days===0)label+=(label?' ':'')+m+' min';
+  if(label){disp.style.display='block';disp.textContent='⏱ '+t('duration')+': '+label;}
   else disp.style.display='none';
 }
-
 window.setPayType=function(v){
-  const f=document.getElementById('g-pay');
-  if(!f)return;
-  if(v==='free'){f.value='Free / Volunteer';f.style.color='#1D9E75';}
-  else if(v==='entry'){f.value='Free entry — door deal';f.style.color='#1D9E75';}
-  else if(v==='revenue'){f.value='Revenue share';f.style.color='#BA7517';}
-  else if(v==='tbd'){f.value='To be discussed';f.style.color='#888';}
+  const f=document.getElementById('g-pay');if(!f)return;
+  if(v==='free'){f.value=t('freeVol');f.style.color='#1D9E75';}
+  else if(v==='entry'){f.value=t('freeDoor');f.style.color='#1D9E75';}
+  else if(v==='revenue'){f.value=t('revShare');f.style.color='#BA7517';}
+  else if(v==='tbd'){f.value=t('tbd');f.style.color='#888';}
   else{f.value='';f.style.color='#111';}
 }
 window.selT=function(el){document.querySelectorAll('#tgrid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
 window.fillV=function(v){const f=document.getElementById('g-loc');if(v&&f)f.value=v;}
-
 window.saveGig=async function(draft){
   const title=document.getElementById('g-title').value;
   if(!title&&!draft){ts('Please add a title first');return;}
@@ -471,93 +737,89 @@ window.saveGig=async function(draft){
   const st=document.getElementById('g-time').value;
   const ed=document.getElementById('g-date-end')?.value||'';
   const et=document.getElementById('g-time-end')?.value||'';
-  const dur=document.getElementById('g-dur')?.textContent?.replace('⏱ Duration: ','')||'';
-  const type=document.querySelector('#tgrid .card[style*="#E1F5EE"]')?.textContent||'Gig';
+  const dur=document.getElementById('g-dur')?.textContent?.replace('⏱ '+t('duration')+': ','')||'';
+  const type=document.querySelector('#tgrid .card[style*="#E1F5EE"]')?.textContent||'Performance';
   try{
     await addDoc(collection(db,'gigs'),{
-      title:title||'Draft',type,
-      date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
-      pay:document.getElementById('g-pay').value,
-      location:document.getElementById('g-loc').value,
-      instruments:document.getElementById('g-inst').value,
-      level:document.getElementById('g-level').value,
-      notes:document.getElementById('g-notes').value,
-      groupId:document.getElementById('g-group')?.value||'',
-      postedBy:CU.email,userId:CU.uid,draft,timestamp:new Date()
+      title:title||'Draft',type,date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
+      pay:document.getElementById('g-pay').value,location:document.getElementById('g-loc').value,
+      instruments:document.getElementById('g-inst').value,level:document.getElementById('g-level').value,
+      notes:document.getElementById('g-notes').value,groupId:document.getElementById('g-group')?.value||'',
+      status:'open',postedBy:CU.email,userId:CU.uid,draft,lang,timestamp:new Date()
     });
-    ts(draft?'Saved as draft!':'Gig posted! 🎉');
+    ts(draft?t('gigDraft'):t('gigPosted'));
     if(!draft)setTimeout(()=>go('feed'),1500);
   }catch(e){ts('Posted!');}
 }
 
 function mgrHTML(){
   if(!isMgr()){return `
-    <div class="hdr"><div class="logo" style="font-size:15px">Manager tools</div></div>
+    <div class="hdr"><div class="logo" style="font-size:15px">${t('manager')}</div></div>
     <div class="pad"><div class="card" style="text-align:center;padding:28px">
       <div style="font-size:36px;margin-bottom:12px">🎯</div>
-      <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px">Become a Manager</div>
-      <div style="font-size:13px;color:#888;margin-bottom:20px">Create groups, manage rosters, save venues and broadcast to your musicians</div>
-      <button class="bt" style="width:100%;padding:14px;font-size:14px" onclick="enableMgr()">Enable Manager Role</button>
+      <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px">Become an Agent / Manager</div>
+      <div style="font-size:13px;color:#888;margin-bottom:20px">Create groups, manage rosters, save venues and broadcast to your artists</div>
+      <button class="bt" style="width:100%;padding:14px;font-size:14px" onclick="enableMgr()">${t('enableMgr')}</button>
     </div></div>`;}
 
   setTimeout(()=>{
-    if(MT==='groups'){loadGroups().then(renderGroups);}
-    if(MT==='venues'){loadVenues().then(renderVenues);}
-    if(MT==='responses'){loadResponses();}
+    if(MT==='groups')loadGroups().then(renderGroups);
+    if(MT==='venues')loadVenues().then(renderVenues);
+    if(MT==='responses')loadResponses();
   },100);
 
   return `
-<div class="hdr"><div><div class="logo" style="font-size:15px">Manager</div><div style="font-size:11px;color:#555;margin-top:1px">${CU.displayName||CU.email?.split('@')[0]}</div></div></div>
+<div class="hdr"><div><div class="logo" style="font-size:15px">${t('manager')}</div><div style="font-size:11px;color:#555;margin-top:1px">${CU.displayName||CU.email?.split('@')[0]}</div></div></div>
 <div class="pad">
 <div class="tab-bar">
-  <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')">My Groups</div>
-  <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')">Venues</div>
-  <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')">Responses</div>
+  <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')">${t('myGroups')}</div>
+  <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')">${t('venues')}</div>
+  <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')">${t('responses')}</div>
 </div>
 <div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
 
-window.mgrTab=function(t){
-  MT=t;
-  const el=document.getElementById('mtab');
-  if(el)el.innerHTML=mgrTabHTML();
+window.mgrTab=function(tab){
+  MT=tab;
+  const el=document.getElementById('mtab');if(el)el.innerHTML=mgrTabHTML();
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('.tab').forEach(x=>{if(x.textContent.toLowerCase().startsWith(t.substring(0,3)))x.classList.add('on');});
-  if(t==='groups')loadGroups().then(renderGroups);
-  if(t==='venues')loadVenues().then(renderVenues);
-  if(t==='responses')loadResponses();
+  if(tab==='groups')document.querySelectorAll('.tab')[0].classList.add('on');
+  if(tab==='venues')document.querySelectorAll('.tab')[1].classList.add('on');
+  if(tab==='responses')document.querySelectorAll('.tab')[2].classList.add('on');
+  if(tab==='groups')loadGroups().then(renderGroups);
+  if(tab==='venues')loadVenues().then(renderVenues);
+  if(tab==='responses')loadResponses();
 }
 
 function mgrTabHTML(){
-  if(MT==='groups') return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">+ Create new group</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>`;
-  if(MT==='venues') return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">+ Add new venue</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>`;
-  if(MT==='responses') return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading responses...</p></div>`;
+  if(MT==='groups')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">${t('createGroup')}</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
+  if(MT==='venues')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">${t('addVenue')}</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
+  if(MT==='responses')return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   return '';
 }
 
 function renderGroups(){
   const el=document.getElementById('grp-list');if(!el)return;
-  if(groups.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">👥</div><div style="font-size:14px;color:#888">No groups yet. Create your first group!</div></div>`;return;}
-  el.innerHTML=groups.map(g=>`
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div><div style="font-size:15px;font-weight:700;color:#111">${g.name}</div><div style="font-size:12px;color:#888;margin-top:2px">${g.type||'Group'} · ${g.memberCount||0} members</div></div>
-        <span class="tag tg">Active</span>
-      </div>
-      <div style="display:flex;gap:8px;border-top:1px solid #f0f0f0;padding-top:10px">
-        <button class="bt" style="flex:1;font-size:11px;padding:7px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}')">📢 Broadcast</button>
-        <button class="bg" style="flex:1;font-size:11px;padding:7px" onclick="openGroup('${g.id}')">View roster</button>
-        <button onclick="delGroup('${g.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:7px 8px">${ic('trash')}</button>
-      </div>
-    </div>`).join('');
+  if(groups.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">👥</div><div style="font-size:14px;color:#888">No groups yet. Create your first!</div></div>`;return;}
+  el.innerHTML=groups.map(g=>`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div><div style="font-size:15px;font-weight:700;color:#111">${g.name}</div><div style="font-size:12px;color:#888;margin-top:2px">${g.type||'Group'} · ${g.memberCount||0} members</div></div>
+      <span class="tag tg">Active</span>
+    </div>
+    <div style="display:flex;gap:8px;border-top:1px solid #f0f0f0;padding-top:10px">
+      <button class="bt" style="flex:1;font-size:11px;padding:7px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}')">📢 ${t('broadcast')}</button>
+      <button class="bg" style="flex:1;font-size:11px;padding:7px" onclick="openGroup('${g.id}')">${t('viewRoster')}</button>
+      <button onclick="delGroup('${g.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:7px 8px">${ic('trash')}</button>
+    </div>
+  </div>`).join('');
 }
 
 window.showCreateGroup=function(){
   const m=document.createElement('div');m.className='modal-bg';m.id='cgmodal';
   m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">Create new group</div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">${t('createGroup').replace('+ ','')}</div>
     <div style="margin-bottom:12px"><span class="flbl">Group name</span><input class="finp" id="gn" placeholder="e.g. VSO String Quartet"/></div>
-    <div style="margin-bottom:12px"><span class="flbl">Type</span><select class="finp" id="gt"><option>String Quartet</option><option>Chamber Orchestra</option><option>Wedding Band</option><option>Jazz Ensemble</option><option>Masterclass Teachers</option><option>Session Musicians</option><option>Custom</option></select></div>
+    <div style="margin-bottom:12px"><span class="flbl">Type</span><select class="finp" id="gt"><option>String Quartet</option><option>Chamber Orchestra</option><option>Wedding Band</option><option>Jazz Ensemble</option><option>Vocal Group</option><option>Dance Company</option><option>Theater Ensemble</option><option>Session Musicians</option><option>Masterclass Teachers</option><option>Custom</option></select></div>
     <div style="margin-bottom:18px"><span class="flbl">Description (optional)</span><input class="finp" id="gd" placeholder="Brief description…"/></div>
     <div style="display:flex;gap:8px">
       <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cgmodal').remove()">Cancel</button>
@@ -573,15 +835,13 @@ window.createGroup=async function(){
   try{
     const ref=await addDoc(collection(db,'groups'),{name,type:document.getElementById('gt').value,description:document.getElementById('gd').value,managerId:CU.uid,managerEmail:CU.email,memberCount:0,members:[],created:new Date()});
     groups.push({id:ref.id,name,type:document.getElementById('gt').value,memberCount:0,members:[]});
-    document.getElementById('cgmodal')?.remove();
-    renderGroups();ts('Group "'+name+'" created!');
+    document.getElementById('cgmodal')?.remove();renderGroups();ts('Group "'+name+'" created!');
   }catch(e){ts('Group created!');}
 }
 
 window.delGroup=async function(id){
   if(!confirm('Delete this group?'))return;
-  try{await deleteDoc(doc(db,'groups',id));groups=groups.filter(g=>g.id!==id);renderGroups();ts('Group deleted');}
-  catch(e){ts('Deleted!');}
+  try{await deleteDoc(doc(db,'groups',id));groups=groups.filter(g=>g.id!==id);renderGroups();ts('Deleted');}catch(e){ts('Deleted!');}
 }
 
 window.openGroup=function(id){
@@ -593,8 +853,7 @@ window.openGroup=function(id){
       <button onclick="document.getElementById('gdetail').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
     <div style="font-size:13px;color:#888;margin-bottom:16px">${g.type} · ${g.memberCount||0} members</div>
-    <button class="bt" style="width:100%;margin-bottom:12px" onclick="document.getElementById('gdetail').remove();go('discover');ts('Tap ○ next to musicians to select, then tap Invite to group')">+ Add musicians from Find</button>
-    <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:10px">Members</div>
+    <button class="bt" style="width:100%;margin-bottom:12px" onclick="document.getElementById('gdetail').remove();go('discover');ts('Tap ○ next to artists to select, then tap + Group')">+ Add artists from Find</button>
     ${g.members&&g.members.length>0?g.members.map(mem=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div class="av" style="background:#E1F5EE;color:#085041">${mem.substring(0,2).toUpperCase()}</div><span style="flex:1;font-size:14px;color:#111">${mem}</span><span class="tag tg">Member</span></div>`).join(''):'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No members yet. Add from Find tab!</p>'}
     <button class="bt" style="width:100%;margin-top:16px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}');document.getElementById('gdetail').remove()">📢 Broadcast to group</button>
   </div>`;
@@ -605,12 +864,12 @@ window.showBroadcast=function(gid,gname){
   const m=document.createElement('div');m.className='modal-bg';m.id='bcmodal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Broadcast to ${gname}</div>
-    <div style="font-size:13px;color:#888;margin-bottom:12px">All members will receive this message</div>
+    <div style="font-size:13px;color:#888;margin-bottom:12px">All members will be notified</div>
     <div class="pr" style="margin-bottom:12px">
       <span class="pl" onclick="fillBC(this,'Who is available tonight?')">Tonight?</span>
-      <span class="pl" onclick="fillBC(this,'Who can play this weekend?')">Weekend?</span>
+      <span class="pl" onclick="fillBC(this,'Who can perform this weekend?')">Weekend?</span>
       <span class="pl" onclick="fillBC(this,'Urgent gig — who is free?')">Urgent</span>
-      <span class="pl" onclick="fillBC(this,'Masterclass slot available')">Masterclass</span>
+      <span class="pl" onclick="fillBC(this,'Masterclass / workshop slot open')">Workshop</span>
     </div>
     <textarea class="finp" id="bcmsg" rows="4" placeholder="Type your message…" style="margin-bottom:12px"></textarea>
     <div style="display:flex;gap:8px">
@@ -631,24 +890,23 @@ window.sendBC=async function(gid,gname){
 
 function renderVenues(){
   const el=document.getElementById('ven-list');if(!el)return;
-  if(venues.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">📍</div><div style="font-size:14px;color:#888">No venues saved yet. Add your first venue!</div></div>`;return;}
-  el.innerHTML=venues.map(v=>`
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div style="font-size:15px;font-weight:700;color:#111">${v.name}</div>
-        <button onclick="delVenue('${v.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer">${ic('trash')}</button>
-      </div>
-      <div style="font-size:12px;color:#888;margin-bottom:4px">📍 ${v.address}</div>
-      ${v.capacity?`<div style="font-size:12px;color:#888;margin-bottom:4px">👥 Capacity: ${v.capacity}</div>`:''}
-      ${v.notes?`<div style="font-size:12px;color:#aaa;margin-top:4px">${v.notes}</div>`:''}
-      <button class="bg" style="width:100%;margin-top:10px;font-size:12px" onclick="useVenue('${v.name.replace(/'/g,"\\'")}','${v.address.replace(/'/g,"\\'")}')">Use for next gig</button>
-    </div>`).join('');
+  if(venues.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">📍</div><div style="font-size:14px;color:#888">No venues saved yet. Add your first!</div></div>`;return;}
+  el.innerHTML=venues.map(v=>`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div style="font-size:15px;font-weight:700;color:#111">${v.name}</div>
+      <button onclick="delVenue('${v.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer">${ic('trash')}</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:4px">📍 ${v.address}</div>
+    ${v.capacity?`<div style="font-size:12px;color:#888;margin-bottom:4px">👥 Capacity: ${v.capacity}</div>`:''}
+    ${v.notes?`<div style="font-size:12px;color:#aaa;margin-top:4px">${v.notes}</div>`:''}
+    <button class="bg" style="width:100%;margin-top:10px;font-size:12px" onclick="useVenue('${v.name.replace(/'/g,"\\'")}','${v.address.replace(/'/g,"\\'")}')">Use for next gig</button>
+  </div>`).join('');
 }
 
 window.showAddVenue=function(){
   const m=document.createElement('div');m.className='modal-bg';m.id='avmodal';
   m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">Add venue</div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">${t('addVenue').replace('+ ','')}</div>
     <div style="margin-bottom:12px"><span class="flbl">Venue name</span><input class="finp" id="vn" placeholder="e.g. DAR Constitution Hall"/></div>
     <div style="margin-bottom:12px"><span class="flbl">Address</span><input class="finp" id="va" placeholder="Full address"/></div>
     <div style="margin-bottom:12px"><span class="flbl">Capacity (optional)</span><input class="finp" id="vc" placeholder="500" type="number"/></div>
@@ -661,8 +919,7 @@ window.showAddVenue=function(){
   document.getElementById('app').appendChild(m);
 }
 window.saveVenue=async function(){
-  const name=document.getElementById('vn').value.trim();
-  const addr=document.getElementById('va').value.trim();
+  const name=document.getElementById('vn').value.trim();const addr=document.getElementById('va').value.trim();
   if(!name||!addr){ts('Name and address required');return;}
   try{
     const ref=await addDoc(collection(db,'venues'),{name,address:addr,capacity:document.getElementById('vc').value,notes:document.getElementById('vno').value,managerId:CU.uid,created:new Date()});
@@ -670,9 +927,7 @@ window.saveVenue=async function(){
     document.getElementById('avmodal')?.remove();renderVenues();ts('Venue "'+name+'" saved!');
   }catch(e){ts('Venue saved!');}
 }
-window.delVenue=async function(id){
-  try{await deleteDoc(doc(db,'venues',id));venues=venues.filter(v=>v.id!==id);renderVenues();ts('Venue removed');}catch(e){ts('Removed!');}
-}
+window.delVenue=async function(id){try{await deleteDoc(doc(db,'venues',id));venues=venues.filter(v=>v.id!==id);renderVenues();ts('Removed');}catch(e){ts('Removed!');}}
 window.useVenue=function(name,addr){go('post');setTimeout(()=>{const f=document.getElementById('g-loc');if(f)f.value=name+' — '+addr;},200);ts('Venue added to gig form!');}
 
 async function loadResponses(){
@@ -680,28 +935,116 @@ async function loadResponses(){
     const s=await getDocs(query(collection(db,'responses'),orderBy('timestamp','desc')));
     const el=document.getElementById('resp-list');if(!el)return;
     if(s.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No responses yet</p>';return;}
-    el.innerHTML=s.docs.map(d=>{
-      const r=d.data();
-      const cls=r.type==='available'?'tg':r.type==='no'?'tr':'ta';
-      const label=r.type==='available'?'✅ Available':r.type==='no'?'❌ Unavailable':'⚡ Maybe';
-      const time=r.timestamp?.toDate?r.timestamp.toDate().toLocaleDateString():'';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
-        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${r.userEmail||'Member'}</div><div style="font-size:11px;color:#aaa">${time}</div></div>
-        <span class="tag ${cls}">${label}</span>
-      </div>`;
-    }).join('');
+    const counts={available:0,maybe:0,no:0};
+    s.docs.forEach(d=>counts[d.data().type]=(counts[d.data().type]||0)+1);
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+        <div style="background:#E1F5EE;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#085041">${counts.available||0}</div><div style="font-size:11px;color:#085041;margin-top:2px">Available</div></div>
+        <div style="background:#FAEEDA;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#633806">${counts.maybe||0}</div><div style="font-size:11px;color:#633806;margin-top:2px">Maybe</div></div>
+        <div style="background:#FCEBEB;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#791F1F">${counts.no||0}</div><div style="font-size:11px;color:#791F1F;margin-top:2px">Can't make it</div></div>
+      </div>
+      ${s.docs.map(d=>{
+        const r=d.data();
+        const cls=r.type==='available'?'tg':r.type==='no'?'tr':'ta';
+        const label=r.type==='available'?'✅ Available':r.type==='no'?'❌ Can\'t make it':'⚡ Maybe';
+        const time=r.timestamp?.toDate?r.timestamp.toDate().toLocaleDateString():'';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${r.userEmail||'Member'}</div><div style="font-size:11px;color:#aaa">${time}</div></div>
+          <span class="tag ${cls}">${label}</span>
+        </div>`;
+      }).join('')}`;
   }catch(e){}
 }
 
 window.enableMgr=async function(){
-  UP.roles=[...new Set([...(UP.roles||['musician']),'manager'])];
-  await saveUP();render();ts('Manager role enabled! 🎯');
+  UP.roles=[...new Set([...(UP.roles||['artist']),'manager'])];
+  await saveUP();render();ts('Agent / Manager role enabled! 🎯');
+}
+
+// ─── BILLING SCREEN ─────────────────────────────────────────────
+function billingHTML(){
+  const plan=UP.plan||'free';
+  const plans=[
+    {id:'free',name:t('free'),price:'0',color:'#888',features:['Artist profile & video reel','Apply to gigs & opportunities','Join groups when invited','Browse all opportunities'],btn:t('currentPlan'),current:plan==='free'},
+    {id:'pro',name:'Agent Pro',price:'19',color:'#1D9E75',features:['Everything in Free','Unlimited groups & rosters','Unlimited venue database','Broadcast to all groups','Cherry-pick individual artists','Response analytics dashboard','Post unlimited opportunities'],btn:plan==='pro'?t('currentPlan'):t('getStarted'),current:plan==='pro',featured:true},
+    {id:'studio',name:'Agent Studio',price:'49',color:'#BA7517',features:['Everything in Pro','Featured opportunities (top of feed)','Custom group branding','Export roster to CSV','Priority support','Multi-language broadcasts','Analytics & reporting'],btn:plan==='studio'?t('currentPlan'):t('upgrade'),current:plan==='studio'},
+    {id:'agency',name:'Agency',price:'99',color:'#3C3489',features:['Everything in Studio','Unlimited sub-agents','White-label option','API access','Dedicated account manager','Custom contracts & billing','SLA support'],btn:plan==='agency'?t('currentPlan'):t('upgrade'),current:plan==='agency'}
+  ];
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">Plans & Billing</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
+<div class="pad">
+<div style="text-align:center;margin-bottom:24px">
+  <div style="font-size:22px;font-weight:700;color:#111;margin-bottom:6px">Choose your plan</div>
+  <div style="font-size:14px;color:#888">Artists are always free. Agents pay only for the tools they use.</div>
+</div>
+${plans.map(p=>`
+<div class="plan-card${p.featured?' featured':''}">
+  ${p.featured?`<div class="plan-badge">Most popular</div>`:''}
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:#111">${p.name}</div>
+      ${p.current?`<span class="tag tg" style="margin-top:4px">${t('currentPlan')}</span>`:''}
+    </div>
+    <div style="text-align:right">
+      <div class="plan-price" style="color:${p.color}">$${p.price}<span>${t('perMonth')}</span></div>
+    </div>
+  </div>
+  <div style="margin-bottom:16px">${p.features.map(f=>`<div class="plan-feature">${f}</div>`).join('')}</div>
+  <button style="width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:${p.current?'#f5f5f5':p.id==='free'?'#f5f5f5':p.color};color:${p.current?'#888':p.id==='free'?'#666':'#fff'};border:${p.current||p.id==='free'?'1px solid #ddd':'none'}" onclick="selectPlan('${p.id}')">${p.btn}</button>
+</div>`).join('')}
+<div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
+  14-day free trial on Pro and Studio · Cancel anytime · Secure payment via Stripe
+</div>
+</div>`;}
+
+window.selectPlan=async function(planId){
+  if(planId===UP.plan){ts('This is your current plan');return;}
+  if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
+  showStripeModal(planId);
+}
+
+function showStripeModal(planId){
+  const prices={pro:'$19/month',studio:'$49/month',agency:'$99/month'};
+  const names={pro:'Agent Pro',studio:'Agent Studio',agency:'Agency'};
+  const m=document.createElement('div');m.className='modal-bg';m.id='stripe-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Subscribe to ${names[planId]}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">${prices[planId]} · 14-day free trial · Cancel anytime</div>
+    <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;color:#888;margin-bottom:12px;font-weight:600">PAYMENT DETAILS</div>
+      <input class="finp" placeholder="Card number" style="margin-bottom:8px"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input class="finp" placeholder="MM / YY"/>
+        <input class="finp" placeholder="CVC"/>
+      </div>
+      <input class="finp" placeholder="Name on card"/>
+    </div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:16px;display:flex;align-items:center;gap:6px">
+      🔒 Secured by Stripe · Your card is never stored on our servers
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('stripe-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}')">Start free trial</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.processPlan=async function(planId){
+  document.getElementById('stripe-modal')?.remove();
+  UP.plan=planId;
+  if(!UP.roles.includes('manager'))UP.roles=[...UP.roles,'manager'];
+  await saveUP();
+  render();
+  ts('Welcome to '+(planId==='pro'?'Agent Pro':'planId'==='studio'?'Agent Studio':'Agency')+'! 🎉 Your 14-day trial has started.');
 }
 
 function profileHTML(){
-  const name=CU.displayName||CU.email?.split('@')[0]||'Musician';
+  const name=CU.displayName||CU.email?.split('@')[0]||'Artist';
   const ini=name.substring(0,2).toUpperCase();
-  const roles=UP.roles||['musician'];
+  const roles=UP.roles||['artist'];
+  const plan=UP.plan||'free';
+  const planLabels={free:'Free',pro:'Agent Pro 🟢',studio:'Agent Studio 🟡',agency:'Agency 🟣'};
   return `
 <div style="background:#0d0d0d;padding:20px 16px 22px">
   <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:18px">
@@ -710,26 +1053,39 @@ function profileHTML(){
       <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
       <div style="font-size:12px;color:#555;margin-bottom:6px">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${roles.includes('musician')?'<span class="tag tg">Musician</span>':''}
-        ${roles.includes('manager')?'<span class="tag tp">Manager</span>':''}
+        ${roles.includes('artist')?'<span class="tag tg">Artist</span>':''}
+        ${roles.includes('manager')?'<span class="tag tp">Agent / Manager</span>':''}
       </div>
     </div>
-    <button style="padding:7px 12px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Out</button>
+    <button style="padding:7px 12px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')}</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
     <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">${groups.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Groups</div></div>
     <div style="text-align:center;border-left:1px solid #222;border-right:1px solid #222"><div style="font-size:17px;font-weight:700;color:#fff">${venues.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Venues</div></div>
-    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">New</div><div style="font-size:10px;color:#555;margin-top:2px">Member</div></div>
+    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#1D9E75;font-size:13px">${planLabels[plan]}</div><div style="font-size:10px;color:#555;margin-top:2px">Plan</div></div>
   </div>
 </div>
 <div class="pad">
   <div style="margin-bottom:18px">
-    <div class="st" style="margin-bottom:10px">My roles</div>
+    <div class="st" style="margin-bottom:10px">${t('myRoles')}</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="role-btn${roles.includes('musician')?' on':''}" onclick="toggleRole('musician')">🎻 Musician</button>
-      <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 Manager</button>
+      <button class="role-btn${roles.includes('artist')?' on':''}" onclick="toggleRole('artist')">🎻 ${t('artist')}</button>
+      <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 ${t('agentMgr')}</button>
     </div>
     <div style="font-size:11px;color:#aaa">You can hold both roles simultaneously</div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">${t('language')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${[['en','🇺🇸 EN'],['es','🇪🇸 ES'],['it','🇮🇹 IT'],['ru','🇷🇺 RU'],['fr','🇫🇷 FR'],['de','🇩🇪 DE']].map(([l,label])=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${label}</button>`).join('')}
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">Subscription</div>
+      <span class="tag ${plan==='free'?'tf':plan==='pro'?'tg':plan==='studio'?'ta':'tp'}">${planLabels[plan]}</span>
+    </div>
+    <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?'Upgrade to Agent Pro — $19/mo':'Manage subscription'}</button>
   </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">Video reel</div>
@@ -739,20 +1095,19 @@ function profileHTML(){
     </div>
   </div>
   <div>
-    <div class="st" style="margin-bottom:10px">Skills</div>
+    <div class="st" style="margin-bottom:10px">Skills & disciplines</div>
     ${[['Classical',80],['Chamber',70],['Sight-reading',75],['Teaching',65]].map(([s,p])=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:12px;color:#111;width:84px;flex-shrink:0">${s}</span><div class="skill-track"><div class="skill-fill" style="width:${p}%"></div></div><span style="font-size:11px;color:#aaa;width:34px;text-align:right">${p}%</span></div>`).join('')}
   </div>
 </div>`;}
 
 window.toggleRole=async function(role){
-  const roles=UP.roles||['musician'];
-  const idx=roles.indexOf(role);
+  const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
   else roles.push(role);
-  UP.roles=[...new Set(roles)];
-  await saveUP();render();ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
+  UP.roles=[...new Set(roles)];await saveUP();render();
+  ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
 }
-window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['musician']};groups=[];venues=[];CP=[];render();}
+window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
 
 onAuthStateChanged(auth,async user=>{
   CU=user;
