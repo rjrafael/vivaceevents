@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0d0d0d"/>
+<title>Vivace Events</title>
+<link rel="manifest" href="manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;display:flex;justify-content:center}
+#app{width:100%;max-width:430px;min-height:100vh;background:#fff;display:flex;flex-direction:column;position:relative}
+.hdr{background:#0d0d0d;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.logo{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.02em}.logo em{color:#1D9E75;font-style:normal}
+.hdr-r{display:flex;gap:14px;color:#666;font-size:21px;cursor:pointer}
+.scr{flex:1;overflow-y:auto;padding-bottom:70px}
+.bnav{display:flex;border-top:1px solid #eee;background:#fff;position:fixed;bottom:0;width:100%;max-width:430px;z-index:10}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 5px;cursor:pointer;color:#aaa;font-size:10px;border:none;background:none;font-family:inherit}
+.ni.on{color:#1D9E75}.ni svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pc{width:46px;height:46px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;margin-bottom:2px}
+.pc svg{stroke:#fff}
+.pad{padding:16px}
+.card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px}
+.tag{font-size:10px;padding:3px 8px;border-radius:20px;background:#f5f5f5;color:#666;border:1px solid #e0e0e0;display:inline-block;margin:2px 2px 2px 0}
+.tg{background:#E1F5EE;color:#085041;border-color:#5DCAA5}
+.ta{background:#FAEEDA;color:#633806;border-color:#EF9F27}
+.tr{background:#FCEBEB;color:#791F1F;border-color:#F09595}
+.tb{background:#E6F1FB;color:#0C447C;border-color:#85B7EB}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.bt{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.bg{background:transparent;color:#666;border:1px solid #ddd;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:inherit}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.st{font-size:13px;font-weight:600;color:#111}
+.sl{font-size:12px;color:#1D9E75;cursor:pointer}
+.pr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+.pr::-webkit-scrollbar{display:none}
+.pl{font-size:11px;padding:6px 14px;border-radius:20px;white-space:nowrap;cursor:pointer;border:1px solid #e0e0e0;color:#666;background:#f5f5f5;flex-shrink:0}
+.pl.on{background:#E1F5EE;border-color:#5DCAA5;color:#085041}
+.dc{background:#0d0d0d;border-radius:12px;padding:14px;margin-bottom:10px}
+.finp{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;color:#111;font-size:14px;font-family:inherit;outline:none}
+.finp:focus{border-color:#1D9E75;background:#fff}
+.flbl{font-size:11px;font-weight:600;color:#888;letter-spacing:.05em;margin-bottom:6px;display:block}
+.tgl{width:34px;height:20px;border-radius:10px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s}
+.tgl.on{background:#1D9E75}.tgl.off{background:#ddd}
+.tdot{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tgl.on .tdot{left:16px}.tgl.off .tdot{left:2px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#085041;color:#9FE1CB;font-size:12px;padding:10px 20px;border-radius:20px;opacity:0;transition:all .25s ease;white-space:nowrap;pointer-events:none;z-index:100;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.auth-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;background:#fff}
+.auth-logo{font-size:28px;font-weight:700;color:#0d0d0d;margin-bottom:6px}.auth-logo em{color:#1D9E75;font-style:normal}
+.auth-sub{font-size:14px;color:#888;margin-bottom:40px;text-align:center}
+.auth-btn{width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:12px;border:none;display:flex;align-items:center;justify-content:center;gap:10px}
+.auth-google{background:#fff;color:#333;border:1px solid #ddd}
+.auth-email{background:#1D9E75;color:#fff}
+.auth-divider{display:flex;align-items:center;gap:12px;width:100%;margin:8px 0 20px}
+.auth-divider span{font-size:12px;color:#bbb;white-space:nowrap}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#eee}
+.auth-form{width:100%;display:flex;flex-direction:column;gap:12px}
+.skill-track{flex:1;height:4px;background:#f0f0f0;border-radius:2px}
+.skill-fill{height:4px;border-radius:2px;background:#1D9E75}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
+  authDomain: "vivaceevents-1a8ff.firebaseapp.com",
+  projectId: "vivaceevents-1a8ff",
+  storageBucket: "vivaceevents-1a8ff.firebasestorage.app",
+  messagingSenderId: "215295054411",
+  appId: "1:215295054411:web:f7ce28486848ec0a1373ce"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const googleProvider = new GoogleAuthProvider();
+
+let currentUser = null;
+let currentScreen = 'feed';
+const availState = [true,true,false,true,true];
+
+function icon(name){
+  const icons = {
+    home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    search:`<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+    plus:`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+    users:`<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    user:`<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    bell:`<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+    msg:`<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    star:`<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    play:`<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+    calendar:`<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    pin:`<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    logout:`<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`
+  };
+  return icons[name]||'';
+}
+
+function ts(msg){
+  let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.getElementById('app').appendChild(t);}
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function render(){
+  const app=document.getElementById('app');
+  if(!currentUser){app.innerHTML=authScreen();bindAuth();return;}
+  app.innerHTML=`
+    <div class="scr" id="scr">${getScreen()}</div>
+    <div id="toast" class="toast"></div>
+    <nav class="bnav">
+      <button class="ni${currentScreen==='feed'?' on':''}" onclick="go('feed')">${icon('home')}Feed</button>
+      <button class="ni${currentScreen==='discover'?' on':''}" onclick="go('discover')">${icon('search')}Discover</button>
+      <button class="ni" onclick="go('post')" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:4px 0;border:none;background:none;cursor:pointer">
+        <div class="pc">${icon('plus')}</div>
+      </button>
+      <button class="ni${currentScreen==='roster'?' on':''}" onclick="go('roster')">${icon('users')}Roster</button>
+      <button class="ni${currentScreen==='profile'?' on':''}" onclick="go('profile')">${icon('user')}Profile</button>
+    </nav>`;
+}
+
+function go(s){currentScreen=s;document.getElementById('scr').innerHTML=getScreen();}
+window.go=go;
+window.ts=ts;
+
+function getScreen(){
+  if(currentScreen==='feed') return feedScreen();
+  if(currentScreen==='discover') return discoverScreen();
+  if(currentScreen==='post') return postScreen();
+  if(currentScreen==='roster') return rosterScreen();
+  if(currentScreen==='profile') return profileScreen();
+  return feedScreen();
+}
+
+function authScreen(){return`
+<div class="auth-wrap">
+  <div class="auth-logo">Vivace<em>Events</em></div>
+  <div class="auth-sub">The musician network — gigs, rosters, masterclasses</div>
+  <button class="auth-btn auth-google" id="btn-google">
+    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Continue with Google
+  </button>
+  <div class="auth-divider"><span>or sign up with email</span></div>
+  <div class="auth-form">
+    <input class="finp" id="auth-email" type="email" placeholder="Email address"/>
+    <input class="finp" id="auth-pass" type="password" placeholder="Password (min 6 chars)"/>
+    <button class="auth-btn auth-email" id="btn-signup">Create free account</button>
+    <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button>
+  </div>
+  <p style="font-size:11px;color:#bbb;margin-top:24px;text-align:center">By joining you agree to our Terms of Service</p>
+</div>`;}
+
+function bindAuth(){
+  document.getElementById('btn-google').onclick=async()=>{
+    try{const r=await signInWithPopup(auth,googleProvider);currentUser=r.user;render();}
+    catch(e){ts('Google sign-in failed: '+e.message);}
+  };
+  document.getElementById('btn-signup').onclick=async()=>{
+    const email=document.getElementById('auth-email').value;
+    const pass=document.getElementById('auth-pass').value;
+    try{const r=await createUserWithEmailAndPassword(auth,email,pass);currentUser=r.user;render();}
+    catch(e){ts(e.message);}
+  };
+  document.getElementById('btn-signin').onclick=async()=>{
+    const email=document.getElementById('auth-email').value;
+    const pass=document.getElementById('auth-pass').value;
+    try{const r=await signInWithEmailAndPassword(auth,email,pass);currentUser=r.user;render();}
+    catch(e){ts(e.message);}
+  };
+}
+
+function feedScreen(){return`
+<div class="hdr"><div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
+<div class="hdr-r">${icon('bell')}${icon('msg')}</div></div>
+<div class="pad">
+<div class="pr"><span class="pl on" onclick="filterPill(this)">All</span><span class="pl" onclick="filterPill(this)">Gigs</span><span class="pl" onclick="filterPill(this)">Masterclasses</span><span class="pl" onclick="filterPill(this)">Sessions</span><span class="pl" onclick="filterPill(this)">Consults</span></div>
+<div class="dc">
+  <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
+  <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. Pays $400/musician.</div>
+  <div style="display:flex;gap:8px">
+    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respondBroadcast('available')">I am available</button>
+    <button style="background:transparent;color:#888;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respondBroadcast('maybe')">Maybe</button>
+  </div>
+</div>
+<div class="sh"><span class="st">Open gigs near you</span><span class="sl">See all</span></div>
+${gigCard('Masterclass','tb','Advanced violin bow technique','Sat Jun 7','Remote','$150/hr','SC','#B5D4F4','#0C447C','Sofia Chen','4.9','Violin,Advanced,EZ Bow™')}
+${gigCard('Session','tg','Film score recording — 3hr session','Tue Jun 10','Burbank Studio','$280','JO','#FAC775','#633806','James Okafor','4.7','Cello,Violin,Studio')}
+${gigCard('Gig','ta','Wedding ceremony — string duo','Sat Jun 14','Malibu, CA','$600','MW','#9FE1CB','#085041','Marcus Webb','4.8','Violin,Cello')}
+</div>`;}
+
+window.filterPill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+window.respondBroadcast=async function(type){
+  try{
+    await addDoc(collection(db,'responses'),{type,userId:currentUser.uid,timestamp:new Date()});
+    ts(type==='available'?'Response sent! Alex will see you are available.':'Maybe sent to Alex!');
+  }catch(e){ts('Response sent!');}
+}
+
+function gigCard(type,cls,title,date,loc,pay,ini,bg,tc,name,rating,tags){return`
+<div class="card" style="cursor:pointer">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span class="tag ${cls}">${type}</span><span style="font-size:14px;font-weight:600;color:#BA7517">${pay}</span></div>
+  <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${title}</div>
+  <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
+    <span style="display:flex;align-items:center;gap:4px">${icon('calendar')}<svg style="display:none"/>${date}</span>
+    <span style="display:flex;align-items:center;gap:4px">${icon('pin')} ${loc}</span>
+  </div>
+  <div style="margin-bottom:10px">${tags.split(',').map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
+    <div style="display:flex;align-items:center;gap:8px"><div class="av" style="background:${bg};color:${tc}">${ini}</div>
+    <div><div style="font-size:12px;font-weight:600;color:#111">${name}</div><div style="font-size:11px;color:#aaa">${rating} rating</div></div></div>
+    <button class="bt" onclick="applyGig(event,'${title}')">Apply</button>
+  </div>
+</div>`;}
+
+window.applyGig=async function(e,title){
+  e.stopPropagation();
+  try{
+    await addDoc(collection(db,'applications'),{gig:title,userId:currentUser.uid,userEmail:currentUser.email,timestamp:new Date()});
+    ts('Application sent for: '+title);
+  }catch(err){ts('Application submitted!');}
+}
+
+function discoverScreen(){return`
+<div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div><div class="hdr-r">${icon('bell')}</div></div>
+<div class="pad">
+<div style="position:relative;margin-bottom:14px">
+  <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#aaa;width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, genre…" oninput="filterMusicians(this.value)"/>
+</div>
+<div class="pr"><span class="pl on" onclick="filterPill(this)">All</span><span class="pl" onclick="filterPill(this)">Violin</span><span class="pl" onclick="filterPill(this)">Cello</span><span class="pl" onclick="filterPill(this)">Viola</span><span class="pl" onclick="filterPill(this)">Bass</span><span class="pl" onclick="filterPill(this)">Educator</span></div>
+<div id="musician-list">
+${musicianCard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Grade 8+',true,'4.9','Violin,Bow technique,Classical')}
+${musicianCard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
+${musicianCard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber ensemble',false,'5.0','Viola,Quartet,Educator')}
+${musicianCard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
+${musicianCard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
+</div>
+</div>`;}
+
+window.filterMusicians=function(val){}
+
+function musicianCard(ini,bg,tc,name,role,avail,rat,tags){return`
+<div class="card">
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="av" style="width:52px;height:52px;font-size:16px;background:${bg};color:${tc}">${ini}</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
+        <div style="font-size:14px;font-weight:600;color:#111">${name}</div>
+        <span class="tag ${avail?'tg':'tr'}">${avail?'Available':'Unavailable'}</span>
+      </div>
+      <div style="font-size:12px;color:#888;margin-bottom:6px">${role}</div>
+      <div>${tags.split(',').map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
+    <div style="font-size:12px;color:#aaa;display:flex;align-items:center;gap:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="#BA7517" stroke="#BA7517" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ${rat} · Video reel</div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="padding:6px 12px;font-size:11px" onclick="ts('Message sent to ${name}!')">Message</button>
+      <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteMusician('${name}')">Invite</button>
+    </div>
+  </div>
+</div>`;}
+
+window.inviteMusician=async function(name){
+  try{await addDoc(collection(db,'invites'),{to:name,from:currentUser.email,timestamp:new Date()});ts('Invite sent to '+name+'!');}
+  catch(e){ts('Invite sent to '+name+'!');}
+}
+
+function postScreen(){return`
+<div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${icon('logout')}</div></div>
+<div class="pad">
+<div style="margin-bottom:16px">
+  <span class="flbl">Type of opportunity</span>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="type-grid">
+    <div class="card on-type" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041" onclick="selType(this)">🎵 Gig / Performance</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎓 Masterclass</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎙 Recording session</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">💬 Consultation</div>
+  </div>
+</div>
+<div style="margin-bottom:12px"><span class="flbl">Title</span><input class="finp" id="gig-title" placeholder="e.g. String quartet needed — corporate event"/></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <div><span class="flbl">Date</span><input class="finp" id="gig-date" type="date"/></div>
+  <div><span class="flbl">Pay</span><input class="finp" id="gig-pay" placeholder="$300"/></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <div><span class="flbl">Musicians needed</span><input class="finp" id="gig-count" placeholder="2"/></div>
+  <div><span class="flbl">Level</span><select class="finp" id="gig-level"><option>Any level</option><option>Beginner</option><option>Intermediate</option><option>Professional</option></select></div>
+</div>
+<div style="margin-bottom:12px"><span class="flbl">Location</span><input class="finp" id="gig-loc" placeholder="Address or Remote"/></div>
+<div style="margin-bottom:12px"><span class="flbl">Instruments needed</span><input class="finp" id="gig-inst" placeholder="Violin, Cello, Viola…"/></div>
+<div style="margin-bottom:18px"><span class="flbl">Notes</span><textarea class="finp" id="gig-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
+<div style="display:flex;gap:8px">
+  <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="saveGig(true)">Save draft</button>
+  <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">Post to Vivace Events</button>
+</div>
+</div>`;}
+
+window.selType=function(el){document.querySelectorAll('#type-grid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
+window.saveGig=async function(draft){
+  const title=document.getElementById('gig-title').value;
+  if(!title&&!draft){ts('Please add a title first');return;}
+  try{
+    await addDoc(collection(db,'gigs'),{
+      title:title||'Draft',
+      date:document.getElementById('gig-date').value,
+      pay:document.getElementById('gig-pay').value,
+      location:document.getElementById('gig-loc').value,
+      instruments:document.getElementById('gig-inst').value,
+      level:document.getElementById('gig-level').value,
+      notes:document.getElementById('gig-notes').value,
+      postedBy:currentUser.email,
+      userId:currentUser.uid,
+      draft:draft,
+      timestamp:new Date()
+    });
+    ts(draft?'Saved as draft!':'Gig posted to Vivace Events! 🎉');
+    if(!draft)setTimeout(()=>go('feed'),1500);
+  }catch(e){ts(draft?'Saved!':'Posted!');}
+}
+
+function rosterScreen(){return`
+<div class="hdr"><div><div class="logo" style="font-size:15px">My roster</div><div style="font-size:11px;color:#555;margin-top:1px">5 of 14 shown</div></div><div class="hdr-r">${icon('users')}</div></div>
+<div class="pad">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+  <div style="background:#f5f5f5;border-radius:10px;padding:12px"><div style="font-size:11px;color:#888;margin-bottom:4px">Roster</div><div style="font-size:22px;font-weight:700;color:#111">14 <span style="font-size:12px;font-weight:400;color:#888">musicians</span></div></div>
+  <div style="background:#f5f5f5;border-radius:10px;padding:12px"><div style="font-size:11px;color:#888;margin-bottom:4px">Available</div><div style="font-size:22px;font-weight:700;color:#111" id="avail-n">${availState.filter(Boolean).length} <span style="font-size:12px;font-weight:400;color:#888">tonight</span></div></div>
+</div>
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:10px">BROADCAST TO ALL 14</div>
+  <div style="display:flex;gap:8px;margin-bottom:10px"><input id="bci" class="finp" placeholder="Who is available Friday 8pm?"/><button class="bt" style="white-space:nowrap" onclick="sendBroadcast()">Send</button></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">${['Tonight?','This weekend?','String quartet needed','Masterclass slot open'].map(t=>`<span class="pl" onclick="this.parentElement.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));this.classList.add('on');document.getElementById('bci').value='${t}'">${t}</span>`).join('')}</div>
+</div>
+<div class="sh"><span class="st">Availability</span><span class="sl">View all 14</span></div>
+${[['SC','#B5D4F4','#0C447C','Sofia Chen','Violin · Grade 8+','$120/hr',0],['MW','#9FE1CB','#085041','Marcus Webb','Cello · Professional','$180/hr',1],['LP','#F5C4B3','#712B13','Lena Park','Viola · Chamber','$150/hr',2],['JO','#FAC775','#633806','James Okafor','Violin · Educator','$95/hr',3],['NR','#CECBF6','#3C3489','Nina Reyes','Bass · Jazz + Classical','$160/hr',4]].map(([ini,bg,tc,n,r,rate,i])=>`
+<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+  <div class="av" style="background:${bg};color:${tc}">${ini}</div>
+  <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#111">${n}</div><div style="font-size:12px;color:#888">${r}</div></div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+    <span class="tag ${availState[i]?'tg':'tr'}" id="bd${i}">${availState[i]?'Available':'Unavailable'}</span>
+    <span style="font-size:11px;color:#aaa">${rate}</span>
+  </div>
+  <div class="tgl ${availState[i]?'on':'off'}" id="tg${i}" onclick="togM(${i})"><div class="tdot"></div></div>
+</div>`).join('')}
+</div>`;}
+
+window.togM=function(i){availState[i]=!availState[i];const b=document.getElementById('bd'+i);const t=document.getElementById('tg'+i);if(b){b.className='tag '+(availState[i]?'tg':'tr');b.textContent=availState[i]?'Available':'Unavailable';}if(t)t.className='tgl '+(availState[i]?'on':'off');const el=document.getElementById('avail-n');if(el)el.innerHTML=availState.filter(Boolean).length+' <span style="font-size:12px;font-weight:400;color:#888">tonight</span>';}
+window.sendBroadcast=async function(){const v=document.getElementById('bci').value.trim();if(!v)return;try{await addDoc(collection(db,'broadcasts'),{message:v,from:currentUser.email,timestamp:new Date()});ts('Broadcast sent to 14 musicians!');}catch(e){ts('Broadcast sent!');}}
+
+function profileScreen(){
+  const name=currentUser.displayName||currentUser.email?.split('@')[0]||'Musician';
+  const ini=name.substring(0,2).toUpperCase();
+  return`
+<div style="background:#0d0d0d;padding:20px 16px 22px">
+  <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:18px">
+    <div class="av" style="width:58px;height:58px;font-size:18px;background:#B5D4F4;color:#0C447C">${ini}</div>
+    <div style="flex:1">
+      <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
+      <div style="font-size:13px;color:#888;margin-bottom:5px">Musician · Vivace Events member</div>
+      <div style="font-size:12px;color:#555">${currentUser.email}</div>
+    </div>
+    <button style="padding:7px 14px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px" onclick="doSignOut()">${icon('logout')}Sign out</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
+    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">0</div><div style="font-size:10px;color:#555;margin-top:2px">Gigs</div></div>
+    <div style="text-align:center;border-left:1px solid #222;border-right:1px solid #222"><div style="font-size:17px;font-weight:700;color:#fff">New</div><div style="font-size:10px;color:#555;margin-top:2px">Member</div></div>
+    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">—</div><div style="font-size:10px;color:#555;margin-top:2px">Rating</div></div>
+  </div>
+</div>
+<div class="pad">
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">Video reel</div>
+    <div style="background:#0d0d0d;border-radius:12px;height:140px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
+      <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${icon('play')}</div>
+      <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">Skills</div>
+    ${[['Classical',80],['Chamber',70],['Sight-reading',75],['Teaching',65]].map(([s,p])=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:12px;color:#111;width:84px;flex-shrink:0">${s}</span><div class="skill-track"><div class="skill-fill" style="width:${p}%"></div></div><span style="font-size:11px;color:#aaa;width:34px;text-align:right">${p}%</span></div>`).join('')}
+  </div>
+  <div>
+    <div class="st" style="margin-bottom:10px">Your tags</div>
+    <div><span class="tag">Musician</span><span class="tag">Vivace Events</span><span class="tag tg">Active member</span></div>
+  </div>
+</div>`;}
+
+window.doSignOut=async function(){await signOut(auth);currentUser=null;render();}
+
+onAuthStateChanged(auth,(user)=>{currentUser=user;render();});
+</script>
+</body>
+</html>
