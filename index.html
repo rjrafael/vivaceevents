@@ -29,8 +29,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tp{background:#EEEDFE;color:#3C3489;border-color:#AFA9EC}
 .av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
 .bt{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-.bt-amber{background:#BA7517;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-.bt-dark{background:#0d0d0d;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .bg{background:transparent;color:#666;border:1px solid #ddd;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:inherit}
 .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .st{font-size:13px;font-weight:600;color:#111}
@@ -54,24 +52,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .auth-sub{font-size:14px;color:#888;margin-bottom:40px;text-align:center}
 .auth-btn{width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:12px;border:none;display:flex;align-items:center;justify-content:center;gap:10px}
 .auth-google{background:#fff;color:#333;border:1px solid #ddd}
-.auth-email{background:#1D9E75;color:#fff}
+.auth-email-btn{background:#1D9E75;color:#fff}
 .auth-divider{display:flex;align-items:center;gap:12px;width:100%;margin:8px 0 20px}
 .auth-divider span{font-size:12px;color:#bbb;white-space:nowrap}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#eee}
 .auth-form{width:100%;display:flex;flex-direction:column;gap:12px}
 .skill-track{flex:1;height:4px;background:#f0f0f0;border-radius:2px}
 .skill-fill{height:4px;border-radius:2px;background:#1D9E75}
-.role-btn{flex:1;padding:12px 8px;border-radius:10px;border:1px solid #e0e0e0;background:#f9f9f9;color:#666;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center;transition:all .15s}
+.role-btn{flex:1;padding:12px 8px;border-radius:10px;border:1px solid #e0e0e0;background:#f9f9f9;color:#666;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
 .role-btn.on{border-color:#5DCAA5;background:#E1F5EE;color:#085041}
 .modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#fff;border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:430px;max-height:85vh;overflow-y:auto}
-.member-check{width:22px;height:22px;border-radius:50%;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.member-check{width:22px;height:22px;border-radius:50%;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .member-check.on{background:#1D9E75;border-color:#1D9E75;color:#fff}
 .tab-bar{display:flex;border-bottom:1px solid #eee;margin-bottom:16px}
 .tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#aaa;cursor:pointer;border-bottom:2px solid transparent}
 .tab.on{color:#1D9E75;border-bottom-color:#1D9E75}
-.resp-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5}
-.resp-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+.dur-badge{font-size:12px;color:#1D9E75;font-weight:600;padding:6px 10px;background:#E1F5EE;border-radius:8px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -79,118 +76,105 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
-  authDomain: "vivaceevents-1a8ff.firebaseapp.com",
-  projectId: "vivaceevents-1a8ff",
-  storageBucket: "vivaceevents-1a8ff.firebasestorage.app",
-  messagingSenderId: "215295054411",
-  appId: "1:215295054411:web:f7ce28486848ec0a1373ce"
+const FB = {
+  apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
+  authDomain:"vivaceevents-1a8ff.firebaseapp.com",
+  projectId:"vivaceevents-1a8ff",
+  storageBucket:"vivaceevents-1a8ff.firebasestorage.app",
+  messagingSenderId:"215295054411",
+  appId:"1:215295054411:web:f7ce28486848ec0a1373ce"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const auth = getAuth(firebaseApp);
-const db = getFirestore(firebaseApp);
-const googleProvider = new GoogleAuthProvider();
+const app = initializeApp(FB);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const gp = new GoogleAuthProvider();
 
-let currentUser = null;
-let userProfile = {roles:['musician'], groups:[], venues:[]};
-let currentScreen = 'feed';
-let managerTab = 'groups';
-let selectedGroupId = null;
-let cherryPicked = [];
-let savedVenues = [];
-let myGroups = [];
+let CU = null;
+let UP = {roles:['musician']};
+let CS = 'feed';
+let MT = 'groups';
+let CP = [];
+let venues = [];
+let groups = [];
 
-function icon(name){
-  const icons={
-    home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    search:`<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
-    plus:`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
-    users:`<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-    user:`<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    bell:`<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
-    msg:`<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
-    play:`<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
-    logout:`<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
-    pin:`<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-    trash:`<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
-    mgr:`<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>`,
-    check:`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`
-  };
-  return icons[name]||'';
-}
+const SVG = {
+  home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  search:`<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  users:`<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  user:`<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  bell:`<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  play:`<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+  out:`<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
+  mgr:`<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>`,
+  chk:`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`
+};
 
-function ts(msg){
+function ic(n){return SVG[n]||'';}
+
+function ts(m){
   let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.getElementById('app').appendChild(t);}
-  t.textContent=msg;t.classList.add('show');
-  clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2500);
+  t.textContent=m;t.classList.add('show');
+  clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-function isManager(){return userProfile.roles&&userProfile.roles.includes('manager');}
-function isMusician(){return !userProfile.roles||userProfile.roles.includes('musician');}
+function isMgr(){return UP.roles&&UP.roles.includes('manager');}
 
-async function loadUserProfile(){
+async function loadUP(){
   try{
-    const d=await getDoc(doc(db,'users',currentUser.uid));
-    if(d.exists()) userProfile={...userProfile,...d.data()};
-    else await setDoc(doc(db,'users',currentUser.uid),{roles:['musician'],email:currentUser.email,name:currentUser.displayName||currentUser.email.split('@')[0],created:new Date()});
-  }catch(e){console.log(e);}
+    const d=await getDoc(doc(db,'users',CU.uid));
+    if(d.exists()) UP={...UP,...d.data()};
+    else await setDoc(doc(db,'users',CU.uid),{roles:['musician'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],created:new Date()});
+  }catch(e){}
 }
-
-async function saveUserProfile(){
-  try{await setDoc(doc(db,'users',currentUser.uid),{...userProfile,email:currentUser.email},{ merge:true });}
-  catch(e){console.log(e);}
-}
+async function saveUP(){try{await setDoc(doc(db,'users',CU.uid),{...UP,email:CU.email},{merge:true});}catch(e){}}
 
 async function loadGroups(){
   try{
-    const q=query(collection(db,'groups'),where('managerId','==',currentUser.uid));
-    const snap=await getDocs(q);
-    myGroups=snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.log(e);}
+    const s=await getDocs(query(collection(db,'groups'),where('managerId','==',CU.uid)));
+    groups=s.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
 }
-
 async function loadVenues(){
   try{
-    const q=query(collection(db,'venues'),where('managerId','==',currentUser.uid));
-    const snap=await getDocs(q);
-    savedVenues=snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.log(e);}
+    const s=await getDocs(query(collection(db,'venues'),where('managerId','==',CU.uid)));
+    venues=s.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
 }
 
 function render(){
-  const app=document.getElementById('app');
-  if(!currentUser){app.innerHTML=authScreen();bindAuth();return;}
-  const mgr=isManager();
-  app.innerHTML=`
-    <div class="scr" id="scr">${getScreen()}</div>
+  const el=document.getElementById('app');
+  if(!CU){el.innerHTML=authHTML();bindAuth();return;}
+  el.innerHTML=`
+    <div class="scr" id="scr">${getScr()}</div>
     <div id="toast" class="toast"></div>
     <nav class="bnav">
-      <button class="ni${currentScreen==='feed'?' on':''}" onclick="go('feed')">${icon('home')}Feed</button>
-      <button class="ni${currentScreen==='discover'?' on':''}" onclick="go('discover')">${icon('search')}Find</button>
-      <button class="ni" onclick="go('post')" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:4px 0;border:none;background:none;cursor:pointer"><div class="pc">${icon('plus')}</div></button>
-      <button class="ni${currentScreen==='manager'?' on':''}" onclick="go('manager')">${icon('mgr')}${mgr?'Manager':'Roster'}</button>
-      <button class="ni${currentScreen==='profile'?' on':''}" onclick="go('profile')">${icon('user')}Profile</button>
+      <button class="ni${CS==='feed'?' on':''}" onclick="go('feed')">${ic('home')}Feed</button>
+      <button class="ni${CS==='discover'?' on':''}" onclick="go('discover')">${ic('search')}Find</button>
+      <button class="ni" onclick="go('post')" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:4px 0;border:none;background:none;cursor:pointer"><div class="pc">${ic('plus')}</div></button>
+      <button class="ni${CS==='manager'?' on':''}" onclick="go('manager')">${ic('mgr')}Manager</button>
+      <button class="ni${CS==='profile'?' on':''}" onclick="go('profile')">${ic('user')}Profile</button>
     </nav>`;
 }
 
-function go(s){currentScreen=s;document.getElementById('scr').innerHTML=getScreen();}
+function go(s){CS=s;document.getElementById('scr').innerHTML=getScr();}
 window.go=go; window.ts=ts;
 
-function getScreen(){
-  if(currentScreen==='feed') return feedScreen();
-  if(currentScreen==='discover') return discoverScreen();
-  if(currentScreen==='post') return postScreen();
-  if(currentScreen==='manager') return managerScreen();
-  if(currentScreen==='profile') return profileScreen();
-  return feedScreen();
+function getScr(){
+  if(CS==='feed') return feedHTML();
+  if(CS==='discover') return discoverHTML();
+  if(CS==='post') return postHTML();
+  if(CS==='manager') return mgrHTML();
+  if(CS==='profile') return profileHTML();
+  return feedHTML();
 }
 
-function authScreen(){return`
+function authHTML(){return `
 <div class="auth-wrap">
   <div class="auth-logo">Vivace<em>Events</em></div>
   <div class="auth-sub">The musician network — gigs, rosters, masterclasses</div>
@@ -198,123 +182,116 @@ function authScreen(){return`
     <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
     Continue with Google
   </button>
-  <div class="auth-divider"><span>or sign up with email</span></div>
+  <div class="auth-divider"><span>or use email</span></div>
   <div class="auth-form">
-    <input class="finp" id="auth-email" type="email" placeholder="Email address"/>
-    <input class="finp" id="auth-pass" type="password" placeholder="Password (min 6 chars)"/>
-    <button class="auth-btn auth-email" id="btn-signup">Create free account</button>
+    <input class="finp" id="ae" type="email" placeholder="Email address"/>
+    <input class="finp" id="ap" type="password" placeholder="Password (min 6 chars)"/>
+    <button class="auth-btn auth-email-btn" id="btn-signup">Create free account</button>
     <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button>
   </div>
-  <p style="font-size:11px;color:#bbb;margin-top:24px;text-align:center">By joining you agree to our Terms of Service</p>
 </div>`;}
 
 function bindAuth(){
   document.getElementById('btn-google').onclick=async()=>{
-    try{const r=await signInWithPopup(auth,googleProvider);currentUser=r.user;await loadUserProfile();await loadGroups();await loadVenues();render();}
-    catch(e){ts('Google sign-in failed: '+e.message);}
+    try{const r=await signInWithPopup(auth,gp);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
+    catch(e){ts('Google sign-in failed');}
   };
   document.getElementById('btn-signup').onclick=async()=>{
-    const email=document.getElementById('auth-email').value;
-    const pass=document.getElementById('auth-pass').value;
-    try{const r=await createUserWithEmailAndPassword(auth,email,pass);currentUser=r.user;await loadUserProfile();render();}
+    try{const r=await createUserWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();render();}
     catch(e){ts(e.message);}
   };
   document.getElementById('btn-signin').onclick=async()=>{
-    const email=document.getElementById('auth-email').value;
-    const pass=document.getElementById('auth-pass').value;
-    try{const r=await signInWithEmailAndPassword(auth,email,pass);currentUser=r.user;await loadUserProfile();await loadGroups();await loadVenues();render();}
+    try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
     catch(e){ts(e.message);}
   };
 }
 
-async function loadRealGigs(){
+async function loadGigs(){
   try{
-    const q=query(collection(db,'gigs'),orderBy('timestamp','desc'));
-    const snap=await getDocs(q);
-    const el=document.getElementById('real-gigs');
+    const s=await getDocs(query(collection(db,'gigs'),orderBy('timestamp','desc')));
+    const el=document.getElementById('gig-list');
     if(!el)return;
-    if(snap.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No gigs posted yet — be the first!</p>';return;}
-    el.innerHTML=snap.docs.map(d=>{
+    if(s.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No gigs yet — post the first one!</p>';return;}
+    el.innerHTML=s.docs.map(d=>{
       const g=d.data();
-      const isFree=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer'));
+      const free=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer'));
+      const multiday=g.dateEnd&&g.dateEnd!==g.date&&g.dateEnd!=='';
       return `<div class="card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <span class="tag tg">${g.type||'Gig'}</span>
-          <span style="font-size:14px;font-weight:600;color:${isFree?'#1D9E75':'#BA7517'}">${g.pay||'TBD'}</span>
+          <span style="font-size:14px;font-weight:600;color:${free?'#1D9E75':'#BA7517'}">${g.pay||'TBD'}</span>
         </div>
         <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${g.title||'Untitled'}</div>
         <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
-          ${g.date?`<span>📅 ${g.date}</span>`:''}
+          ${g.date?`<span>📅 ${g.date}${g.time?' at '+g.time:''}${multiday?' — '+g.dateEnd+(g.timeEnd?' at '+g.timeEnd:''):''}</span>`:''}
+          ${g.duration?`<span>⏱ ${g.duration}</span>`:''}
           ${g.location?`<span>📍 ${g.location}</span>`:''}
         </div>
         ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}</div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
-          <button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${g.title}')">Apply</button>
+          <button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}')">Apply</button>
         </div>
       </div>`;
     }).join('');
   }catch(e){console.log(e);}
 }
 
-function feedScreen(){
-  setTimeout(loadRealGigs,100);
-  return`
+function feedHTML(){
+  setTimeout(loadGigs,100);
+  return `
 <div class="hdr"><div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
-<div class="hdr-r">${icon('bell')}${icon('msg')}</div></div>
+<div class="hdr-r">${ic('bell')}</div></div>
 <div class="pad">
-<div class="pr"><span class="pl on" onclick="filterPill(this)">All</span><span class="pl" onclick="filterPill(this)">Gigs</span><span class="pl" onclick="filterPill(this)">Masterclasses</span><span class="pl" onclick="filterPill(this)">Sessions</span><span class="pl" onclick="filterPill(this)">Free</span></div>
+<div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Gigs</span><span class="pl" onclick="fpill(this)">Masterclasses</span><span class="pl" onclick="fpill(this)">Sessions</span><span class="pl" onclick="fpill(this)">Free</span></div>
 <div class="dc">
   <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
-  <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. Pays $400/musician.</div>
-  <div style="display:flex;gap:8px">
-    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respondBroadcast('available')">I am available</button>
-    <button style="background:transparent;color:#888;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respondBroadcast('maybe')">Maybe</button>
-    <button style="background:transparent;color:#F09595;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respondBroadcast('no')">Can't make it</button>
+  <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respond('available')">I am available</button>
+    <button style="background:transparent;color:#888;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respond('maybe')">Maybe</button>
+    <button style="background:transparent;color:#F09595;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respond('no')">Can't make it</button>
   </div>
 </div>
 <div class="sh"><span class="st">Posted gigs</span><span class="sl" onclick="go('post')">+ Post new</span></div>
-<div id="real-gigs"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading gigs...</p></div>
+<div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>
 </div>`;}
 
-window.filterPill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
-window.respondBroadcast=async function(type){
-  try{await addDoc(collection(db,'responses'),{type,userId:currentUser.uid,userEmail:currentUser.email,timestamp:new Date()});
-  ts(type==='available'?'✅ Response sent!':type==='maybe'?'Maybe sent!':'Response sent!');}
-  catch(e){ts('Response sent!');}
+window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+window.respond=async function(type){
+  try{await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
+  ts(type==='available'?'✅ Sent! Alex will see you.':type==='maybe'?'⚡ Maybe sent!':'Response sent!');}
+  catch(e){ts('Sent!');}
 }
 window.applyGig=async function(e,title){
   e.stopPropagation();
-  try{await addDoc(collection(db,'applications'),{gig:title,userId:currentUser.uid,userEmail:currentUser.email,timestamp:new Date()});
-  ts('Application sent for: '+title);}
+  try{await addDoc(collection(db,'applications'),{gig:title,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});ts('Application sent for: '+title);}
   catch(e){ts('Application submitted!');}
 }
 
-function discoverScreen(){return`
-<div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div><div class="hdr-r">${icon('bell')}</div></div>
+function discoverHTML(){
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div></div>
 <div class="pad">
 <div style="position:relative;margin-bottom:14px">
   <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
   <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, genre…"/>
 </div>
-<div class="pr"><span class="pl on" onclick="filterPill(this)">All</span><span class="pl" onclick="filterPill(this)">Violin</span><span class="pl" onclick="filterPill(this)">Cello</span><span class="pl" onclick="filterPill(this)">Viola</span><span class="pl" onclick="filterPill(this)">Bass</span><span class="pl" onclick="filterPill(this)">Educator</span></div>
-${isManager()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px">
-  <div style="flex:1;font-size:13px;color:#666">Cherry-pick mode: select musicians to invite to a group</div>
-  <button class="bt" style="font-size:11px;padding:6px 12px" onclick="openCherryPick()">Select</button>
-</div>`:''}
-${musicianCard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Grade 8+',true,'4.9','Violin,Bow technique,Classical')}
-${musicianCard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
-${musicianCard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber ensemble',false,'5.0','Viola,Quartet,Educator')}
-${musicianCard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
-${musicianCard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
+<div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Violin</span><span class="pl" onclick="fpill(this)">Cello</span><span class="pl" onclick="fpill(this)">Viola</span><span class="pl" onclick="fpill(this)">Bass</span><span class="pl" onclick="fpill(this)">Educator</span></div>
+${isMgr()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="flex:1;font-size:13px;color:#666">Cherry-pick mode: tap ○ to select musicians</div><span class="tag tp">${CP.length} selected</span></div>`:''}
+${mcard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Grade 8+',true,'4.9','Violin,Bow technique,Classical')}
+${mcard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
+${mcard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber ensemble',false,'5.0','Viola,Quartet,Educator')}
+${mcard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
+${mcard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
+${CP.length>0?`<div style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0d0d0d;color:#fff;font-size:13px;padding:12px 20px;border-radius:20px;z-index:100;display:flex;align-items:center;gap:12px;max-width:380px;width:calc(100% - 32px)"><span style="flex:1">${CP.length} musician${CP.length>1?'s':''} selected</span><button onclick="sendCP()" style="background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Invite to group</button><button onclick="clearCP()" style="background:transparent;border:none;color:#888;font-size:18px;cursor:pointer">✕</button></div>`:''}
 </div>`;}
 
-function musicianCard(ini,bg,tc,name,role,avail,rat,tags){
-  const isM=isManager();
-  return`
-<div class="card" id="mcard-${name.replace(/\s/g,'')}">
+function mcard(ini,bg,tc,name,role,avail,rat,tags){
+  const sel=CP.includes(name);
+  return `<div class="card">
   <div style="display:flex;gap:12px;align-items:center">
-    ${isM?`<div class="member-check" id="chk-${name.replace(/\s/g,'')}" onclick="togglePick('${name}')">${icon('check')}</div>`:''}
+    ${isMgr()?`<div class="member-check${sel?' on':''}" onclick="toggleCP('${name}')">${ic('chk')}</div>`:''}
     <div class="av" style="width:52px;height:52px;font-size:16px;background:${bg};color:${tc}">${ini}</div>
     <div style="flex:1;min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
@@ -326,491 +303,422 @@ function musicianCard(ini,bg,tc,name,role,avail,rat,tags){
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
-    <div style="font-size:12px;color:#aaa">⭐ ${rat} · Video reel</div>
+    <div style="font-size:12px;color:#aaa">⭐ ${rat}</div>
     <div style="display:flex;gap:8px">
       <button class="bg" style="padding:6px 12px;font-size:11px" onclick="ts('Message sent to ${name}!')">Message</button>
-      ${isM?`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteToGroup('${name}')">+ Group</button>`:`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent to ${name}!')">Invite</button>`}
+      ${isMgr()?`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteOne('${name}')">+ Group</button>`:`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent!')">Invite</button>`}
     </div>
   </div>
 </div>`;}
 
-window.togglePick=function(name){
-  const el=document.getElementById('chk-'+name.replace(/\s/g,''));
-  if(!el)return;
-  const idx=cherryPicked.indexOf(name);
-  if(idx>-1){cherryPicked.splice(idx,1);el.classList.remove('on');}
-  else{cherryPicked.push(name);el.classList.add('on');}
-  updatePickBar();
+window.toggleCP=function(name){
+  const idx=CP.indexOf(name);
+  if(idx>-1)CP.splice(idx,1); else CP.push(name);
+  document.getElementById('scr').innerHTML=discoverHTML();
+}
+window.clearCP=function(){CP=[];document.getElementById('scr').innerHTML=discoverHTML();}
+window.sendCP=function(){
+  if(groups.length===0){ts('Create a group first in Manager tab!');return;}
+  showGPicker(CP);
+}
+window.inviteOne=function(name){
+  if(groups.length===0){ts('Create a group first in Manager tab!');return;}
+  showGPicker([name]);
 }
 
-function updatePickBar(){
-  let bar=document.getElementById('pick-bar');
-  if(cherryPicked.length>0){
-    if(!bar){
-      bar=document.createElement('div');bar.id='pick-bar';
-      bar.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0d0d0d;color:#fff;font-size:13px;padding:12px 20px;border-radius:20px;z-index:100;display:flex;align-items:center;gap:12px;max-width:380px;width:calc(100% - 32px)';
-      document.getElementById('app').appendChild(bar);
-    }
-    bar.innerHTML=`<span style="flex:1">${cherryPicked.length} musician${cherryPicked.length>1?'s':''} selected</span><button onclick="sendPickedInvites()" style="background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Invite to group</button><button onclick="clearPicks()" style="background:transparent;color:#888;border:none;font-size:18px;cursor:pointer">✕</button>`;
-  } else {
-    if(bar) bar.remove();
-  }
-}
-
-window.clearPicks=function(){cherryPicked=[];document.querySelectorAll('.member-check').forEach(e=>e.classList.remove('on'));updatePickBar();}
-window.openCherryPick=function(){ts('Tap the circle next to each musician to select them');}
-window.sendPickedInvites=function(){
-  if(cherryPicked.length===0)return;
-  if(myGroups.length===0){ts('Create a group first in Manager tab!');return;}
-  showGroupPicker(cherryPicked);
-}
-
-function showGroupPicker(names){
-  const modal=document.createElement('div');modal.className='modal-bg';modal.id='gpicker';
-  modal.innerHTML=`<div class="modal">
+function showGPicker(names){
+  const m=document.createElement('div');m.className='modal-bg';m.id='gpick';
+  m.innerHTML=`<div class="modal">
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">Invite to which group?</div>
     <div style="font-size:13px;color:#888;margin-bottom:16px">Inviting: ${names.join(', ')}</div>
-    ${myGroups.map(g=>`<div class="card" style="cursor:pointer;margin-bottom:8px" onclick="confirmGroupInvite('${g.id}','${g.name}')">
+    ${groups.map(g=>`<div class="card" style="cursor:pointer;margin-bottom:8px" onclick="doInvite('${g.id}','${g.name.replace(/'/g,"\\'")}',${JSON.stringify(names)})">
       <div style="font-size:14px;font-weight:600;color:#111">${g.name}</div>
-      <div style="font-size:12px;color:#888">${g.memberCount||0} members · ${g.type||'Group'}</div>
+      <div style="font-size:12px;color:#888">${g.type||'Group'} · ${g.memberCount||0} members</div>
     </div>`).join('')}
-    <button class="bg" style="width:100%;margin-top:8px" onclick="document.getElementById('gpicker').remove()">Cancel</button>
+    <button class="bg" style="width:100%;margin-top:8px" onclick="document.getElementById('gpick').remove()">Cancel</button>
   </div>`;
-  document.getElementById('app').appendChild(modal);
+  document.getElementById('app').appendChild(m);
 }
 
-window.confirmGroupInvite=async function(groupId,groupName){
+window.doInvite=async function(gid,gname,names){
   try{
-    for(const name of cherryPicked){
-      await addDoc(collection(db,'invites'),{groupId,groupName,toName:name,fromId:currentUser.uid,fromEmail:currentUser.email,status:'pending',timestamp:new Date()});
-    }
-    ts(`Invites sent to ${cherryPicked.length} musician${cherryPicked.length>1?'s':''} for ${groupName}!`);
-    document.getElementById('gpicker')?.remove();
-    clearPicks();
+    for(const n of names) await addDoc(collection(db,'invites'),{groupId:gid,groupName:gname,toName:n,fromId:CU.uid,fromEmail:CU.email,status:'pending',timestamp:new Date()});
+    ts('Invites sent to '+names.length+' musician'+(names.length>1?'s':'')+' for '+gname+'!');
+    document.getElementById('gpick')?.remove();
+    CP=[];
   }catch(e){ts('Invites sent!');}
 }
 
-window.inviteToGroup=function(name){
-  if(myGroups.length===0){ts('Create a group first in Manager tab!');return;}
-  showGroupPicker([name]);
-}
-
-function postScreen(){
-  const venueOptions=savedVenues.map(v=>`<option value="${v.name} — ${v.address}">${v.name}</option>`).join('');
-  return`
-<div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${icon('logout')}</div></div>
+function postHTML(){
+  const vopts=venues.map(v=>`<option value="${v.name} — ${v.address}">${v.name}</option>`).join('');
+  const gopts=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${ic('out')}</div></div>
 <div class="pad">
-<div style="margin-bottom:16px">
-  <span class="flbl">Type of opportunity</span>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="type-grid">
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041" onclick="selType(this)">🎵 Gig / Performance</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎓 Masterclass</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎙 Recording session</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">💬 Consultation</div>
+<div style="margin-bottom:14px">
+  <span class="flbl">Type</span>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="tgrid">
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-size:13px" onclick="selT(this)">🎵 Gig / Performance</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">🎓 Masterclass</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">🎙 Recording session</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">💬 Consultation</div>
   </div>
 </div>
-<div style="margin-bottom:12px"><span class="flbl">Title</span><input class="finp" id="gig-title" placeholder="e.g. String quartet — corporate gala"/></div>
+<div style="margin-bottom:12px"><span class="flbl">Title</span><input class="finp" id="g-title" placeholder="e.g. String quartet — corporate gala"/></div>
+
 <div style="margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span class="flbl" style="margin:0">Date & time</span>
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:11px;color:#888">Multi-day</span>
-      <div class="tgl off" id="multiday-tgl" onclick="toggleMultiDay()"><div class="tdot"></div></div>
+      <span style="font-size:11px;color:#888">Multi-day event</span>
+      <div class="tgl off" id="md-tgl" onclick="toggleMD()"><div class="tdot"></div></div>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div><span class="flbl">Start date</span><input class="finp" id="gig-date" type="date" onchange="calcDuration()"/></div>
-    <div><span class="flbl">Start time</span><input class="finp" id="gig-time" type="time" onchange="calcDuration()"/></div>
+    <div><span class="flbl">Start date</span><input class="finp" id="g-date" type="date" oninput="calcDur()"/></div>
+    <div><span class="flbl">Start time</span><input class="finp" id="g-time" type="time" oninput="calcDur()"/></div>
   </div>
-  <div id="enddate-row" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div><span class="flbl">End date</span><input class="finp" id="gig-date-end" type="date" onchange="calcDuration()"/></div>
-    <div><span class="flbl">End time</span><input class="finp" id="gig-time-end" type="time" onchange="calcDuration()"/></div>
+  <div id="end-row" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><span class="flbl">End date</span><input class="finp" id="g-date-end" type="date" oninput="calcDur()"/></div>
+    <div><span class="flbl">End time</span><input class="finp" id="g-time-end" type="time" oninput="calcDur()"/></div>
   </div>
-  <div id="duration-display" style="font-size:12px;color:#1D9E75;font-weight:600;padding:6px 10px;background:#E1F5EE;border-radius:8px;display:none"></div>
+  <div id="g-dur" style="display:none" class="dur-badge"></div>
 </div>
+
 <div style="margin-bottom:12px">
   <span class="flbl">Pay / Compensation</span>
-  <select class="finp" id="gig-pay-type" onchange="togglePayField(this.value)" style="margin-bottom:6px">
-    <option value="paid">Paid gig — enter amount</option>
+  <select class="finp" id="g-pay-type" onchange="setPayType(this.value)" style="margin-bottom:6px">
+    <option value="paid">Paid gig — enter amount below</option>
     <option value="free">Free / Volunteer</option>
-    <option value="entry">Free entry (door deal)</option>
+    <option value="entry">Free entry — door deal</option>
     <option value="revenue">Revenue share</option>
     <option value="tbd">To be discussed</option>
   </select>
-  <input class="finp" id="gig-pay" placeholder="e.g. $300 flat or $100/hr"/>
+  <input class="finp" id="g-pay" placeholder="e.g. $300 flat or $100/hr"/>
 </div>
+
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-  <div><span class="flbl">Musicians needed</span><input class="finp" id="gig-count" placeholder="2"/></div>
-  <div><span class="flbl">Level</span><select class="finp" id="gig-level"><option>Any level</option><option>Beginner</option><option>Intermediate</option><option>Professional</option></select></div>
+  <div><span class="flbl">Musicians needed</span><input class="finp" id="g-count" placeholder="2"/></div>
+  <div><span class="flbl">Level</span><select class="finp" id="g-level"><option>Any level</option><option>Beginner</option><option>Intermediate</option><option>Professional</option></select></div>
 </div>
+
 <div style="margin-bottom:12px">
   <span class="flbl">Venue / Location</span>
-  ${savedVenues.length>0?`<select class="finp" id="gig-venue-select" onchange="fillVenue(this.value)" style="margin-bottom:6px"><option value="">— Select saved venue or type below —</option>${venueOptions}</select>`:''}
-  <input class="finp" id="gig-loc" placeholder="Address or Remote"/>
+  ${venues.length>0?`<select class="finp" id="g-vsel" onchange="fillV(this.value)" style="margin-bottom:6px"><option value="">— Select saved venue —</option>${vopts}</select>`:''}
+  <input class="finp" id="g-loc" placeholder="Address or Remote"/>
 </div>
-<div style="margin-bottom:12px"><span class="flbl">Instruments needed</span><input class="finp" id="gig-inst" placeholder="Violin, Cello, Viola…"/></div>
-<div style="margin-bottom:18px"><span class="flbl">Notes</span><textarea class="finp" id="gig-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
-${isManager()&&myGroups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="gig-group"><option value="">— Don't notify a group —</option>${myGroups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('')}</select></div>`:''}
+
+<div style="margin-bottom:12px"><span class="flbl">Instruments needed</span><input class="finp" id="g-inst" placeholder="Violin, Cello, Viola…"/></div>
+<div style="margin-bottom:14px"><span class="flbl">Notes</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
+${isMgr()&&groups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="g-group"><option value="">— Don't notify a group —</option>${gopts}</select></div>`:''}
 <div style="display:flex;gap:8px">
   <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="saveGig(true)">Save draft</button>
   <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">Post to Vivace Events</button>
 </div>
 </div>`;}
 
-window.toggleMultiDay=function(){
-  const tgl=document.getElementById('multiday-tgl');
-  const endDate=document.getElementById('gig-date-end');
-  const endTime=document.getElementById('gig-time-end');
+window.toggleMD=function(){
+  const tgl=document.getElementById('md-tgl');
+  const row=document.getElementById('end-row');
   const isOn=tgl.classList.contains('on');
-  if(isOn){
-    tgl.classList.remove('on');tgl.classList.add('off');
-    document.getElementById('enddate-row').style.display='none';
-  } else {
-    tgl.classList.add('on');tgl.classList.remove('off');
-    document.getElementById('enddate-row').style.display='grid';
-    // Copy start date as default end date
-    const sd=document.getElementById('gig-date').value;
-    if(sd)endDate.value=sd;
+  if(isOn){tgl.classList.replace('on','off');row.style.display='none';}
+  else{
+    tgl.classList.replace('off','on');row.style.display='grid';
+    const sd=document.getElementById('g-date').value;
+    if(sd)document.getElementById('g-date-end').value=sd;
   }
-  calcDuration();
+  calcDur();
 }
 
-window.calcDuration=function(){
-  const sd=document.getElementById('gig-date').value;
-  const st=document.getElementById('gig-time').value;
-  const ed=document.getElementById('gig-date-end').value;
-  const et=document.getElementById('gig-time-end').value;
-  const disp=document.getElementById('duration-display');
-  if(!disp)return;
-  if(!sd){disp.style.display='none';return;}
-  const startStr=sd+(st?'T'+st:''T00:00');
-  const endStr=(ed||sd)+((et?'T'+et:st?'T'+st:'T23:59''));
-  const start=new Date(startStr);
-  const end=new Date(endStr);
-  if(isNaN(start)||isNaN(end)||end<=start){disp.style.display='none';return;}
-  const diffMs=end-start;
-  const diffMins=Math.round(diffMs/60000);
-  const days=Math.floor(diffMins/1440);
-  const hrs=Math.floor((diffMins%1440)/60);
-  const mins=diffMins%60;
+window.calcDur=function(){
+  const sd=document.getElementById('g-date')?.value;
+  const st=document.getElementById('g-time')?.value;
+  const ed=document.getElementById('g-date-end')?.value;
+  const et=document.getElementById('g-time-end')?.value;
+  const disp=document.getElementById('g-dur');
+  if(!disp||!sd){if(disp)disp.style.display='none';return;}
+  const s=new Date(sd+'T'+(st||'00:00'));
+  const e=new Date((ed||sd)+'T'+(et||st||'23:59'));
+  if(isNaN(s)||isNaN(e)||e<=s){disp.style.display='none';return;}
+  const mins=Math.round((e-s)/60000);
+  const days=Math.floor(mins/1440);
+  const hrs=Math.floor((mins%1440)/60);
+  const m=mins%60;
   let label='';
-  if(days>0)label+=days+' day'+(days>1?'s':'');
-  if(hrs>0)label+=(label?' ':'')+ hrs+' hr'+(hrs>1?'s':'');
-  if(mins>0&&days===0)label+=(label?' ':'')+mins+' min';
+  if(days>0) label+=days+' day'+(days>1?'s':'');
+  if(hrs>0) label+=(label?' ':'')+hrs+' hr'+(hrs>1?'s':'');
+  if(m>0&&days===0) label+=(label?' ':'')+m+' min';
   if(label){disp.style.display='block';disp.textContent='⏱ Duration: '+label;}
   else disp.style.display='none';
 }
 
-window.fillVenue=function(val){if(val)document.getElementById('gig-loc').value=val;}
-window.togglePayField=function(val){
-  const f=document.getElementById('gig-pay');
+window.setPayType=function(v){
+  const f=document.getElementById('g-pay');
   if(!f)return;
-  if(val==='free'){f.value='Free / Volunteer';f.style.color='#1D9E75';}
-  else if(val==='entry'){f.value='Free entry — door deal';f.style.color='#1D9E75';}
-  else if(val==='revenue'){f.value='Revenue share';f.style.color='#BA7517';}
-  else if(val==='tbd'){f.value='To be discussed';f.style.color='#888';}
+  if(v==='free'){f.value='Free / Volunteer';f.style.color='#1D9E75';}
+  else if(v==='entry'){f.value='Free entry — door deal';f.style.color='#1D9E75';}
+  else if(v==='revenue'){f.value='Revenue share';f.style.color='#BA7517';}
+  else if(v==='tbd'){f.value='To be discussed';f.style.color='#888';}
   else{f.value='';f.style.color='#111';}
 }
-window.selType=function(el){document.querySelectorAll('#type-grid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
+window.selT=function(el){document.querySelectorAll('#tgrid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
+window.fillV=function(v){const f=document.getElementById('g-loc');if(v&&f)f.value=v;}
+
 window.saveGig=async function(draft){
-  const title=document.getElementById('gig-title').value;
-  const type=document.querySelector('#type-grid .card[style*="#E1F5EE"]')?.textContent||'Gig';
+  const title=document.getElementById('g-title').value;
   if(!title&&!draft){ts('Please add a title first');return;}
+  const sd=document.getElementById('g-date').value;
+  const st=document.getElementById('g-time').value;
+  const ed=document.getElementById('g-date-end')?.value||'';
+  const et=document.getElementById('g-time-end')?.value||'';
+  const dur=document.getElementById('g-dur')?.textContent?.replace('⏱ Duration: ','')||'';
+  const type=document.querySelector('#tgrid .card[style*="#E1F5EE"]')?.textContent||'Gig';
   try{
     await addDoc(collection(db,'gigs'),{
       title:title||'Draft',type,
-      date:document.getElementById('gig-date').value,
-      dateEnd:document.getElementById('gig-date-end')?.value||'',
-      timeEnd:document.getElementById('gig-time-end')?.value||'',
-      time:document.getElementById('gig-time')?.value||'',
-      pay:document.getElementById('gig-pay').value,
-      location:document.getElementById('gig-loc').value,
-      instruments:document.getElementById('gig-inst').value,
-      level:document.getElementById('gig-level').value,
-      notes:document.getElementById('gig-notes').value,
-      groupId:document.getElementById('gig-group')?.value||'',
-      postedBy:currentUser.email,userId:currentUser.uid,draft,timestamp:new Date()
+      date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
+      pay:document.getElementById('g-pay').value,
+      location:document.getElementById('g-loc').value,
+      instruments:document.getElementById('g-inst').value,
+      level:document.getElementById('g-level').value,
+      notes:document.getElementById('g-notes').value,
+      groupId:document.getElementById('g-group')?.value||'',
+      postedBy:CU.email,userId:CU.uid,draft,timestamp:new Date()
     });
     ts(draft?'Saved as draft!':'Gig posted! 🎉');
     if(!draft)setTimeout(()=>go('feed'),1500);
   }catch(e){ts('Posted!');}
 }
 
-function managerScreen(){
-  if(!isManager()){
-    return`<div class="hdr"><div class="logo" style="font-size:15px">Manager tools</div></div>
-    <div class="pad">
-    <div class="card" style="text-align:center;padding:24px">
-      <div style="font-size:32px;margin-bottom:12px">🎯</div>
+function mgrHTML(){
+  if(!isMgr()){return `
+    <div class="hdr"><div class="logo" style="font-size:15px">Manager tools</div></div>
+    <div class="pad"><div class="card" style="text-align:center;padding:28px">
+      <div style="font-size:36px;margin-bottom:12px">🎯</div>
       <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px">Become a Manager</div>
       <div style="font-size:13px;color:#888;margin-bottom:20px">Create groups, manage rosters, save venues and broadcast to your musicians</div>
-      <button class="bt" style="width:100%;padding:14px;font-size:14px" onclick="enableManager()">Enable Manager Role</button>
-    </div>
-    </div>`;}
+      <button class="bt" style="width:100%;padding:14px;font-size:14px" onclick="enableMgr()">Enable Manager Role</button>
+    </div></div>`;}
 
-  setTimeout(()=>{loadGroups().then(()=>renderGroupsList());loadVenues().then(()=>renderVenuesList());},100);
-  return`
-<div class="hdr"><div><div class="logo" style="font-size:15px">Manager</div><div style="font-size:11px;color:#555;margin-top:1px">${currentUser.displayName||currentUser.email?.split('@')[0]}</div></div>
-<div class="hdr-r">${icon('bell')}</div></div>
+  setTimeout(()=>{
+    if(MT==='groups'){loadGroups().then(renderGroups);}
+    if(MT==='venues'){loadVenues().then(renderVenues);}
+    if(MT==='responses'){loadResponses();}
+  },100);
+
+  return `
+<div class="hdr"><div><div class="logo" style="font-size:15px">Manager</div><div style="font-size:11px;color:#555;margin-top:1px">${CU.displayName||CU.email?.split('@')[0]}</div></div></div>
 <div class="pad">
 <div class="tab-bar">
-  <div class="tab ${managerTab==='groups'?'on':''}" onclick="switchMgrTab('groups')">My Groups</div>
-  <div class="tab ${managerTab==='venues'?'on':''}" onclick="switchMgrTab('venues')">Venues</div>
-  <div class="tab ${managerTab==='responses'?'on':''}" onclick="switchMgrTab('responses')">Responses</div>
+  <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')">My Groups</div>
+  <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')">Venues</div>
+  <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')">Responses</div>
 </div>
-<div id="mgr-content">${renderMgrTab()}</div>
+<div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
 
-window.switchMgrTab=function(tab){
-  managerTab=tab;
-  const el=document.getElementById('mgr-content');
-  if(el){el.innerHTML=renderMgrTab();}
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
-  document.querySelectorAll('.tab').forEach(t=>{if(t.textContent.toLowerCase().includes(tab.substring(0,4)))t.classList.add('on');});
-  if(tab==='groups')loadGroups().then(()=>renderGroupsList());
-  if(tab==='venues')loadVenues().then(()=>renderVenuesList());
-  if(tab==='responses')loadResponses();
+window.mgrTab=function(t){
+  MT=t;
+  const el=document.getElementById('mtab');
+  if(el)el.innerHTML=mgrTabHTML();
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(x=>{if(x.textContent.toLowerCase().startsWith(t.substring(0,3)))x.classList.add('on');});
+  if(t==='groups')loadGroups().then(renderGroups);
+  if(t==='venues')loadVenues().then(renderVenues);
+  if(t==='responses')loadResponses();
 }
 
-function renderMgrTab(){
-  if(managerTab==='groups') return renderGroupsTab();
-  if(managerTab==='venues') return renderVenuesTab();
-  if(managerTab==='responses') return renderResponsesTab();
+function mgrTabHTML(){
+  if(MT==='groups') return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">+ Create new group</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>`;
+  if(MT==='venues') return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">+ Add new venue</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading...</p></div>`;
+  if(MT==='responses') return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading responses...</p></div>`;
   return '';
 }
 
-function renderGroupsTab(){return`
-<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">+ Create new group</button>
-<div id="groups-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading groups...</p></div>`;}
-
-function renderGroupsList(){
-  const el=document.getElementById('groups-list');
-  if(!el)return;
-  if(myGroups.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:32px;margin-bottom:10px">👥</div><div style="font-size:14px;color:#888">No groups yet.<br>Create your first group above!</div></div>`;return;}
-  el.innerHTML=myGroups.map(g=>`
-    <div class="card" style="cursor:pointer" onclick="openGroup('${g.id}')">
+function renderGroups(){
+  const el=document.getElementById('grp-list');if(!el)return;
+  if(groups.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">👥</div><div style="font-size:14px;color:#888">No groups yet. Create your first group!</div></div>`;return;}
+  el.innerHTML=groups.map(g=>`
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-size:15px;font-weight:700;color:#111">${g.name}</div>
-          <div style="font-size:12px;color:#888;margin-top:2px">${g.type||'Group'} · ${g.memberCount||0} members</div>
-        </div>
+        <div><div style="font-size:15px;font-weight:700;color:#111">${g.name}</div><div style="font-size:12px;color:#888;margin-top:2px">${g.type||'Group'} · ${g.memberCount||0} members</div></div>
         <span class="tag tg">Active</span>
       </div>
-      ${g.description?`<div style="font-size:12px;color:#888;margin-bottom:10px">${g.description}</div>`:''}
       <div style="display:flex;gap:8px;border-top:1px solid #f0f0f0;padding-top:10px">
-        <button class="bt" style="flex:1;font-size:12px;padding:7px" onclick="event.stopPropagation();broadcastToGroup('${g.id}','${g.name}')">📢 Broadcast</button>
-        <button class="bg" style="flex:1;font-size:12px;padding:7px" onclick="event.stopPropagation();openGroup('${g.id}')">View roster</button>
-        <button onclick="event.stopPropagation();deleteGroup('${g.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:7px">${icon('trash')}</button>
+        <button class="bt" style="flex:1;font-size:11px;padding:7px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}')">📢 Broadcast</button>
+        <button class="bg" style="flex:1;font-size:11px;padding:7px" onclick="openGroup('${g.id}')">View roster</button>
+        <button onclick="delGroup('${g.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:7px 8px">${ic('trash')}</button>
       </div>
     </div>`).join('');
 }
 
 window.showCreateGroup=function(){
-  const modal=document.createElement('div');modal.className='modal-bg';modal.id='create-group-modal';
-  modal.innerHTML=`<div class="modal">
+  const m=document.createElement('div');m.className='modal-bg';m.id='cgmodal';
+  m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">Create new group</div>
-    <div style="margin-bottom:12px"><span class="flbl">Group name</span><input class="finp" id="grp-name" placeholder="e.g. VSO String Quartet"/></div>
-    <div style="margin-bottom:12px"><span class="flbl">Type</span>
-      <select class="finp" id="grp-type">
-        <option>String Quartet</option><option>Chamber Orchestra</option><option>Wedding Band</option>
-        <option>Jazz Ensemble</option><option>Masterclass Teachers</option><option>Session Musicians</option><option>Custom</option>
-      </select>
-    </div>
-    <div style="margin-bottom:18px"><span class="flbl">Description (optional)</span><input class="finp" id="grp-desc" placeholder="Brief description…"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Group name</span><input class="finp" id="gn" placeholder="e.g. VSO String Quartet"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Type</span><select class="finp" id="gt"><option>String Quartet</option><option>Chamber Orchestra</option><option>Wedding Band</option><option>Jazz Ensemble</option><option>Masterclass Teachers</option><option>Session Musicians</option><option>Custom</option></select></div>
+    <div style="margin-bottom:18px"><span class="flbl">Description (optional)</span><input class="finp" id="gd" placeholder="Brief description…"/></div>
     <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('create-group-modal').remove()">Cancel</button>
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cgmodal').remove()">Cancel</button>
       <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="createGroup()">Create group</button>
     </div>
   </div>`;
-  document.getElementById('app').appendChild(modal);
+  document.getElementById('app').appendChild(m);
 }
 
 window.createGroup=async function(){
-  const name=document.getElementById('grp-name').value.trim();
+  const name=document.getElementById('gn').value.trim();
   if(!name){ts('Please enter a group name');return;}
   try{
-    const ref=await addDoc(collection(db,'groups'),{
-      name,type:document.getElementById('grp-type').value,
-      description:document.getElementById('grp-desc').value,
-      managerId:currentUser.uid,managerEmail:currentUser.email,
-      memberCount:0,members:[],created:new Date()
-    });
-    myGroups.push({id:ref.id,name,type:document.getElementById('grp-type').value,memberCount:0,members:[]});
-    document.getElementById('create-group-modal')?.remove();
-    renderGroupsList();
-    ts(`Group "${name}" created!`);
+    const ref=await addDoc(collection(db,'groups'),{name,type:document.getElementById('gt').value,description:document.getElementById('gd').value,managerId:CU.uid,managerEmail:CU.email,memberCount:0,members:[],created:new Date()});
+    groups.push({id:ref.id,name,type:document.getElementById('gt').value,memberCount:0,members:[]});
+    document.getElementById('cgmodal')?.remove();
+    renderGroups();ts('Group "'+name+'" created!');
   }catch(e){ts('Group created!');}
 }
 
-window.deleteGroup=async function(id){
+window.delGroup=async function(id){
   if(!confirm('Delete this group?'))return;
-  try{await deleteDoc(doc(db,'groups',id));myGroups=myGroups.filter(g=>g.id!==id);renderGroupsList();ts('Group deleted');}
+  try{await deleteDoc(doc(db,'groups',id));groups=groups.filter(g=>g.id!==id);renderGroups();ts('Group deleted');}
   catch(e){ts('Deleted!');}
 }
 
 window.openGroup=function(id){
-  const group=myGroups.find(g=>g.id===id);
-  if(!group)return;
-  const modal=document.createElement('div');modal.className='modal-bg';modal.id='group-detail';
-  modal.innerHTML=`<div class="modal">
+  const g=groups.find(x=>x.id===id);if(!g)return;
+  const m=document.createElement('div');m.className='modal-bg';m.id='gdetail';
+  m.innerHTML=`<div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div style="font-size:17px;font-weight:700;color:#111">${group.name}</div>
-      <button onclick="document.getElementById('group-detail').remove()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer">✕</button>
+      <div style="font-size:17px;font-weight:700;color:#111">${g.name}</div>
+      <button onclick="document.getElementById('gdetail').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${group.type} · ${group.memberCount||0} members</div>
-    <button class="bt" style="width:100%;margin-bottom:16px" onclick="document.getElementById('group-detail').remove();currentScreen='discover';go('discover');ts('Select musicians and tap + Group to add them')">+ Add musicians from Discover</button>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${g.type} · ${g.memberCount||0} members</div>
+    <button class="bt" style="width:100%;margin-bottom:12px" onclick="document.getElementById('gdetail').remove();go('discover');ts('Tap ○ next to musicians to select, then tap Invite to group')">+ Add musicians from Find</button>
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:10px">Members</div>
-    ${group.members&&group.members.length>0?
-      group.members.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
-        <div class="av" style="background:#E1F5EE;color:#085041">${m.substring(0,2).toUpperCase()}</div>
-        <span style="flex:1;font-size:14px;color:#111">${m}</span>
-        <span class="tag tg">Member</span>
-      </div>`).join(''):
-      '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No members yet. Add musicians from Discover!</p>'}
-    <button class="bt" style="width:100%;margin-top:16px" onclick="broadcastToGroup('${group.id}','${group.name}');document.getElementById('group-detail').remove()">📢 Broadcast to this group</button>
+    ${g.members&&g.members.length>0?g.members.map(mem=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div class="av" style="background:#E1F5EE;color:#085041">${mem.substring(0,2).toUpperCase()}</div><span style="flex:1;font-size:14px;color:#111">${mem}</span><span class="tag tg">Member</span></div>`).join(''):'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No members yet. Add from Find tab!</p>'}
+    <button class="bt" style="width:100%;margin-top:16px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}');document.getElementById('gdetail').remove()">📢 Broadcast to group</button>
   </div>`;
-  document.getElementById('app').appendChild(modal);
+  document.getElementById('app').appendChild(m);
 }
 
-window.broadcastToGroup=function(groupId,groupName){
-  const modal=document.createElement('div');modal.className='modal-bg';modal.id='broadcast-modal';
-  modal.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Broadcast to ${groupName}</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">All members will receive this message</div>
+window.showBroadcast=function(gid,gname){
+  const m=document.createElement('div');m.className='modal-bg';m.id='bcmodal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Broadcast to ${gname}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:12px">All members will receive this message</div>
     <div class="pr" style="margin-bottom:12px">
       <span class="pl" onclick="fillBC(this,'Who is available tonight?')">Tonight?</span>
       <span class="pl" onclick="fillBC(this,'Who can play this weekend?')">Weekend?</span>
-      <span class="pl" onclick="fillBC(this,'String quartet needed — urgent!')">Urgent gig</span>
+      <span class="pl" onclick="fillBC(this,'Urgent gig — who is free?')">Urgent</span>
       <span class="pl" onclick="fillBC(this,'Masterclass slot available')">Masterclass</span>
     </div>
-    <textarea class="finp" id="bc-msg" rows="4" placeholder="Type your message to the group…" style="margin-bottom:12px"></textarea>
+    <textarea class="finp" id="bcmsg" rows="4" placeholder="Type your message…" style="margin-bottom:12px"></textarea>
     <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('broadcast-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="sendGroupBroadcast('${groupId}','${groupName}')">Send broadcast</button>
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('bcmodal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="sendBC('${gid}','${gname.replace(/'/g,"\\'")}')">Send broadcast</button>
     </div>
   </div>`;
-  document.getElementById('app').appendChild(modal);
+  document.getElementById('app').appendChild(m);
 }
-
-window.fillBC=function(el,text){document.querySelectorAll('#broadcast-modal .pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');document.getElementById('bc-msg').value=text;}
-window.sendGroupBroadcast=async function(groupId,groupName){
-  const msg=document.getElementById('bc-msg').value.trim();
+window.fillBC=function(el,txt){document.querySelectorAll('#bcmodal .pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');document.getElementById('bcmsg').value=txt;}
+window.sendBC=async function(gid,gname){
+  const msg=document.getElementById('bcmsg').value.trim();
   if(!msg){ts('Please type a message');return;}
-  try{
-    await addDoc(collection(db,'broadcasts'),{message:msg,groupId,groupName,fromId:currentUser.uid,fromEmail:currentUser.email,timestamp:new Date()});
-    document.getElementById('broadcast-modal')?.remove();
-    ts(`Broadcast sent to ${groupName}! 📢`);
-  }catch(e){ts('Broadcast sent!');}
+  try{await addDoc(collection(db,'broadcasts'),{message:msg,groupId:gid,groupName:gname,fromId:CU.uid,fromEmail:CU.email,timestamp:new Date()});
+  document.getElementById('bcmodal')?.remove();ts('Broadcast sent to '+gname+'! 📢');}
+  catch(e){ts('Broadcast sent!');}
 }
 
-function renderVenuesTab(){return`
-<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">+ Add new venue</button>
-<div id="venues-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading venues...</p></div>`;}
-
-function renderVenuesList(){
-  const el=document.getElementById('venues-list');
-  if(!el)return;
-  if(savedVenues.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:32px;margin-bottom:10px">📍</div><div style="font-size:14px;color:#888">No venues saved yet.<br>Add your first venue above!</div></div>`;return;}
-  el.innerHTML=savedVenues.map(v=>`
+function renderVenues(){
+  const el=document.getElementById('ven-list');if(!el)return;
+  if(venues.length===0){el.innerHTML=`<div style="text-align:center;padding:30px 0"><div style="font-size:36px;margin-bottom:10px">📍</div><div style="font-size:14px;color:#888">No venues saved yet. Add your first venue!</div></div>`;return;}
+  el.innerHTML=venues.map(v=>`
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div style="font-size:15px;font-weight:700;color:#111">${v.name}</div>
-        <button onclick="deleteVenue('${v.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer">${icon('trash')}</button>
+        <button onclick="delVenue('${v.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer">${ic('trash')}</button>
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:4px">📍 ${v.address}</div>
       ${v.capacity?`<div style="font-size:12px;color:#888;margin-bottom:4px">👥 Capacity: ${v.capacity}</div>`:''}
-      ${v.notes?`<div style="font-size:12px;color:#aaa;margin-top:6px">${v.notes}</div>`:''}
-      <button class="bg" style="width:100%;margin-top:10px;font-size:12px" onclick="copyVenueToPost('${v.name}','${v.address}')">Use for next gig</button>
+      ${v.notes?`<div style="font-size:12px;color:#aaa;margin-top:4px">${v.notes}</div>`:''}
+      <button class="bg" style="width:100%;margin-top:10px;font-size:12px" onclick="useVenue('${v.name.replace(/'/g,"\\'")}','${v.address.replace(/'/g,"\\'")}')">Use for next gig</button>
     </div>`).join('');
 }
 
 window.showAddVenue=function(){
-  const modal=document.createElement('div');modal.className='modal-bg';modal.id='add-venue-modal';
-  modal.innerHTML=`<div class="modal">
+  const m=document.createElement('div');m.className='modal-bg';m.id='avmodal';
+  m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">Add venue</div>
-    <div style="margin-bottom:12px"><span class="flbl">Venue name</span><input class="finp" id="ven-name" placeholder="e.g. DAR Constitution Hall"/></div>
-    <div style="margin-bottom:12px"><span class="flbl">Address</span><input class="finp" id="ven-addr" placeholder="Full address"/></div>
-    <div style="margin-bottom:12px"><span class="flbl">Capacity (optional)</span><input class="finp" id="ven-cap" placeholder="e.g. 500" type="number"/></div>
-    <div style="margin-bottom:18px"><span class="flbl">Notes (parking, load-in, contact)</span><textarea class="finp" id="ven-notes" rows="3" placeholder="Parking on 2nd St, load-in at side entrance…"></textarea></div>
+    <div style="margin-bottom:12px"><span class="flbl">Venue name</span><input class="finp" id="vn" placeholder="e.g. DAR Constitution Hall"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Address</span><input class="finp" id="va" placeholder="Full address"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Capacity (optional)</span><input class="finp" id="vc" placeholder="500" type="number"/></div>
+    <div style="margin-bottom:18px"><span class="flbl">Notes (parking, load-in, contact)</span><textarea class="finp" id="vno" rows="3" placeholder="Parking on 2nd St, side entrance for load-in…"></textarea></div>
     <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('add-venue-modal').remove()">Cancel</button>
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('avmodal').remove()">Cancel</button>
       <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveVenue()">Save venue</button>
     </div>
   </div>`;
-  document.getElementById('app').appendChild(modal);
+  document.getElementById('app').appendChild(m);
 }
-
 window.saveVenue=async function(){
-  const name=document.getElementById('ven-name').value.trim();
-  const address=document.getElementById('ven-addr').value.trim();
-  if(!name||!address){ts('Name and address required');return;}
+  const name=document.getElementById('vn').value.trim();
+  const addr=document.getElementById('va').value.trim();
+  if(!name||!addr){ts('Name and address required');return;}
   try{
-    const ref=await addDoc(collection(db,'venues'),{name,address,capacity:document.getElementById('ven-cap').value,notes:document.getElementById('ven-notes').value,managerId:currentUser.uid,created:new Date()});
-    savedVenues.push({id:ref.id,name,address,capacity:document.getElementById('ven-cap').value,notes:document.getElementById('ven-notes').value});
-    document.getElementById('add-venue-modal')?.remove();
-    renderVenuesList();
-    ts(`Venue "${name}" saved!`);
+    const ref=await addDoc(collection(db,'venues'),{name,address:addr,capacity:document.getElementById('vc').value,notes:document.getElementById('vno').value,managerId:CU.uid,created:new Date()});
+    venues.push({id:ref.id,name,address:addr,capacity:document.getElementById('vc').value,notes:document.getElementById('vno').value});
+    document.getElementById('avmodal')?.remove();renderVenues();ts('Venue "'+name+'" saved!');
   }catch(e){ts('Venue saved!');}
 }
-
-window.deleteVenue=async function(id){
-  try{await deleteDoc(doc(db,'venues',id));savedVenues=savedVenues.filter(v=>v.id!==id);renderVenuesList();ts('Venue removed');}
-  catch(e){ts('Removed!');}
+window.delVenue=async function(id){
+  try{await deleteDoc(doc(db,'venues',id));venues=venues.filter(v=>v.id!==id);renderVenues();ts('Venue removed');}catch(e){ts('Removed!');}
 }
-window.copyVenueToPost=function(name,addr){go('post');setTimeout(()=>{const f=document.getElementById('gig-loc');if(f)f.value=`${name} — ${addr}`;},200);ts('Venue added to gig form!');}
-
-function renderResponsesTab(){
-  setTimeout(loadResponses,100);
-  return`<div class="sh"><span class="st">Broadcast responses</span></div><div id="responses-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading responses...</p></div>`;}
+window.useVenue=function(name,addr){go('post');setTimeout(()=>{const f=document.getElementById('g-loc');if(f)f.value=name+' — '+addr;},200);ts('Venue added to gig form!');}
 
 async function loadResponses(){
   try{
-    const q=query(collection(db,'responses'),orderBy('timestamp','desc'));
-    const snap=await getDocs(q);
-    const el=document.getElementById('responses-list');
-    if(!el)return;
-    if(snap.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No responses yet</p>';return;}
-    el.innerHTML=snap.docs.map(d=>{
+    const s=await getDocs(query(collection(db,'responses'),orderBy('timestamp','desc')));
+    const el=document.getElementById('resp-list');if(!el)return;
+    if(s.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No responses yet</p>';return;}
+    el.innerHTML=s.docs.map(d=>{
       const r=d.data();
       const cls=r.type==='available'?'tg':r.type==='no'?'tr':'ta';
       const label=r.type==='available'?'✅ Available':r.type==='no'?'❌ Unavailable':'⚡ Maybe';
       const time=r.timestamp?.toDate?r.timestamp.toDate().toLocaleDateString():'';
-      return `<div class="resp-row">
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
         <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${r.userEmail||'Member'}</div><div style="font-size:11px;color:#aaa">${time}</div></div>
-        <span class="resp-badge tag ${cls}">${label}</span>
+        <span class="tag ${cls}">${label}</span>
       </div>`;
     }).join('');
-  }catch(e){console.log(e);}
+  }catch(e){}
 }
 
-window.enableManager=async function(){
-  userProfile.roles=[...new Set([...(userProfile.roles||['musician']),'manager'])];
-  await saveUserProfile();
-  render();
-  ts('Manager role enabled! 🎯');
+window.enableMgr=async function(){
+  UP.roles=[...new Set([...(UP.roles||['musician']),'manager'])];
+  await saveUP();render();ts('Manager role enabled! 🎯');
 }
 
-function profileScreen(){
-  const name=currentUser.displayName||currentUser.email?.split('@')[0]||'Musician';
+function profileHTML(){
+  const name=CU.displayName||CU.email?.split('@')[0]||'Musician';
   const ini=name.substring(0,2).toUpperCase();
-  const roles=userProfile.roles||['musician'];
-  return`
+  const roles=UP.roles||['musician'];
+  return `
 <div style="background:#0d0d0d;padding:20px 16px 22px">
   <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:18px">
     <div class="av" style="width:58px;height:58px;font-size:18px;background:#B5D4F4;color:#0C447C">${ini}</div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:6px">${currentUser.email}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:6px">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('musician')?'<span class="tag tg">Musician</span>':''}
         ${roles.includes('manager')?'<span class="tag tp">Manager</span>':''}
       </div>
     </div>
-    <button style="padding:7px 14px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px" onclick="doSignOut()">${icon('logout')} Out</button>
+    <button style="padding:7px 12px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Out</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
-    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">${myGroups.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Groups</div></div>
-    <div style="text-align:center;border-left:1px solid #222;border-right:1px solid #222"><div style="font-size:17px;font-weight:700;color:#fff">${savedVenues.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Venues</div></div>
+    <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">${groups.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Groups</div></div>
+    <div style="text-align:center;border-left:1px solid #222;border-right:1px solid #222"><div style="font-size:17px;font-weight:700;color:#fff">${venues.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Venues</div></div>
     <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">New</div><div style="font-size:10px;color:#555;margin-top:2px">Member</div></div>
   </div>
 </div>
@@ -818,40 +726,37 @@ function profileScreen(){
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">My roles</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="role-btn ${roles.includes('musician')?'on':''}" onclick="toggleRole('musician')">🎻 Musician</button>
-      <button class="role-btn ${roles.includes('manager')?'on':''}" onclick="toggleRole('manager')">🎯 Manager</button>
+      <button class="role-btn${roles.includes('musician')?' on':''}" onclick="toggleRole('musician')">🎻 Musician</button>
+      <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 Manager</button>
     </div>
     <div style="font-size:11px;color:#aaa">You can hold both roles simultaneously</div>
   </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">Video reel</div>
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
-      <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${icon('play')}</div>
+      <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
     </div>
   </div>
-  <div style="margin-bottom:18px">
+  <div>
     <div class="st" style="margin-bottom:10px">Skills</div>
     ${[['Classical',80],['Chamber',70],['Sight-reading',75],['Teaching',65]].map(([s,p])=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:12px;color:#111;width:84px;flex-shrink:0">${s}</span><div class="skill-track"><div class="skill-fill" style="width:${p}%"></div></div><span style="font-size:11px;color:#aaa;width:34px;text-align:right">${p}%</span></div>`).join('')}
   </div>
 </div>`;}
 
 window.toggleRole=async function(role){
-  const roles=userProfile.roles||['musician'];
+  const roles=UP.roles||['musician'];
   const idx=roles.indexOf(role);
-  if(idx>-1){if(roles.length===1){ts('You must have at least one role');return;}roles.splice(idx,1);}
+  if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
   else roles.push(role);
-  userProfile.roles=[...new Set(roles)];
-  await saveUserProfile();
-  render();
-  ts(roles.includes(role)?`${role.charAt(0).toUpperCase()+role.slice(1)} role enabled!`:`${role} role removed`);
+  UP.roles=[...new Set(roles)];
+  await saveUP();render();ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
 }
+window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['musician']};groups=[];venues=[];CP=[];render();}
 
-window.doSignOut=async function(){await signOut(auth);currentUser=null;userProfile={roles:['musician']};myGroups=[];savedVenues=[];render();}
-
-onAuthStateChanged(auth,async(user)=>{
-  currentUser=user;
-  if(user){await loadUserProfile();await loadGroups();await loadVenues();}
+onAuthStateChanged(auth,async user=>{
+  CU=user;
+  if(user){await loadUP();await loadGroups();await loadVenues();}
   render();
 });
 </script>
