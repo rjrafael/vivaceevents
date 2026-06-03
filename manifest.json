@@ -1,7 +1,7 @@
 {
-  "name": "Vivace Events",
-  "short_name": "Vivace",
-  "description": "The musician network — gigs, rosters, masterclasses",
+  "name": "Vivace Events — Virtual Studio Orchestra LLC",
+  "short_name": "VivaceEvents",
+  "description": "The global artist network — by Virtual Studio Orchestra LLC",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
