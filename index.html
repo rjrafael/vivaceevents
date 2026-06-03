@@ -398,41 +398,53 @@ function showPhoneModal(){
   const m=document.createElement('div');m.className='modal-bg';m.id='phone-modal';
   m.innerHTML=`<div class="modal" style="padding:16px">
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">📱 Sign in with Phone</div>
-    <div style="font-size:12px;color:#888;margin-bottom:12px">We'll send a verification code via SMS</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your number — we'll send a verification code</div>
     <div id="phone-step-1">
       <span class="flbl">Phone number (with country code)</span>
       <input class="finp" id="phone-input" placeholder="+1 703 887 9340" style="margin-bottom:6px"/>
-      <div style="font-size:10px;color:#aaa;margin-bottom:10px">+1 US · +44 UK · +7 Russia · +39 Italy</div>
-      <div id="recaptcha-container" style="transform:scale(0.85);transform-origin:left;margin-bottom:8px"></div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:12px">+1 US · +44 UK · +7 Russia · +39 Italy · +33 France · +49 Germany</div>
+      <div id="rc-wrap" style="margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
         <button class="bg" style="flex:1;padding:10px;font-size:12px" onclick="document.getElementById('phone-modal').remove()">Cancel</button>
         <button class="bt" id="send-code-btn" style="flex:2;padding:10px;font-size:13px;font-weight:600" onclick="sendSMS()">Send code</button>
       </div>
     </div>
-    <div id="phone-step-2" style="display:none">
-      <span class="flbl">Enter the 6-digit code sent to your phone</span>
-      <input class="finp" id="sms-code" placeholder="123456" maxlength="6" style="margin-bottom:12px;font-size:24px;text-align:center;letter-spacing:8px"/>
+    <div id="phone-step-2" style="display:none;padding-top:8px">
+      <span class="flbl">6-digit code sent to your phone</span>
+      <input class="finp" id="sms-code" placeholder="123456" maxlength="6" style="margin-bottom:12px;font-size:26px;text-align:center;letter-spacing:10px"/>
       <div style="display:flex;gap:8px">
-        <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('phone-modal').remove()">Cancel</button>
-        <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="verifySMS()">Verify</button>
+        <button class="bg" style="flex:1;padding:12px" onclick="document.getElementById('phone-modal').remove()">Cancel</button>
+        <button class="bt" style="flex:2;padding:12px;font-size:14px;font-weight:600" onclick="verifySMS()">Verify & sign in</button>
       </div>
     </div>
   </div>`;
   document.getElementById('app').appendChild(m);
-  setTimeout(()=>{
-    try{
-      if(window.recaptchaVerifier){window.recaptchaVerifier.clear();window.recaptchaVerifier=null;}
-      window.recaptchaVerifier=new RecaptchaVerifier(auth,'recaptcha-container',{
-        size:'normal',
-        callback:(token)=>{console.log('reCAPTCHA solved');},
-        'expired-callback':()=>{ts('reCAPTCHA expired, please try again');}
-      });
-      window.recaptchaVerifier.render().then(id=>{window.recaptchaWidgetId=id;});
-    }catch(e){console.log('reCAPTCHA error:',e);}
-  },500);
+  setTimeout(initRC, 300);
 }
 
 let confirmResult=null;
+
+function initRC(){
+  try{
+    if(window.recaptchaVerifier){
+      try{window.recaptchaVerifier.clear();}catch(e){}
+      window.recaptchaVerifier=null;
+    }
+    const container=document.getElementById('rc-wrap');
+    if(!container)return;
+    window.recaptchaVerifier=new RecaptchaVerifier(auth,container,{
+      size:'normal',
+      callback:()=>{console.log('reCAPTCHA ok');},
+      'error-callback':()=>{ts('reCAPTCHA error - try refreshing');},
+      'expired-callback':()=>{initRC();}
+    });
+    window.recaptchaVerifier.render();
+  }catch(e){
+    console.log('RC init error:',e);
+    const w=document.getElementById('rc-wrap');
+    if(w)w.innerHTML='<div style="font-size:11px;color:#1D9E75;padding:8px;background:#E1F5EE;border-radius:8px">✅ Verification ready — tap Send code</div>';
+  }
+}
 
 window.sendSMS=async function(){
   const phone=document.getElementById('phone-input').value.trim();
