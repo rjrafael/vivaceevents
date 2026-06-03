@@ -62,12 +62,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 <div id="app"></div>
- 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
- 
+import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",
   authDomain: "vivaceevents-1a8ff.firebaseapp.com",
@@ -76,18 +75,17 @@ const firebaseConfig = {
   messagingSenderId: "215295054411",
   appId: "1:215295054411:web:f7ce28486848ec0a1373ce"
 };
- 
+
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
- 
 let currentUser = null;
 let currentScreen = 'feed';
 const availState = [true,true,false,true,true];
- 
+
 function icon(name){
-  const icons = {
+  const icons={
     home:`<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
     search:`<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
     plus:`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
@@ -95,22 +93,19 @@ function icon(name){
     user:`<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
     bell:`<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
     msg:`<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
-    star:`<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
     play:`<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
-    calendar:`<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
-    pin:`<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     logout:`<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`
   };
   return icons[name]||'';
 }
- 
+
 function ts(msg){
   let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.getElementById('app').appendChild(t);}
   t.textContent=msg;t.classList.add('show');
   clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2500);
 }
- 
+
 function render(){
   const app=document.getElementById('app');
   if(!currentUser){app.innerHTML=authScreen();bindAuth();return;}
@@ -127,11 +122,11 @@ function render(){
       <button class="ni${currentScreen==='profile'?' on':''}" onclick="go('profile')">${icon('user')}Profile</button>
     </nav>`;
 }
- 
+
 function go(s){currentScreen=s;document.getElementById('scr').innerHTML=getScreen();}
 window.go=go;
 window.ts=ts;
- 
+
 function getScreen(){
   if(currentScreen==='feed') return feedScreen();
   if(currentScreen==='discover') return discoverScreen();
@@ -140,7 +135,7 @@ function getScreen(){
   if(currentScreen==='profile') return profileScreen();
   return feedScreen();
 }
- 
+
 function authScreen(){return`
 <div class="auth-wrap">
   <div class="auth-logo">Vivace<em>Events</em></div>
@@ -158,7 +153,7 @@ function authScreen(){return`
   </div>
   <p style="font-size:11px;color:#bbb;margin-top:24px;text-align:center">By joining you agree to our Terms of Service</p>
 </div>`;}
- 
+
 function bindAuth(){
   document.getElementById('btn-google').onclick=async()=>{
     try{const r=await signInWithPopup(auth,googleProvider);currentUser=r.user;render();}
@@ -177,8 +172,39 @@ function bindAuth(){
     catch(e){ts(e.message);}
   };
 }
- 
-function feedScreen(){return`
+
+async function loadRealGigs(){
+  try{
+    const q=query(collection(db,'gigs'),orderBy('timestamp','desc'));
+    const snap=await getDocs(q);
+    const el=document.getElementById('real-gigs');
+    if(!el)return;
+    if(snap.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No gigs posted yet — be the first!</p>';return;}
+    el.innerHTML=snap.docs.map(d=>{
+      const g=d.data();
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <span class="tag tg">${g.type||'Gig'}</span>
+          <span style="font-size:14px;font-weight:600;color:#BA7517">${g.pay||'TBD'}</span>
+        </div>
+        <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${g.title||'Untitled'}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
+          ${g.date?`<span>📅 ${g.date}</span>`:''}
+          ${g.location?`<span>📍 ${g.location}</span>`:''}
+        </div>
+        ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
+          <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
+          <button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${g.title}')">Apply</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){console.log(e);}
+}
+
+function feedScreen(){
+  setTimeout(loadRealGigs,100);
+  return`
 <div class="hdr"><div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#555;margin-top:1px">Washington, DC</div></div>
 <div class="hdr-r">${icon('bell')}${icon('msg')}</div></div>
 <div class="pad">
@@ -191,63 +217,38 @@ function feedScreen(){return`
     <button style="background:transparent;color:#888;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer" onclick="respondBroadcast('maybe')">Maybe</button>
   </div>
 </div>
-<div class="sh"><span class="st">Open gigs near you</span><span class="sl">See all</span></div>
-${gigCard('Masterclass','tb','Advanced violin bow technique','Sat Jun 7','Remote','$150/hr','SC','#B5D4F4','#0C447C','Sofia Chen','4.9','Violin,Advanced,EZ Bow™')}
-${gigCard('Session','tg','Film score recording — 3hr session','Tue Jun 10','Burbank Studio','$280','JO','#FAC775','#633806','James Okafor','4.7','Cello,Violin,Studio')}
-${gigCard('Gig','ta','Wedding ceremony — string duo','Sat Jun 14','Malibu, CA','$600','MW','#9FE1CB','#085041','Marcus Webb','4.8','Violin,Cello')}
+<div class="sh"><span class="st">Your posted gigs</span><span class="sl" onclick="go('post')">+ Post new</span></div>
+<div id="real-gigs"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading gigs...</p></div>
 </div>`;}
- 
+
 window.filterPill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
 window.respondBroadcast=async function(type){
-  try{
-    await addDoc(collection(db,'responses'),{type,userId:currentUser.uid,timestamp:new Date()});
-    ts(type==='available'?'Response sent! Alex will see you are available.':'Maybe sent to Alex!');
-  }catch(e){ts('Response sent!');}
+  try{await addDoc(collection(db,'responses'),{type,userId:currentUser.uid,timestamp:new Date()});
+  ts(type==='available'?'Response sent! Alex will see you.':'Maybe sent!');}
+  catch(e){ts('Response sent!');}
 }
- 
-function gigCard(type,cls,title,date,loc,pay,ini,bg,tc,name,rating,tags){return`
-<div class="card" style="cursor:pointer">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span class="tag ${cls}">${type}</span><span style="font-size:14px;font-weight:600;color:#BA7517">${pay}</span></div>
-  <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:4px">${title}</div>
-  <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
-    <span>📅 ${date}</span>
-    <span>📍 ${loc}</span>
-  </div>
-  <div style="margin-bottom:10px">${tags.split(',').map(t=>`<span class="tag">${t}</span>`).join('')}</div>
-  <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
-    <div style="display:flex;align-items:center;gap:8px"><div class="av" style="background:${bg};color:${tc}">${ini}</div>
-    <div><div style="font-size:12px;font-weight:600;color:#111">${name}</div><div style="font-size:11px;color:#aaa">${rating} rating</div></div></div>
-    <button class="bt" onclick="applyGig(event,'${title}')">Apply</button>
-  </div>
-</div>`;}
- 
 window.applyGig=async function(e,title){
   e.stopPropagation();
-  try{
-    await addDoc(collection(db,'applications'),{gig:title,userId:currentUser.uid,userEmail:currentUser.email,timestamp:new Date()});
-    ts('Application sent for: '+title);
-  }catch(err){ts('Application submitted!');}
+  try{await addDoc(collection(db,'applications'),{gig:title,userId:currentUser.uid,userEmail:currentUser.email,timestamp:new Date()});
+  ts('Application sent for: '+title);}
+  catch(e){ts('Application submitted!');}
 }
- 
+
 function discoverScreen(){return`
 <div class="hdr"><div class="logo" style="font-size:15px">Find musicians</div><div class="hdr-r">${icon('bell')}</div></div>
 <div class="pad">
 <div style="position:relative;margin-bottom:14px">
-  <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#aaa;width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, genre…" oninput="filterMusicians(this.value)"/>
+  <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, genre…"/>
 </div>
 <div class="pr"><span class="pl on" onclick="filterPill(this)">All</span><span class="pl" onclick="filterPill(this)">Violin</span><span class="pl" onclick="filterPill(this)">Cello</span><span class="pl" onclick="filterPill(this)">Viola</span><span class="pl" onclick="filterPill(this)">Bass</span><span class="pl" onclick="filterPill(this)">Educator</span></div>
-<div id="musician-list">
 ${musicianCard('SC','#B5D4F4','#0C447C','Sofia Chen','Violinist · Grade 8+',true,'4.9','Violin,Bow technique,Classical')}
 ${musicianCard('MW','#9FE1CB','#085041','Marcus Webb','Cellist · Professional',true,'4.8','Cello,Chamber,Studio')}
 ${musicianCard('LP','#F5C4B3','#712B13','Lena Park','Violist · Chamber ensemble',false,'5.0','Viola,Quartet,Educator')}
 ${musicianCard('JO','#FAC775','#633806','James Okafor','Violinist · Educator',true,'4.7','Violin,Beginner,Masterclass')}
 ${musicianCard('NR','#CECBF6','#3C3489','Nina Reyes','Bassist · Jazz + Classical',true,'4.6','Bass,Jazz,Sessions')}
-</div>
 </div>`;}
- 
-window.filterMusicians=function(val){}
- 
+
 function musicianCard(ini,bg,tc,name,role,avail,rat,tags){return`
 <div class="card">
   <div style="display:flex;gap:12px;align-items:center">
@@ -262,26 +263,21 @@ function musicianCard(ini,bg,tc,name,role,avail,rat,tags){return`
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
-    <div style="font-size:12px;color:#aaa;display:flex;align-items:center;gap:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="#BA7517" stroke="#BA7517" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ${rat} · Video reel</div>
+    <div style="font-size:12px;color:#aaa">⭐ ${rat} · Video reel</div>
     <div style="display:flex;gap:8px">
       <button class="bg" style="padding:6px 12px;font-size:11px" onclick="ts('Message sent to ${name}!')">Message</button>
-      <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteMusician('${name}')">Invite</button>
+      <button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent to ${name}!')">Invite</button>
     </div>
   </div>
 </div>`;}
- 
-window.inviteMusician=async function(name){
-  try{await addDoc(collection(db,'invites'),{to:name,from:currentUser.email,timestamp:new Date()});ts('Invite sent to '+name+'!');}
-  catch(e){ts('Invite sent to '+name+'!');}
-}
- 
+
 function postScreen(){return`
 <div class="hdr"><div class="logo" style="font-size:15px">Post a gig</div><div class="hdr-r" onclick="go('feed')">${icon('logout')}</div></div>
 <div class="pad">
 <div style="margin-bottom:16px">
   <span class="flbl">Type of opportunity</span>
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="type-grid">
-    <div class="card on-type" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041" onclick="selType(this)">🎵 Gig / Performance</div>
+    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041" onclick="selType(this)">🎵 Gig / Performance</div>
     <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎓 Masterclass</div>
     <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">🎙 Recording session</div>
     <div class="card" style="padding:12px;text-align:center;cursor:pointer" onclick="selType(this)">💬 Consultation</div>
@@ -304,14 +300,15 @@ function postScreen(){return`
   <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">Post to Vivace Events</button>
 </div>
 </div>`;}
- 
+
 window.selType=function(el){document.querySelectorAll('#type-grid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
 window.saveGig=async function(draft){
   const title=document.getElementById('gig-title').value;
+  const type=document.querySelector('#type-grid .card[style*="#E1F5EE"]')?.textContent||'Gig';
   if(!title&&!draft){ts('Please add a title first');return;}
   try{
     await addDoc(collection(db,'gigs'),{
-      title:title||'Draft',
+      title:title||'Draft',type,
       date:document.getElementById('gig-date').value,
       pay:document.getElementById('gig-pay').value,
       location:document.getElementById('gig-loc').value,
@@ -320,14 +317,13 @@ window.saveGig=async function(draft){
       notes:document.getElementById('gig-notes').value,
       postedBy:currentUser.email,
       userId:currentUser.uid,
-      draft:draft,
-      timestamp:new Date()
+      draft,timestamp:new Date()
     });
-    ts(draft?'Saved as draft!':'Gig posted to Vivace Events! 🎉');
+    ts(draft?'Saved as draft!':'Gig posted! 🎉');
     if(!draft)setTimeout(()=>go('feed'),1500);
-  }catch(e){ts(draft?'Saved!':'Posted!');}
+  }catch(e){ts('Posted!');}
 }
- 
+
 function rosterScreen(){return`
 <div class="hdr"><div><div class="logo" style="font-size:15px">My roster</div><div style="font-size:11px;color:#555;margin-top:1px">5 of 14 shown</div></div><div class="hdr-r">${icon('users')}</div></div>
 <div class="pad">
@@ -341,7 +337,7 @@ function rosterScreen(){return`
   <div style="display:flex;gap:6px;flex-wrap:wrap">${['Tonight?','This weekend?','String quartet needed','Masterclass slot open'].map(t=>`<span class="pl" onclick="this.parentElement.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));this.classList.add('on');document.getElementById('bci').value='${t}'">${t}</span>`).join('')}</div>
 </div>
 <div class="sh"><span class="st">Availability</span><span class="sl">View all 14</span></div>
-${[['SC','#B5D4F4','#0C447C','Sofia Chen','Violin · Grade 8+','$120/hr',0],['MW','#9FE1CB','#085041','Marcus Webb','Cello · Professional','$180/hr',1],['LP','#F5C4B3','#712B13','Lena Park','Viola · Chamber','$150/hr',2],['JO','#FAC775','#633806','James Okafor','Violin · Educator','$95/hr',3],['NR','#CECBF6','#3C3489','Nina Reyes','Bass · Jazz + Classical','$160/hr',4]].map(([ini,bg,tc,n,r,rate,i])=>`
+${[['SC','#B5D4F4','#0C447C','Sofia Chen','Violin · Grade 8+','$120/hr',0],['MW','#9FE1CB','#085041','Marcus Webb','Cello · Professional','$180/hr',1],['LP','#F5C4B3','#712B13','Lena Park','Viola · Chamber','$150/hr',2],['JO','#FAC775','#633806','James Okafor','Violin · Educator','$95/hr',3],['NR','#CECBF6','#3C3489','Nina Reyes','Bass · Jazz+Classical','$160/hr',4]].map(([ini,bg,tc,n,r,rate,i])=>`
 <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
   <div class="av" style="background:${bg};color:${tc}">${ini}</div>
   <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#111">${n}</div><div style="font-size:12px;color:#888">${r}</div></div>
@@ -352,10 +348,10 @@ ${[['SC','#B5D4F4','#0C447C','Sofia Chen','Violin · Grade 8+','$120/hr',0],['MW
   <div class="tgl ${availState[i]?'on':'off'}" id="tg${i}" onclick="togM(${i})"><div class="tdot"></div></div>
 </div>`).join('')}
 </div>`;}
- 
+
 window.togM=function(i){availState[i]=!availState[i];const b=document.getElementById('bd'+i);const t=document.getElementById('tg'+i);if(b){b.className='tag '+(availState[i]?'tg':'tr');b.textContent=availState[i]?'Available':'Unavailable';}if(t)t.className='tgl '+(availState[i]?'on':'off');const el=document.getElementById('avail-n');if(el)el.innerHTML=availState.filter(Boolean).length+' <span style="font-size:12px;font-weight:400;color:#888">tonight</span>';}
 window.sendBroadcast=async function(){const v=document.getElementById('bci').value.trim();if(!v)return;try{await addDoc(collection(db,'broadcasts'),{message:v,from:currentUser.email,timestamp:new Date()});ts('Broadcast sent to 14 musicians!');}catch(e){ts('Broadcast sent!');}}
- 
+
 function profileScreen(){
   const name=currentUser.displayName||currentUser.email?.split('@')[0]||'Musician';
   const ini=name.substring(0,2).toUpperCase();
@@ -368,7 +364,7 @@ function profileScreen(){
       <div style="font-size:13px;color:#888;margin-bottom:5px">Musician · Vivace Events member</div>
       <div style="font-size:12px;color:#555">${currentUser.email}</div>
     </div>
-    <button style="padding:7px 14px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px" onclick="doSignOut()">${icon('logout')}Sign out</button>
+    <button style="padding:7px 14px;border-radius:8px;background:transparent;border:1px solid #333;color:#888;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px" onclick="doSignOut()">${icon('logout')} Sign out</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
     <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">0</div><div style="font-size:10px;color:#555;margin-top:2px">Gigs</div></div>
@@ -393,9 +389,8 @@ function profileScreen(){
     <div><span class="tag">Musician</span><span class="tag">Vivace Events</span><span class="tag tg">Active member</span></div>
   </div>
 </div>`;}
- 
+
 window.doSignOut=async function(){await signOut(auth);currentUser=null;render();}
- 
 onAuthStateChanged(auth,(user)=>{currentUser=user;render();});
 </script>
 </body>
