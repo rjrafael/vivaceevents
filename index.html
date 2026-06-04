@@ -640,13 +640,15 @@ async function loadGigs(){
             ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
               <div style="display:flex;gap:6px">
                 <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨 Emergency</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
               </div>
             `:''}
             ${isMine&&filled?`
-              <div style="display:flex;gap:6px">
-                <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨 Emergency</button>
+              <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                <div style="display:flex;gap:6px">
+                  <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
+                  <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
+                </div>
               </div>
             `:''}
             ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
