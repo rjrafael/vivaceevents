@@ -87,7 +87,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .star-btn:active{transform:scale(1.3)}
 .priority-btn{padding:10px 8px;border-radius:12px;border:2px solid #eee;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;background:#f9f9f9;flex:1}
 .priority-btn.sel{border-width:2px;transform:scale(1.04)}
-.never-badge{background:#FCEBEB;color:#791F1F;border:1px solid #F09595;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;display:inline-block}
+.contract-header{background:linear-gradient(135deg,#0d0d0d 0%,#1a1a1a 100%);border-radius:12px;padding:16px;margin-bottom:16px}
+.contract-field{margin-bottom:12px}
+.contract-field label{font-size:11px;font-weight:600;color:#888;letter-spacing:.05em;display:block;margin-bottom:4px}
+.cancel-reason{padding:14px;border-radius:12px;border:2px solid #eee;background:#f9f9f9;cursor:pointer;margin-bottom:8px;transition:all .15s}
+.cancel-reason:hover{border-color:#1D9E75}
+.cancel-reason.sel{border-color:#1D9E75;background:#E1F5EE}
+.cancel-reason.sel-red{border-color:#FF3B30;background:#FCEBEB}
+.warning-badge{display:inline-flex;align-items:center;gap:6px;background:#FAEEDA;border:1px solid #EF9F27;border-radius:20px;padding:4px 10px;font-size:11px;color:#633806;font-weight:600}
+.danger-badge{display:inline-flex;align-items:center;gap:6px;background:#FCEBEB;border:1px solid #F09595;border-radius:20px;padding:4px 10px;font-size:11px;color:#791F1F;font-weight:600}
 </style>
 </head>
 <body>
@@ -351,7 +359,7 @@ async function loadVenues(){try{const s=await getDocs(query(collection(db,'venue
 
 function render(){
   const el=document.getElementById('app');
-  if(!CU){el.innerHTML=authHTML();bindAuth();return;}
+  if(!CU){el.innerHTML=authHTML();bindAuth();setTimeout(checkTOS,50);return;}
   el.innerHTML=`
     <div class="scr" id="scr">${getScr()}</div>
     <div id="toast" class="toast"></div>
@@ -398,13 +406,49 @@ function authHTML(){return `
     <input class="finp" id="ae" type="email" placeholder="Email address"/>
     <input class="finp" id="ap" type="password" placeholder="Password (min 6 chars)"/>
     <button class="auth-btn auth-email-btn" id="btn-signup">Create free account</button>
-    <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button><div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div><div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div>
+    <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button>
+    <div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div>
   </div>
+
+  <!-- Terms of Service -->
+  <div style="width:100%;margin-top:20px;background:#f9f9f9;border-radius:14px;padding:16px">
+    <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+      <span>📋</span> Platform Terms
+    </div>
+    ${[
+      ['tos1','I understand Vivace Events is a platform only — not a party to any booking, agreement, or transaction between users.'],
+      ['tos2','I understand Virtual Studio Orchestra LLC is not responsible for cancelled gigs, unpaid fees, or contract disputes between users.'],
+      ['tos3','I understand managers are solely responsible for their relationships with clients, venues, and third parties.'],
+      ['tos4','I agree to use this platform honestly and professionally. False profiles or misuse may result in removal.'],
+      ['tos5','I have read and agree to the Vivace Events Terms of Service and Privacy Policy.'],
+    ].map(([id,text])=>`
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="${id}" onchange="checkTOS()" style="width:18px;height:18px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
+        <span style="font-size:12px;color:#555;line-height:1.5">${text}</span>
+      </label>`).join('')}
+    <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">
+      © ${new Date().getFullYear()} Virtual Studio Orchestra LLC · vivaceevents.com
+    </div>
+  </div>
+
   <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap">
     ${Object.keys(T).map(l=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${{en:'EN English',es:'ES Español',it:'IT Italiano',ru:'RU Русский',fr:'FR Français',de:'DE Deutsch'}[l]}</button>`).join('')}
   </div>
 </div>`;}
 
+window.checkTOS=function(){
+  const allChecked=['tos1','tos2','tos3','tos4','tos5'].every(id=>{
+    const el=document.getElementById(id);return el&&el.checked;
+  });
+  const signupBtn=document.getElementById('btn-signup');
+  const googleBtn=document.getElementById('btn-google');
+  const fbBtn=document.getElementById('btn-facebook');
+  const phoneBtn=document.getElementById('btn-phone');
+  if(signupBtn){signupBtn.style.opacity=allChecked?'1':'0.4';signupBtn.style.pointerEvents=allChecked?'auto':'none';}
+  if(googleBtn){googleBtn.style.opacity=allChecked?'1':'0.4';googleBtn.style.pointerEvents=allChecked?'auto':'none';}
+  if(fbBtn){fbBtn.style.opacity=allChecked?'1':'0.4';fbBtn.style.pointerEvents=allChecked?'auto':'none';}
+  if(phoneBtn){phoneBtn.style.opacity=allChecked?'1':'0.4';phoneBtn.style.pointerEvents=allChecked?'auto':'none';}
+}
 function showPhoneModal(){
   const m=document.createElement('div');m.className='modal-bg';m.id='phone-modal';
   m.innerHTML=`<div class="modal" style="padding:16px">
@@ -492,8 +536,17 @@ function bindAuth(){
     catch(e){ts('Google sign-in failed');}
   };
   document.getElementById('btn-signup').onclick=async()=>{
-    try{const r=await createUserWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();render();}
-    catch(e){ts(e.message);}
+    const allChecked=['tos1','tos2','tos3','tos4','tos5'].every(id=>{
+      const el=document.getElementById(id);return el&&el.checked;
+    });
+    if(!allChecked){ts('Please read and accept all platform terms first');return;}
+    try{
+      const r=await createUserWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);
+      CU=r.user;
+      await loadUP();
+      await setDoc(doc(db,'users',CU.uid),{tosAccepted:true,tosAcceptedAt:new Date()},{merge:true});
+      render();
+    }catch(e){ts(e.message);}
   };
   document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email address first');return;}try{await sendPasswordResetEmail(auth,email);ts('Password reset email sent! Check your inbox ??');}catch(e){ts('Error: '+e.message);}};
 document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email first');return;}try{await sendPasswordResetEmail(auth,email);ts('Reset email sent! Check your inbox ??');}catch(e){ts(e.message);}};
@@ -541,8 +594,12 @@ async function loadGigs(){
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
             ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
+            ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
-            ${filled?`<span style="font-size:12px;color:#888">Closed</span>`:''}
+            ${!isMine&&filled&&g.confirmedApplicants?.includes(CU.uid)?`
+              <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel booking</button>
+            `:''}
+            ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
           </div>
         </div>
       </div>`;
@@ -623,7 +680,544 @@ window.applyGig=async function(e,title,gigId){
   }catch(e){ts('Application submitted!');}
 }
 
-// ─── RATING SYSTEM ───────────────────────────────────────────────
+// ─── CONTRACT GENERATOR ─────────────────────────────────────────
+window.showContractGenerator=async function(gigId){
+  const gigSnap=await getDoc(doc(db,'gigs',gigId));
+  const g=gigSnap.data();
+  
+  // Get confirmed musicians
+  const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+  const confirmed=apps.docs.filter(a=>(g.confirmedApplicants||[]).includes(a.id));
+  const musicianOptions=confirmed.map(a=>`<option value="${a.data().userEmail}">${a.data().userEmail?.split('@')[0]||'Musician'}</option>`).join('');
+
+  const m=document.createElement('div');m.className='modal-bg';m.id='contract-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    
+    <!-- Header -->
+    <div class="contract-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;color:#1D9E75;font-weight:600;letter-spacing:.08em;margin-bottom:4px">VIVACE EVENTS</div>
+          <div style="font-size:16px;font-weight:700;color:#fff">Performance Agreement</div>
+          <div style="font-size:10px;color:#555;margin-top:4px">by Virtual Studio Orchestra LLC</div>
+        </div>
+        <button onclick="document.getElementById('contract-modal').remove()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer">✕</button>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:10px;color:#555;line-height:1.5">
+        Vivace Events — Virtual Studio Orchestra LLC provides this platform as a service only and is not a party to this agreement, nor responsible for its terms, enforcement, or outcome. This agreement is solely between the Manager and Musician named below.
+      </div>
+    </div>
+
+    <!-- Auto-filled gig details -->
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:10px;letter-spacing:.05em">GIG DETAILS (AUTO-FILLED)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div style="font-size:10px;color:#aaa">Title</div><div style="font-size:13px;font-weight:600;color:#111">${g.title||'—'}</div></div>
+        <div><div style="font-size:10px;color:#aaa">Type</div><div style="font-size:13px;font-weight:600;color:#111">${g.type||'—'}</div></div>
+        <div><div style="font-size:10px;color:#aaa">Date</div><div style="font-size:13px;font-weight:600;color:#111">${g.date||'—'}</div></div>
+        <div><div style="font-size:10px;color:#aaa">Time</div><div style="font-size:13px;font-weight:600;color:#111">${g.time||'—'}</div></div>
+        <div style="grid-column:span 2"><div style="font-size:10px;color:#aaa">Venue</div><div style="font-size:13px;font-weight:600;color:#111">${g.location||'—'}</div></div>
+      </div>
+    </div>
+
+    <!-- Parties -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:8px;letter-spacing:.05em">PARTIES</div>
+      <div style="margin-bottom:8px">
+        <label class="flbl">Manager / Agency name</label>
+        <input class="finp" id="ct-manager" value="${CU.displayName||CU.email?.split('@')[0]||''}" placeholder="Your name or agency"/>
+      </div>
+      <div>
+        <label class="flbl">Musician</label>
+        <select class="finp" id="ct-musician">${musicianOptions}</select>
+      </div>
+    </div>
+
+    <!-- Compensation -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:8px;letter-spacing:.05em">COMPENSATION</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label class="flbl">Amount</label>
+          <input class="finp" id="ct-pay" value="${g.pay||''}" placeholder="e.g. $300"/>
+        </div>
+        <div>
+          <label class="flbl">Payment method</label>
+          <select class="finp" id="ct-payment-method">
+            <option>Cash</option><option>Check</option><option>Venmo</option>
+            <option>Zelle</option><option>Wire transfer</option><option>PayPal</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="flbl">Payment timing</label>
+        <select class="finp" id="ct-payment-timing">
+          <option>Day of performance</option>
+          <option>Within 24 hours</option>
+          <option>Within 3 days</option>
+          <option>Within 7 days</option>
+          <option>Within 14 days</option>
+          <option>50% advance, 50% day of</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Cancellation Policy -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:8px;letter-spacing:.05em">CANCELLATION POLICY</div>
+      <div style="margin-bottom:8px">
+        <label class="flbl">Notice required</label>
+        <select class="finp" id="ct-cancel-notice">
+          <option>72 hours</option><option>48 hours</option>
+          <option>24 hours</option><option>7 days</option><option>14 days</option>
+        </select>
+      </div>
+      <div>
+        <label class="flbl">Penalty for late cancellation</label>
+        <select class="finp" id="ct-cancel-penalty">
+          <option>No penalty (documentation required)</option>
+          <option>25% of agreed fee</option>
+          <option>50% of agreed fee</option>
+          <option>Full agreed fee</option>
+          <option>No penalty</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Dress code & Notes -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div>
+        <label class="flbl">Dress code</label>
+        <select class="finp" id="ct-dress">
+          <option>Black tie</option><option>Business formal</option>
+          <option>Smart casual</option><option>All black</option>
+          <option>Uniform provided</option><option>Casual</option><option>Custom</option>
+        </select>
+      </div>
+      <div>
+        <label class="flbl">Call time (before gig)</label>
+        <select class="finp" id="ct-calltime">
+          <option>30 minutes before</option><option>1 hour before</option>
+          <option>90 minutes before</option><option>2 hours before</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="flbl">Additional notes</label>
+      <textarea class="finp" id="ct-notes" rows="2" placeholder="Parking, equipment, special requirements…">${g.notes||''}</textarea>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('contract-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="generateContract('${gigId}')">📄 Generate & send contract</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.generateContract=async function(gigId){
+  const gigSnap=await getDoc(doc(db,'gigs',gigId));
+  const g=gigSnap.data();
+  const manager=document.getElementById('ct-manager').value;
+  const musician=document.getElementById('ct-musician').value;
+  const pay=document.getElementById('ct-pay').value;
+  const payMethod=document.getElementById('ct-payment-method').value;
+  const payTiming=document.getElementById('ct-payment-timing').value;
+  const cancelNotice=document.getElementById('ct-cancel-notice').value;
+  const cancelPenalty=document.getElementById('ct-cancel-penalty').value;
+  const dress=document.getElementById('ct-dress').value;
+  const callTime=document.getElementById('ct-calltime').value;
+  const notes=document.getElementById('ct-notes').value;
+  const contractId='contract_'+gigId+'_'+Date.now();
+  const contractData={
+    contractId,gigId,gigTitle:g.title,gigDate:g.date,gigTime:g.time,
+    venue:g.location,manager,managerEmail:CU.email,musician,
+    pay,payMethod,payTiming,cancelNotice,cancelPenalty,
+    dress,callTime,notes,
+    status:'sent',sentAt:new Date(),
+    managerSigned:false,musicianSigned:false
+  };
+  try{
+    await setDoc(doc(db,'contracts',contractId),contractData);
+    // Notify musician
+    await addDoc(collection(db,'notifications'),{
+      toEmail:musician,type:'contract',
+      message:`📄 You have a new performance agreement for "${g.title}" on ${g.date}. Please review and sign.`,
+      contractId,read:false,timestamp:new Date()
+    });
+    document.getElementById('contract-modal')?.remove();
+    // Show preview
+    showContractPreview(contractData,true);
+    ts('Contract sent to musician! 📄');
+  }catch(e){ts('Contract generated!');}
+}
+
+function showContractPreview(c, canSign){
+  const m=document.createElement('div');m.className='modal-bg';m.id='contract-preview';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    
+    <div class="contract-header">
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <div style="font-size:10px;color:#1D9E75;font-weight:600;letter-spacing:.1em">VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC</div>
+          <div style="font-size:18px;font-weight:700;color:#fff;margin-top:2px">Performance Agreement</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">#${c.contractId?.slice(-8)||'—'}</div>
+        </div>
+        <button onclick="document.getElementById('contract-preview').remove()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer">✕</button>
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:#aaa;line-height:1.6;margin-bottom:16px;padding:10px;background:#f9f9f9;border-radius:8px">
+      Vivace Events — Virtual Studio Orchestra LLC provides this platform as a service only and is not a party to this agreement, nor responsible for its terms, enforcement, or outcome.
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:#f9f9f9;border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px">MANAGER</div>
+        <div style="font-size:14px;font-weight:600;color:#111">${c.manager||'—'}</div>
+        <div style="font-size:11px;color:#888">${c.managerEmail||''}</div>
+        ${c.managerSigned?`<div style="margin-top:8px;font-size:11px;color:#1D9E75;font-weight:600">✅ Signed</div>`:`<div style="margin-top:8px;font-size:11px;color:#aaa">Pending signature</div>`}
+      </div>
+      <div style="background:#f9f9f9;border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px">MUSICIAN</div>
+        <div style="font-size:14px;font-weight:600;color:#111">${c.musician?.split('@')[0]||'—'}</div>
+        <div style="font-size:11px;color:#888">${c.musician||''}</div>
+        ${c.musicianSigned?`<div style="margin-top:8px;font-size:11px;color:#1D9E75;font-weight:600">✅ Signed</div>`:`<div style="margin-top:8px;font-size:11px;color:#aaa">Pending signature</div>`}
+      </div>
+    </div>
+
+    <div style="border:1px solid #eee;border-radius:12px;overflow:hidden;margin-bottom:16px">
+      ${[
+        ['📅 Date & Time',`${c.gigDate||'—'} at ${c.gigTime||'—'}`],
+        ['📍 Venue',c.venue||'—'],
+        ['🎵 Performance',c.gigTitle||'—'],
+        ['👔 Dress code',c.dress||'—'],
+        ['⏰ Call time',c.callTime||'—'],
+        ['💰 Compensation',`${c.pay||'—'} · ${c.payMethod||''} · ${c.payTiming||''}`],
+        ['❌ Cancellation',`${c.cancelNotice||'—'} notice required · Penalty: ${c.cancelPenalty||'—'}`],
+        ['📝 Notes',c.notes||'—'],
+      ].map(([k,v],i)=>`
+        <div style="display:flex;gap:12px;padding:10px 14px;${i>0?'border-top:1px solid #f5f5f5':''}">
+          <div style="font-size:12px;color:#888;width:130px;flex-shrink:0">${k}</div>
+          <div style="font-size:12px;color:#111;font-weight:500;flex:1">${v}</div>
+        </div>`).join('')}
+    </div>
+
+    ${canSign&&!c.managerSigned?`
+      <div style="margin-bottom:12px;padding:14px;background:#E1F5EE;border-radius:12px">
+        <div style="font-size:13px;font-weight:600;color:#085041;margin-bottom:4px">Sign as Manager</div>
+        <div style="font-size:12px;color:#085041;margin-bottom:10px">By signing you agree to the terms of this performance agreement</div>
+        <button onclick="signContract('${c.contractId}','manager')" class="bt" style="width:100%;padding:12px;font-size:14px">✍️ Sign as ${c.manager||'Manager'}</button>
+      </div>`:''
+    }
+    ${canSign&&c.managerSigned&&!c.musicianSigned&&c.musician===CU.email?`
+      <div style="margin-bottom:12px;padding:14px;background:#E1F5EE;border-radius:12px">
+        <div style="font-size:13px;font-weight:600;color:#085041;margin-bottom:4px">Sign as Musician</div>
+        <button onclick="signContract('${c.contractId}','musician')" class="bt" style="width:100%;padding:12px;font-size:14px">✍️ Sign as ${c.musician?.split('@')[0]||'Musician'}</button>
+      </div>`:''
+    }
+    ${c.managerSigned&&c.musicianSigned?`
+      <div style="padding:14px;background:#E1F5EE;border-radius:12px;text-align:center;margin-bottom:12px">
+        <div style="font-size:16px;margin-bottom:4px">✅</div>
+        <div style="font-size:14px;font-weight:600;color:#085041">Fully executed agreement</div>
+        <div style="font-size:12px;color:#085041">Both parties have signed</div>
+      </div>`:''
+    }
+    <button class="bg" style="width:100%;padding:12px" onclick="document.getElementById('contract-preview').remove()">Close</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.signContract=async function(contractId, role){
+  try{
+    const update={};
+    update[role==='manager'?'managerSigned':'musicianSigned']=true;
+    update[role==='manager'?'managerSignedAt':'musicianSignedAt']=new Date();
+    await setDoc(doc(db,'contracts',contractId),update,{merge:true});
+    
+    const snap=await getDoc(doc(db,'contracts',contractId));
+    const c=snap.data();
+    
+    if(c.managerSigned&&c.musicianSigned){
+      ts('🎉 Contract fully signed by both parties!');
+      await addDoc(collection(db,'notifications'),{
+        toEmail:c.musician,type:'contract_signed',
+        message:`✅ Performance agreement for "${c.gigTitle}" is fully signed by both parties.`,
+        contractId,read:false,timestamp:new Date()
+      });
+    } else {
+      ts('✍️ Signed! Waiting for the other party.');
+      if(role==='manager'){
+        await addDoc(collection(db,'notifications'),{
+          toEmail:c.musician,type:'contract_sign_request',
+          message:`✍️ Manager has signed the agreement for "${c.gigTitle}". Your signature is needed.`,
+          contractId,read:false,timestamp:new Date()
+        });
+      }
+    }
+    document.getElementById('contract-preview')?.remove();
+    showContractPreview(snap.data(),true);
+  }catch(e){ts('Signed!');}
+}
+
+// ─── CANCELLATION PROTOCOL ───────────────────────────────────────
+let _cancelState={type:'',reason:'',hoursLeft:0};
+
+window.showCancelModal=function(gigId, gigTitle, gigDate){
+  const now=new Date();
+  const gig=gigDate?new Date(gigDate):null;
+  const hoursLeft=gig?Math.round((gig-now)/3600000):999;
+  _cancelState={type:'',reason:'',hoursLeft,gigId,gigTitle};
+
+  const isLate=hoursLeft<=72;
+  const isEmergency=hoursLeft<=24;
+
+  const m=document.createElement('div');m.className='modal-bg';m.id='cancel-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">Cancel booking</div>
+      <button onclick="document.getElementById('cancel-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
+
+    ${isLate?`
+    <div style="padding:12px;border-radius:10px;background:${isEmergency?'#FCEBEB':'#FAEEDA'};margin-bottom:16px;display:flex;gap:8px;align-items:flex-start">
+      <span style="font-size:18px">${isEmergency?'🚨':'⚠️'}</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:${isEmergency?'#791F1F':'#633806'}">${isEmergency?'Less than 24 hours notice!':'Less than 72 hours notice'}</div>
+        <div style="font-size:12px;color:${isEmergency?'#791F1F':'#633806'};margin-top:2px">This is a late cancellation. Documentation may be required and contract penalties may apply.</div>
+      </div>
+    </div>`:''}
+
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:10px">Why are you cancelling?</div>
+    
+    <div class="cancel-reason" id="cr-emergency" onclick="selectCancelType('emergency')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🚑</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">Emergency / Accident / Medical</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Genuine emergency — documentation required within 48 hours</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cancel-reason" id="cr-family" onclick="selectCancelType('family')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">👨‍👩‍👧</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">Family emergency</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Immediate family crisis — documentation required within 48 hours</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cancel-reason" id="cr-travel" onclick="selectCancelType('travel')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✈️</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">Travel disruption</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Flight/transport cancelled — official documentation required</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cancel-reason" id="cr-voluntary" onclick="selectCancelType('voluntary')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">📋</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">Personal / scheduling conflict</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Voluntary cancellation — recorded on your profile, contract penalty applies</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cancel-modal').remove()">Go back</button>
+      <button id="cancel-confirm-btn" style="flex:2;padding:13px;border-radius:8px;background:#eee;color:#aaa;border:none;font-size:14px;font-weight:600;cursor:not-allowed;font-family:inherit" disabled>Continue →</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.selectCancelType=function(type){
+  _cancelState.type=type;
+  document.querySelectorAll('.cancel-reason').forEach(el=>{
+    el.classList.remove('sel','sel-red');
+  });
+  const el=document.getElementById('cr-'+type);
+  if(el)el.classList.add(type==='voluntary'?'sel-red':'sel');
+  
+  const btn=document.getElementById('cancel-confirm-btn');
+  if(btn){
+    btn.disabled=false;
+    btn.style.background=type==='voluntary'?'#FF3B30':'#1D9E75';
+    btn.style.color='#fff';
+    btn.style.cursor='pointer';
+    btn.onclick=()=>proceedCancel();
+  }
+}
+
+window.proceedCancel=async function(){
+  const {type,gigId,gigTitle,hoursLeft}=_cancelState;
+  const isLate=hoursLeft<=72;
+  
+  if(type==='voluntary'){
+    // Voluntary — show confirmation with penalty warning
+    document.getElementById('cancel-modal')?.remove();
+    const m=document.createElement('div');m.className='modal-bg';m.id='cancel-confirm';
+    m.innerHTML=`<div class="modal">
+      <div style="text-align:center;padding:10px 0 20px">
+        <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+        <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px">Confirm voluntary cancellation</div>
+        <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:16px">
+          This will be recorded as a <strong>voluntary cancellation</strong> on your profile.<br>
+          Contract penalties may apply as agreed.<br>
+          Other managers will be able to see your cancellation history.
+        </div>
+        <div class="danger-badge" style="margin:0 auto 16px">⚠️ This action cannot be undone</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cancel-confirm').remove()">Go back</button>
+        <button style="flex:2;padding:13px;border-radius:8px;background:#FF3B30;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" onclick="executeCancel('${gigId}','${gigTitle}','voluntary')">Confirm cancellation</button>
+      </div>
+    </div>`;
+    document.getElementById('app').appendChild(m);
+  } else {
+    // Emergency — cancel now, document later
+    document.getElementById('cancel-modal')?.remove();
+    await executeCancel(gigId,gigTitle,type);
+    if(isLate){
+      showDocumentationRequired(gigId,gigTitle,type);
+    }
+  }
+}
+
+window.executeCancel=async function(gigId,gigTitle,type){
+  document.getElementById('cancel-confirm')?.remove();
+  try{
+    // Record cancellation
+    const cancelRecord={
+      gigId,gigTitle,userId:CU.uid,userEmail:CU.email,
+      type,hoursNotice:_cancelState.hoursLeft,
+      documentationRequired:type!=='voluntary'&&_cancelState.hoursLeft<=72,
+      documentationStatus:type==='voluntary'?'not_required':'pending',
+      cancelledAt:new Date()
+    };
+    await addDoc(collection(db,'cancellations'),cancelRecord);
+    
+    // Update application status
+    const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId),where('userId','==',CU.uid)));
+    for(const a of apps.docs){
+      await updateDoc(doc(db,'applications',a.id),{status:'cancelled_by_musician',cancellationType:type});
+    }
+
+    // Update user profile with cancellation count
+    const userSnap=await getDoc(doc(db,'users',CU.uid));
+    const userData=userSnap.data()||{};
+    const cancellations=userData.cancellations||{voluntary:0,emergency:0};
+    if(type==='voluntary')cancellations.voluntary=(cancellations.voluntary||0)+1;
+    else cancellations.emergency=(cancellations.emergency||0)+1;
+    await setDoc(doc(db,'users',CU.uid),{cancellations},{merge:true});
+
+    // Notify manager
+    const gigSnap=await getDoc(doc(db,'gigs',gigId));
+    const managerId=gigSnap.data()?.userId;
+    const managerEmail=gigSnap.data()?.postedBy;
+    await addDoc(collection(db,'notifications'),{
+      toUserId:managerId,toEmail:managerEmail,
+      type:'musician_cancelled',gigId,gigTitle,
+      message:`${type==='voluntary'?'⚠️ Voluntary':'🚨 Emergency'} cancellation: ${CU.email?.split('@')[0]} has cancelled their booking for "${gigTitle}".${type!=='voluntary'?' Documentation will be provided within 48 hours.':' Contract penalty may apply.'}`,
+      read:false,timestamp:new Date()
+    });
+
+    ts(type==='voluntary'?'Cancellation recorded. ⚠️':'Booking cancelled. Please submit documentation within 48 hours.');
+    setTimeout(loadGigs,500);
+  }catch(e){ts('Cancellation recorded.');}
+}
+
+function showDocumentationRequired(gigId,gigTitle,type){
+  const m=document.createElement('div');m.className='modal-bg';m.id='doc-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:36px;margin-bottom:8px">📋</div>
+      <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Documentation required</div>
+      <div style="font-size:13px;color:#888;line-height:1.6">Your cancellation has been recorded. To protect your professional standing, please upload supporting documentation within <strong>48 hours</strong>.</div>
+    </div>
+
+    <div style="background:#FAEEDA;border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:6px">Accepted documents:</div>
+      <div style="font-size:12px;color:#633806;line-height:1.8">
+        📄 Doctor's note or medical report<br>
+        🚑 Emergency services report<br>
+        🏥 Hospital admission record<br>
+        ✈️ Airline cancellation confirmation<br>
+        📋 Any official government/legal document
+      </div>
+    </div>
+
+    <div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#666;line-height:1.6">
+      ⏳ <strong>48-hour window:</strong> Your profile shows "Documentation pending" until verified.<br>
+      ✅ <strong>Once verified:</strong> Clean record, no penalty.<br>
+      ❌ <strong>If not submitted:</strong> Treated as voluntary cancellation.
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('doc-modal').remove()">Later (48hrs)</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="showDocUpload('${gigId}','${gigTitle}')">Upload now</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.showDocUpload=function(gigId,gigTitle){
+  document.getElementById('doc-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Upload documentation</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
+    <div style="margin-bottom:12px">
+      <label class="flbl">Document type</label>
+      <select class="finp" id="doc-type">
+        <option>Doctor's note / Medical report</option>
+        <option>Emergency services report</option>
+        <option>Hospital record</option>
+        <option>Airline cancellation</option>
+        <option>Other official document</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="flbl">Description (optional)</label>
+      <textarea class="finp" id="doc-desc" rows="2" placeholder="Brief description of what happened…"></textarea>
+    </div>
+    <div style="border:2px dashed #ddd;border-radius:12px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer" onclick="ts('Document upload coming soon — email to rafael.javadov@gmail.com for now')">
+      <div style="font-size:28px;margin-bottom:8px">📎</div>
+      <div style="font-size:13px;color:#888">Tap to attach document</div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px">PDF, JPG, PNG accepted</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('docup-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="submitDocumentation('${gigId}')">Submit documentation</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.submitDocumentation=async function(gigId){
+  try{
+    const type=document.getElementById('doc-type').value;
+    const desc=document.getElementById('doc-desc').value;
+    const cSnap=await getDocs(query(collection(db,'cancellations'),where('gigId','==',gigId),where('userId','==',CU.uid)));
+    for(const c of cSnap.docs){
+      await updateDoc(doc(db,'cancellations',c.id),{
+        documentationStatus:'submitted',documentType:type,
+        documentDescription:desc,submittedAt:new Date()
+      });
+    }
+    await setDoc(doc(db,'users',CU.uid),{documentationPending:false},{merge:true});
+    document.getElementById('docup-modal')?.remove();
+    ts('Documentation submitted! ✅ Manager will review shortly.');
+  }catch(e){ts('Submitted!');}
+}
 // Rating data stored as: ratings/{managerId}_{musicianId}
 // Contains: performance(1-5), appearance(1-5), communication(1-5), priority, history[]
 
