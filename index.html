@@ -2109,9 +2109,23 @@ function showGPicker(names){
 
 window.doInvite=async function(gid,gname,names){
   try{
-    for(const n of names) await addDoc(collection(db,'invites'),{groupId:gid,groupName:gname,toName:n,fromId:CU.uid,fromEmail:CU.email,status:'pending',timestamp:new Date()});
-    ts('Invites sent to '+names.length+' artist'+(names.length>1?'s':'')+' for '+gname+'!');
-    document.getElementById('gpick')?.remove();CP=[];
+    for(const n of names){
+      await addDoc(collection(db,'invites'),{groupId:gid,groupName:gname,toName:n,fromId:CU.uid,fromEmail:CU.email,status:'pending',timestamp:new Date()});
+      // Send notification to invited artist
+      await addDoc(collection(db,'notifications'),{
+        toEmail:n.includes('@')?n:n+'@vivaceevents.com',
+        type:'group_invite',
+        message:`🎵 You've been invited to join the group "${gname}" on Vivace Events!`,
+        groupId:gid,groupName:gname,
+        fromEmail:CU.email,
+        read:false,timestamp:new Date()
+      });
+    }
+    ts('Invites sent to '+names.length+' artist'+(names.length>1?'s':'')+' for '+gname+'! 🎉');
+    document.getElementById('gpick')?.remove();
+    document.getElementById('cp-bar')?.remove();
+    CP=[];
+    document.querySelectorAll('.member-check').forEach(el=>el.classList.remove('on'));
   }catch(e){ts('Invites sent!');}
 }
 
