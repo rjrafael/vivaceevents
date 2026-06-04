@@ -100,6 +100,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cancel-reason.sel-red{border-color:#FF3B30;background:#FCEBEB}
 .warning-badge{display:inline-flex;align-items:center;gap:6px;background:#FAEEDA;border:1px solid #EF9F27;border-radius:20px;padding:4px 10px;font-size:11px;color:#633806;font-weight:600}
 .danger-badge{display:inline-flex;align-items:center;gap:6px;background:#FCEBEB;border:1px solid #F09595;border-radius:20px;padding:4px 10px;font-size:11px;color:#791F1F;font-weight:600}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.5)}60%{box-shadow:0 0 0 8px rgba(255,59,48,0)}}
 </style>
 </head>
 <body>
@@ -636,8 +637,11 @@ async function loadGigs(){
             ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
             ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
-            ${!isMine&&filled&&g.confirmedApplicants?.includes(CU.uid)?`
-              <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel booking</button>
+            ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
+              <div style="display:flex;gap:6px">
+                <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨 Emergency</button>
+              </div>
             `:''}
             ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
           </div>
@@ -1250,267 +1254,101 @@ window.downloadContract=function(url,title){
   link.click();
 }
 
-// ─── CANCELLATION PROTOCOL ───────────────────────────────────────
+// ─── UNIFIED CANCELLATION SYSTEM ────────────────────────────────
 let _cancelState={type:'',reason:'',hoursLeft:0};
 
-window.showCancelModal=function(gigId, gigTitle, gigDate){
+// ── EMERGENCY CANCEL ─────────────────────────────────────────────
+window.showEmergencyCancel=function(gigId, gigTitle, gigDate){
   const now=new Date();
   const gig=gigDate?new Date(gigDate):null;
   const hoursLeft=gig?Math.round((gig-now)/3600000):999;
-  _cancelState={type:'',reason:'',hoursLeft,gigId,gigTitle};
+  _cancelState={type:'emergency',reason:'emergency',hoursLeft,gigId,gigTitle};
 
-  const isLate=hoursLeft<=72;
-  const isEmergency=hoursLeft<=24;
-
-  const m=document.createElement('div');m.className='modal-bg';m.id='cancel-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div style="font-size:17px;font-weight:700;color:#111">Cancel booking</div>
-      <button onclick="document.getElementById('cancel-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+  // Check abuse — has this user had an emergency in last 6 months?
+  const m=document.createElement('div');m.className='modal-bg';m.id='emergency-modal';
+  m.innerHTML=`<div class="modal" style="text-align:center">
+    <div style="font-size:56px;margin-bottom:8px">🚨</div>
+    <div style="font-size:20px;font-weight:700;color:#111;margin-bottom:8px">Emergency cancellation</div>
+    <div style="font-size:13px;color:#666;line-height:1.7;margin-bottom:20px">
+      We understand emergencies happen.<br>
+      Your booking will be cancelled immediately and the manager will be notified right away.<br><br>
+      <strong>You'll have 72 hours to submit documentation</strong> when you're able — no penalty if verified.
     </div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
-
-    ${isLate?`
-    <div style="padding:12px;border-radius:10px;background:${isEmergency?'#FCEBEB':'#FAEEDA'};margin-bottom:16px;display:flex;gap:8px;align-items:flex-start">
-      <span style="font-size:18px">${isEmergency?'🚨':'⚠️'}</span>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:${isEmergency?'#791F1F':'#633806'}">${isEmergency?'Less than 24 hours notice!':'Less than 72 hours notice'}</div>
-        <div style="font-size:12px;color:${isEmergency?'#791F1F':'#633806'};margin-top:2px">This is a late cancellation. Documentation may be required and contract penalties may apply.</div>
-      </div>
-    </div>`:''}
-
-    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:10px">Why are you cancelling?</div>
-    
-    <div class="cancel-reason" id="cr-emergency" onclick="selectCancelType('emergency')">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">🚑</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#111">Emergency / Accident / Medical</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">Genuine emergency — documentation required within 48 hours</div>
-        </div>
-      </div>
+    <div style="background:#FAEEDA;border-radius:12px;padding:12px;margin-bottom:20px;font-size:12px;color:#633806;text-align:left;line-height:1.6">
+      ⚠️ Please only use this for genuine emergencies. Abuse of the emergency system may result in account suspension.
     </div>
-
-    <div class="cancel-reason" id="cr-family" onclick="selectCancelType('family')">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">👨‍👩‍👧</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#111">Family emergency</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">Immediate family crisis — documentation required within 48 hours</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="cancel-reason" id="cr-travel" onclick="selectCancelType('travel')">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">✈️</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#111">Travel disruption</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">Flight/transport cancelled — official documentation required</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="cancel-reason" id="cr-voluntary" onclick="selectCancelType('voluntary')">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">📋</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#111">Personal / scheduling conflict</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">Voluntary cancellation — recorded on your profile, contract penalty applies</div>
-        </div>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cancel-modal').remove()">Go back</button>
-      <button id="cancel-confirm-btn" style="flex:2;padding:13px;border-radius:8px;background:#eee;color:#aaa;border:none;font-size:14px;font-weight:600;cursor:not-allowed;font-family:inherit" disabled>Continue →</button>
-    </div>
+    <button onclick="executeEmergencyCancel('${gigId}','${gigTitle}')" 
+      style="width:100%;padding:16px;border-radius:12px;background:#FF3B30;color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;animation:pulse-red 1.5s infinite">
+      🚨 Yes — Emergency Cancel
+    </button>
+    <button onclick="document.getElementById('emergency-modal').remove()"
+      style="width:100%;padding:13px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:14px;cursor:pointer;font-family:inherit">
+      I'm okay — go back
+    </button>
   </div>`;
   document.getElementById('app').appendChild(m);
 }
 
-window.selectCancelType=function(type){
-  _cancelState.type=type;
-  document.querySelectorAll('.cancel-reason').forEach(el=>{
-    el.classList.remove('sel','sel-red');
-  });
-  const el=document.getElementById('cr-'+type);
-  if(el)el.classList.add(type==='voluntary'?'sel-red':'sel');
-  
-  const btn=document.getElementById('cancel-confirm-btn');
-  if(btn){
-    btn.disabled=false;
-    btn.style.background=type==='voluntary'?'#FF3B30':'#1D9E75';
-    btn.style.color='#fff';
-    btn.style.cursor='pointer';
-    btn.onclick=()=>proceedCancel();
-  }
-}
-
-window.proceedCancel=async function(){
-  const {type,gigId,gigTitle,hoursLeft}=_cancelState;
-  const isLate=hoursLeft<=72;
-  
-  if(type==='voluntary'){
-    // Voluntary — show confirmation with penalty warning
-    document.getElementById('cancel-modal')?.remove();
-    const m=document.createElement('div');m.className='modal-bg';m.id='cancel-confirm';
-    m.innerHTML=`<div class="modal">
-      <div style="text-align:center;padding:10px 0 20px">
-        <div style="font-size:36px;margin-bottom:10px">⚠️</div>
-        <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px">Confirm voluntary cancellation</div>
-        <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:16px">
-          This will be recorded as a <strong>voluntary cancellation</strong> on your profile.<br>
-          Contract penalties may apply as agreed.<br>
-          Other managers will be able to see your cancellation history.
-        </div>
-        <div class="danger-badge" style="margin:0 auto 16px">⚠️ This action cannot be undone</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cancel-confirm').remove()">Go back</button>
-        <button style="flex:2;padding:13px;border-radius:8px;background:#FF3B30;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" onclick="executeCancel('${gigId}','${gigTitle}','voluntary')">Confirm cancellation</button>
-      </div>
-    </div>`;
-    document.getElementById('app').appendChild(m);
-  } else {
-    // Emergency — cancel now, document later
-    document.getElementById('cancel-modal')?.remove();
-    await executeCancel(gigId,gigTitle,type);
-    if(isLate){
-      showDocumentationRequired(gigId,gigTitle,type);
-    }
-  }
-}
-
-window.executeCancel=async function(gigId,gigTitle,type){
-  document.getElementById('cancel-confirm')?.remove();
+window.executeEmergencyCancel=async function(gigId, gigTitle){
+  document.getElementById('emergency-modal')?.remove();
   try{
-    // Record cancellation
+    // Record emergency cancellation
     const cancelRecord={
       gigId,gigTitle,userId:CU.uid,userEmail:CU.email,
-      type,hoursNotice:_cancelState.hoursLeft,
-      documentationRequired:type!=='voluntary'&&_cancelState.hoursLeft<=72,
-      documentationStatus:type==='voluntary'?'not_required':'pending',
+      type:'emergency',hoursNotice:_cancelState.hoursLeft,
+      documentationRequired:true,documentationStatus:'pending',
       cancelledAt:new Date()
     };
     await addDoc(collection(db,'cancellations'),cancelRecord);
-    
-    // Update application status
+
+    // Update application
     const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId),where('userId','==',CU.uid)));
-    for(const a of apps.docs){
-      await updateDoc(doc(db,'applications',a.id),{status:'cancelled_by_musician',cancellationType:type});
-    }
+    for(const a of apps.docs) await updateDoc(doc(db,'applications',a.id),{status:'emergency_cancelled'});
 
-    // Update user profile with cancellation count
+    // Update user profile
     const userSnap=await getDoc(doc(db,'users',CU.uid));
-    const userData=userSnap.data()||{};
+    const userData=userSnap.exists()?userSnap.data():{};
     const cancellations=userData.cancellations||{voluntary:0,emergency:0};
-    if(type==='voluntary')cancellations.voluntary=(cancellations.voluntary||0)+1;
-    else cancellations.emergency=(cancellations.emergency||0)+1;
-    await setDoc(doc(db,'users',CU.uid),{cancellations},{merge:true});
+    cancellations.emergency=(cancellations.emergency||0)+1;
+    await setDoc(doc(db,'users',CU.uid),{cancellations,documentationPending:true},{merge:true});
 
-    // Notify manager
+    // Notify manager — URGENT
     const gigSnap=await getDoc(doc(db,'gigs',gigId));
-    const managerId=gigSnap.data()?.userId;
     const managerEmail=gigSnap.data()?.postedBy;
     await addDoc(collection(db,'notifications'),{
-      toUserId:managerId,toEmail:managerEmail,
-      type:'musician_cancelled',gigId,gigTitle,
-      message:`${type==='voluntary'?'⚠️ Voluntary':'🚨 Emergency'} cancellation: ${CU.email?.split('@')[0]} has cancelled their booking for "${gigTitle}".${type!=='voluntary'?' Documentation will be provided within 48 hours.':' Contract penalty may apply.'}`,
-      read:false,timestamp:new Date()
+      toEmail:managerEmail,type:'emergency_cancel',
+      message:`🚨 EMERGENCY: ${CU.displayName||CU.email?.split('@')[0]||'A musician'} has an emergency and cannot perform at "${gigTitle}". They have been notified to submit documentation within 72 hours.`,
+      read:false,timestamp:new Date(),urgent:true
     });
 
-    ts(type==='voluntary'?'Cancellation recorded. ⚠️':'Booking cancelled. Please submit documentation within 48 hours.');
-    setTimeout(loadGigs,500);
-  }catch(e){ts('Cancellation recorded.');}
-}
-
-function showDocumentationRequired(gigId,gigTitle,type){
-  const m=document.createElement('div');m.className='modal-bg';m.id='doc-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:36px;margin-bottom:8px">📋</div>
-      <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Documentation required</div>
-      <div style="font-size:13px;color:#888;line-height:1.6">Your cancellation has been recorded. To protect your professional standing, please upload supporting documentation within <strong>48 hours</strong>.</div>
-    </div>
-
-    <div style="background:#FAEEDA;border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:6px">Accepted documents:</div>
-      <div style="font-size:12px;color:#633806;line-height:1.8">
-        📄 Doctor's note or medical report<br>
-        🚑 Emergency services report<br>
-        🏥 Hospital admission record<br>
-        ✈️ Airline cancellation confirmation<br>
-        📋 Any official government/legal document
+    // Show compassionate follow-up
+    const followUp=document.createElement('div');followUp.className='modal-bg';followUp.id='emergency-followup';
+    followUp.innerHTML=`<div class="modal" style="text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">💙</div>
+      <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:10px">Stay safe</div>
+      <div style="font-size:13px;color:#666;line-height:1.7;margin-bottom:20px">
+        Your booking has been cancelled and the manager has been notified.<br><br>
+        When you're able, please submit documentation within <strong>72 hours</strong> to keep your record clean. No rush right now — take care of yourself first.
       </div>
-    </div>
-
-    <div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#666;line-height:1.6">
-      ⏳ <strong>48-hour window:</strong> Your profile shows "Documentation pending" until verified.<br>
-      ✅ <strong>Once verified:</strong> Clean record, no penalty.<br>
-      ❌ <strong>If not submitted:</strong> Treated as voluntary cancellation.
-    </div>
-
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('doc-modal').remove()">Later (48hrs)</button>
-      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="showDocUpload('${gigId}','${gigTitle}')">Upload now</button>
-    </div>
-  </div>`;
-  document.getElementById('app').appendChild(m);
+      <div style="background:#E1F5EE;border-radius:12px;padding:14px;margin-bottom:20px">
+        <div style="font-size:12px;color:#085041;line-height:1.6">
+          📄 Accepted documents:<br>
+          Doctor's note · Hospital record · Emergency services report · Any official document
+        </div>
+      </div>
+      <button onclick="showDocUpload('${gigId}','${gigTitle}');document.getElementById('emergency-followup').remove()"
+        class="bt" style="width:100%;padding:13px;margin-bottom:8px">Upload documentation now</button>
+      <button onclick="document.getElementById('emergency-followup').remove()"
+        style="width:100%;padding:12px;border-radius:10px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;cursor:pointer;font-family:inherit">
+        I'll do it later (72 hrs)
+      </button>
+    </div>`;
+    document.getElementById('app').appendChild(followUp);
+    setTimeout(loadGigs,500);
+  }catch(e){ts('Emergency cancellation recorded. Stay safe. 💙');}
 }
 
-window.showDocUpload=function(gigId,gigTitle){
-  document.getElementById('doc-modal')?.remove();
-  const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Upload documentation</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
-    <div style="margin-bottom:12px">
-      <label class="flbl">Document type</label>
-      <select class="finp" id="doc-type">
-        <option>Doctor's note / Medical report</option>
-        <option>Emergency services report</option>
-        <option>Hospital record</option>
-        <option>Airline cancellation</option>
-        <option>Other official document</option>
-      </select>
-    </div>
-    <div style="margin-bottom:12px">
-      <label class="flbl">Description (optional)</label>
-      <textarea class="finp" id="doc-desc" rows="2" placeholder="Brief description of what happened…"></textarea>
-    </div>
-    <div style="border:2px dashed #ddd;border-radius:12px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer" onclick="ts('Document upload coming soon — email to rafael.javadov@gmail.com for now')">
-      <div style="font-size:28px;margin-bottom:8px">📎</div>
-      <div style="font-size:13px;color:#888">Tap to attach document</div>
-      <div style="font-size:11px;color:#aaa;margin-top:4px">PDF, JPG, PNG accepted</div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('docup-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="submitDocumentation('${gigId}')">Submit documentation</button>
-    </div>
-  </div>`;
-  document.getElementById('app').appendChild(m);
-}
-
-window.submitDocumentation=async function(gigId){
-  try{
-    const type=document.getElementById('doc-type').value;
-    const desc=document.getElementById('doc-desc').value;
-    const cSnap=await getDocs(query(collection(db,'cancellations'),where('gigId','==',gigId),where('userId','==',CU.uid)));
-    for(const c of cSnap.docs){
-      await updateDoc(doc(db,'cancellations',c.id),{
-        documentationStatus:'submitted',documentType:type,
-        documentDescription:desc,submittedAt:new Date()
-      });
-    }
-    await setDoc(doc(db,'users',CU.uid),{documentationPending:false},{merge:true});
-    document.getElementById('docup-modal')?.remove();
-    ts('Documentation submitted! ✅ Manager will review shortly.');
-  }catch(e){ts('Submitted!');}
-}
-// Rating data stored as: ratings/{managerId}_{musicianId}
-// Contains: performance(1-5), appearance(1-5), communication(1-5), priority, history[]
-
+// ── REGULAR CANCEL ───────────────────────────────────────────────
 // ─── REPORT SYSTEM ───────────────────────────────────────────────
 window.showReportModal=function(type, targetId, targetName, targetEmail){
   const m=document.createElement('div');m.className='modal-bg';m.id='report-modal';
@@ -1950,20 +1788,162 @@ window.showLangPicker=function(){
 
 window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
 
-window.demoRespond=async function(type){
-  const btns=['demo-avail','demo-maybe','demo-no'];
-  const types=['available','maybe','no'];
-  btns.forEach((id,i)=>{
+// ─── SMART RESPONSE SYSTEM ───────────────────────────────────────
+// Demo broadcast gig date (next Friday 8pm)
+const DEMO_GIG_DATE=new Date();
+DEMO_GIG_DATE.setDate(DEMO_GIG_DATE.getDate()+(5-DEMO_GIG_DATE.getDay()+7)%7||7);
+DEMO_GIG_DATE.setHours(20,0,0,0);
+
+let _currentDemoResponse=null; // tracks current response
+
+function _applyBtnStyles(selected){
+  const map={available:'demo-avail',maybe:'demo-maybe',no:'demo-no'};
+  Object.entries(map).forEach(([type,id])=>{
     const btn=document.getElementById(id);if(!btn)return;
-    btn.style.opacity=types[i]===type?'1':'0.5';
-    btn.style.transform=types[i]===type?'scale(1.05)':'scale(1)';
-    btn.style.boxShadow=types[i]===type?'0 0 0 3px rgba(255,255,255,0.3)':'none';
+    if(!selected){
+      // No response yet — all full color, equal opacity
+      btn.style.opacity='1';
+      btn.style.transform='scale(1)';
+      btn.style.boxShadow='none';
+    } else if(type===selected){
+      // Selected — pop forward
+      btn.style.opacity='1';
+      btn.style.transform='scale(1.05)';
+      btn.style.boxShadow='0 0 0 3px rgba(255,255,255,0.35)';
+    } else {
+      // Others — fade slightly
+      btn.style.opacity='0.45';
+      btn.style.transform='scale(1)';
+      btn.style.boxShadow='none';
+    }
   });
-  try{
-    await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
-    ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'❌ Response recorded');
-  }catch(e){ts('Response saved!');}
 }
+
+async function _saveResponse(type){
+  _currentDemoResponse=type;
+  _applyBtnStyles(type);
+  try{
+    await addDoc(collection(db,'responses'),{
+      type,userId:CU.uid,userEmail:CU.email,
+      broadcastId:'demo',timestamp:new Date()
+    });
+  }catch(e){}
+}
+
+function _hoursUntilGig(){
+  return Math.round((DEMO_GIG_DATE-new Date())/3600000);
+}
+
+function _responseLabel(type){
+  return type==='available'?'I am available':type==='maybe'?'Maybe':'Can\'t make it';
+}
+
+window.demoRespond=async function(type){
+  const hours=_hoursUntilGig();
+
+  // CASE 1: No previous response — first time
+  if(!_currentDemoResponse){
+    // Show friendly first-time confirmation
+    showResponseConfirm({
+      emoji: type==='available'?'✅':type==='maybe'?'⚡':'❌',
+      title: type==='available'?'Mark yourself as available?':type==='maybe'?'Mark as maybe?':'Mark as can\'t make it?',
+      body: type==='available'?'The manager will see you\'re available and may reach out to confirm your spot.':
+            type==='maybe'?'You\'ll appear as "maybe" — you can update this anytime before the gig.':
+            'You\'ll be marked as unavailable. You can still change this later if plans change.',
+      confirmLabel: type==='available'?'✅ Yes, I\'m available':type==='maybe'?'⚡ Mark as maybe':'❌ Can\'t make it',
+      confirmColor: type==='available'?'#1D9E75':type==='maybe'?'#FFD700':'#FF3B30',
+      confirmTextColor: type==='maybe'?'#7A5800':'#fff',
+      onConfirm: async()=>{ await _saveResponse(type); ts(type==='available'?'✅ You\'re marked as available! Manager will be in touch.':type==='maybe'?'⚡ Marked as maybe — you can update anytime.':'❌ Got it — marked as can\'t make it.'); }
+    });
+    return;
+  }
+
+  // CASE 2: Same response — no action needed
+  if(_currentDemoResponse===type){
+    ts('You already selected this response.');
+    return;
+  }
+
+  // CASE 3: Changing response — check timing
+  if(hours<=24){
+    // HARD BLOCK — must use cancellation protocol
+    showResponseConfirm({
+      emoji:'🚨',
+      title:'Less than 24 hours to go!',
+      body:`It's too late to simply change your response. To cancel or change your availability this close to the gig, you need to go through the cancellation process so the manager is properly notified.`,
+      confirmLabel:'Go to cancellation',
+      confirmColor:'#FF3B30',
+      confirmTextColor:'#fff',
+      cancelLabel:'Keep my response',
+      onConfirm:()=>{ ts('Please use the Cancel booking button on the gig card.'); }
+    });
+    return;
+  }
+
+  if(hours<=72){
+    // WARNING — manager will be notified
+    showResponseConfirm({
+      emoji:'⚠️',
+      title:'Heads up — late change',
+      body:`You're changing from "${_responseLabel(_currentDemoResponse)}" to "${_responseLabel(type)}" less than 72 hours before the gig.\n\nThe manager will be notified immediately of this change.`,
+      confirmLabel:`Change to ${_responseLabel(type)}`,
+      confirmColor: type==='available'?'#1D9E75':type==='maybe'?'#FFD700':'#FF3B30',
+      confirmTextColor: type==='maybe'?'#7A5800':'#fff',
+      cancelLabel:'Keep my response',
+      onConfirm: async()=>{
+        await _saveResponse(type);
+        // Notify manager
+        try{
+          await addDoc(collection(db,'notifications'),{
+            toEmail:'manager@vivaceevents.com',
+            type:'response_changed',
+            message:`⚠️ ${CU.email?.split('@')[0]||'A musician'} changed their response from "${_responseLabel(_currentDemoResponse)}" to "${_responseLabel(type)}" — less than 72 hours before the gig.`,
+            read:false,timestamp:new Date()
+          });
+        }catch(e){}
+        ts(`Response updated. Manager has been notified. ${type==='available'?'✅':type==='maybe'?'⚡':'❌'}`);
+      }
+    });
+    return;
+  }
+
+  // CASE 4: More than 72 hours — change freely with simple confirmation
+  showResponseConfirm({
+    emoji: type==='available'?'✅':type==='maybe'?'⚡':'❌',
+    title:`Change to "${_responseLabel(type)}"?`,
+    body:`You previously responded "${_responseLabel(_currentDemoResponse)}". You can change this freely since the gig is more than 72 hours away.`,
+    confirmLabel:`Change to ${_responseLabel(type)}`,
+    confirmColor: type==='available'?'#1D9E75':type==='maybe'?'#FFD700':'#FF3B30',
+    confirmTextColor: type==='maybe'?'#7A5800':'#fff',
+    cancelLabel:'Keep my response',
+    onConfirm: async()=>{
+      await _saveResponse(type);
+      ts(`Response updated to "${_responseLabel(type)}" ${type==='available'?'✅':type==='maybe'?'⚡':'❌'}`);
+    }
+  });
+}
+
+function showResponseConfirm({emoji,title,body,confirmLabel,confirmColor,confirmTextColor,cancelLabel,onConfirm}){
+  document.getElementById('resp-confirm')?.remove();
+  const m=document.createElement('div');
+  m.className='modal-bg';m.id='resp-confirm';
+  m.innerHTML=`<div class="modal" style="text-align:center">
+    <div style="font-size:40px;margin-bottom:12px">${emoji}</div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:10px">${title}</div>
+    <div style="font-size:13px;color:#666;line-height:1.7;margin-bottom:20px;white-space:pre-line">${body}</div>
+    <button onclick="document.getElementById('resp-confirm').remove();(window._respConfirmOk&&window._respConfirmOk())" 
+      style="width:100%;padding:14px;border-radius:10px;background:${confirmColor};color:${confirmTextColor||'#fff'};border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">
+      ${confirmLabel}
+    </button>
+    ${cancelLabel?`<button onclick="document.getElementById('resp-confirm').remove()" 
+      style="width:100%;padding:12px;border-radius:10px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;cursor:pointer;font-family:inherit">
+      ${cancelLabel}
+    </button>`:''}
+  </div>`;
+  window._respConfirmOk=onConfirm;
+  document.getElementById('app').appendChild(m);
+}
+
 window.respond=async function(type){
   try{await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
   ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'Response sent!');}
