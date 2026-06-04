@@ -84,6 +84,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .status-pending{background:#FAEEDA;color:#633806;border-color:#EF9F27}
 .lang-btn{padding:8px 14px;border-radius:8px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:13px;cursor:pointer;font-family:inherit}
 .lang-btn.on{border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-weight:600}
+.trust-locked{background:#f9f9f9;border:1px dashed #ddd;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#aaa}
+.connect-btn{padding:6px 14px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.connected-badge{display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;border:1px solid #5DCAA5;border-radius:20px;padding:3px 8px;font-size:10px;color:#085041;font-weight:600}
 .star-btn{background:none;border:none;font-size:26px;cursor:pointer;padding:2px 4px;transition:transform .1s;line-height:1}
 .star-btn:active{transform:scale(1.3)}
 .priority-btn{padding:10px 8px;border-radius:12px;border:2px solid #eee;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;background:#f9f9f9;flex:1}
@@ -383,7 +386,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile'){setTimeout(loadMyContracts,200);return profileHTML();}
+  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   return feedHTML();
 }
@@ -1580,6 +1583,194 @@ window.submitReport=async function(){
   }catch(e){ts('Report submitted!');}
 }
 
+// ─── NOTIFICATIONS ───────────────────────────────────────────────
+async function checkNotifications(){
+  try{
+    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),where('read','==',false)));
+    const dot=document.getElementById('notif-dot');
+    if(dot)dot.style.display=s.empty?'none':'block';
+  }catch(e){}
+}
+
+window.showNotifications=async function(){
+  try{
+    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),orderBy('timestamp','desc')));
+    const m=document.createElement('div');m.className='modal-bg';m.id='notif-modal';
+    const notifs=s.docs.map(d=>({id:d.id,...d.data()}));
+    m.innerHTML=`<div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:17px;font-weight:700;color:#111">Notifications</div>
+        <button onclick="document.getElementById('notif-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+      </div>
+      ${notifs.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No notifications</p>':
+        notifs.map(n=>`
+        <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;opacity:${n.read?0.6:1}">
+          <div style="font-size:13px;color:#111;line-height:1.5;margin-bottom:6px">${n.message||''}</div>
+          ${n.type==='connection_request'&&n.connectionId?`
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="respondToConnection('${n.connectionId}',true);markRead('${n.id}');document.getElementById('notif-modal').remove()"
+                style="flex:2;padding:8px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+                🔗 Accept connection
+              </button>
+              <button onclick="respondToConnection('${n.connectionId}',false);markRead('${n.id}');document.getElementById('notif-modal').remove()"
+                style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;color:#666;border:1px solid #eee;font-size:12px;cursor:pointer;font-family:inherit">
+                Decline
+              </button>
+            </div>`:''}
+          ${n.type==='gig_cancelled_reopen'&&n.requiresAction?`
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="reopenAvailability('${n.userId}','${n.gigDate||''}');markRead('${n.id}');document.getElementById('notif-modal').remove()"
+                style="flex:1;padding:8px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+                ✅ Reopen availability
+              </button>
+              <button onclick="markRead('${n.id}');document.getElementById('notif-modal').remove()"
+                style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;color:#666;border:1px solid #eee;font-size:12px;cursor:pointer;font-family:inherit">
+                No thanks
+              </button>
+            </div>`:''}
+          ${(n.type==='contract'||n.type==='contract_sign_request')&&n.contractId?`
+            <button onclick="viewContractById('${n.contractId}');markRead('${n.id}');document.getElementById('notif-modal').remove()"
+              style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#0C447C;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+              📄 View & sign contract
+            </button>`:''}
+          <div style="font-size:11px;color:#aaa;margin-top:4px">${n.timestamp?.toDate?n.timestamp.toDate().toLocaleDateString():''}</div>
+        </div>`).join('')}
+      ${notifs.length>0?`<button class="bg" style="width:100%;margin-top:12px;padding:12px" onclick="markAllRead();document.getElementById('notif-modal').remove()">Mark all as read</button>`:''}
+    </div>`;
+    document.getElementById('app').appendChild(m);
+    for(const n of notifs)if(!n.read)markRead(n.id);
+  }catch(e){}
+}
+
+window.markRead=async function(notifId){
+  try{await setDoc(doc(db,'notifications',notifId),{read:true},{merge:true});}catch(e){}
+  const dot=document.getElementById('notif-dot');if(dot)dot.style.display='none';
+}
+
+window.markAllRead=async function(){
+  try{
+    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),where('read','==',false)));
+    for(const d of s.docs)await setDoc(doc(db,'notifications',d.id),{read:true},{merge:true});
+    const dot=document.getElementById('notif-dot');if(dot)dot.style.display='none';
+  }catch(e){}
+}
+
+// ─── TRUST NETWORK / CONNECTION SYSTEM ──────────────────────────
+window.sendConnectionRequest=async function(musicianId, musicianName, musicianEmail){
+  try{
+    // Check if already sent
+    const existing=await getDocs(query(
+      collection(db,'connections'),
+      where('managerId','==',CU.uid),
+      where('musicianId','==',musicianId)
+    ));
+    if(!existing.empty){
+      const status=existing.docs[0].data().status;
+      if(status==='accepted'){ts('Already connected! ✅');return;}
+      if(status==='pending'){ts('Connection request already sent ⏳');return;}
+    }
+
+    // Create connection request
+    const connId=CU.uid+'_'+musicianId;
+    await setDoc(doc(db,'connections',connId),{
+      managerId:CU.uid,managerEmail:CU.email,
+      managerName:CU.displayName||CU.email?.split('@')[0]||'Manager',
+      musicianId,musicianEmail,musicianName,
+      status:'pending',requestedAt:new Date()
+    });
+
+    // Notify musician
+    await addDoc(collection(db,'notifications'),{
+      toEmail:musicianEmail,
+      type:'connection_request',
+      connectionId:connId,
+      managerId:CU.uid,
+      message:`🔗 ${CU.displayName||CU.email?.split('@')[0]||'A manager'} wants to connect with you on Vivace Events. Accepting will allow them to view your contact information.`,
+      read:false,timestamp:new Date()
+    });
+
+    ts('Connection request sent! Waiting for musician\'s approval 🔗');
+    loadArtistCards();
+  }catch(e){ts('Request sent!');}
+}
+
+window.respondToConnection=async function(connectionId, accept){
+  try{
+    await setDoc(doc(db,'connections',connectionId),{
+      status:accept?'accepted':'declined',
+      respondedAt:new Date()
+    },{merge:true});
+
+    const snap=await getDoc(doc(db,'connections',connectionId));
+    const c=snap.data();
+
+    if(accept){
+      await addDoc(collection(db,'notifications'),{
+        toEmail:c.managerEmail,type:'connection_accepted',
+        message:`✅ ${c.musicianName||'The musician'} accepted your connection request. You can now view their contact information.`,
+        read:false,timestamp:new Date()
+      });
+      ts('Connection accepted! ✅ Manager can now see your contact info.');
+    } else {
+      ts('Connection declined.');
+    }
+
+    // Refresh notifications
+    showNotifications();
+  }catch(e){ts('Done!');}
+}
+
+// Add My Connections section to profile
+async function loadMyConnections(){
+  const el=document.getElementById('my-connections');if(!el)return;
+  try{
+    let connections=[];
+    if(isMgr()){
+      const s=await getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid),where('status','==','accepted')));
+      connections=s.docs.map(d=>({id:d.id,...d.data(),role:'manager'}));
+    } else {
+      const s=await getDocs(query(collection(db,'connections'),where('musicianEmail','==',CU.email),where('status','==','accepted')));
+      connections=s.docs.map(d=>({id:d.id,...d.data(),role:'musician'}));
+    }
+
+    // Also show pending
+    const pending=isMgr()?
+      await getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid),where('status','==','pending'))):
+      await getDocs(query(collection(db,'connections'),where('musicianEmail','==',CU.email),where('status','==','pending')));
+    const pendingList=pending.docs.map(d=>({id:d.id,...d.data(),isPending:true}));
+
+    if(connections.length===0&&pendingList.length===0){
+      el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">No connections yet</div>`;
+      return;
+    }
+
+    el.innerHTML=[...connections,...pendingList].map(c=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
+        <div class="av" style="width:36px;height:36px;font-size:12px;background:#E1F5EE;color:#085041">
+          ${(c.role==='manager'?(c.musicianName||c.musicianEmail||'?'):(c.managerName||c.managerEmail||'?')).substring(0,2).toUpperCase()}
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:#111">
+            ${c.role==='manager'?(c.musicianName||c.musicianEmail?.split('@')[0]||'—'):(c.managerName||c.managerEmail?.split('@')[0]||'—')}
+          </div>
+          <div style="font-size:11px;color:#aaa">${c.isPending?'⏳ Pending':'🔗 Connected'}</div>
+        </div>
+        ${!c.isPending?`
+          <button onclick="revokeConnection('${c.id}')" style="font-size:11px;color:#F09595;background:none;border:none;cursor:pointer;padding:4px 8px">Revoke</button>
+        `:''}
+      </div>`).join('');
+  }catch(e){}
+}
+
+window.revokeConnection=async function(connectionId){
+  if(!confirm('Revoke this connection? They will no longer see your contact info.'))return;
+  try{
+    await setDoc(doc(db,'connections',connectionId),{status:'revoked'},{merge:true});
+    ts('Connection revoked.');
+    loadMyConnections();
+  }catch(e){ts('Revoked!');}
+}
+
 // ─── RATING SYSTEM ───────────────────────────────────────────────
 let _ratingState={perf:0,appear:0,comm:0,priority:''};
 
@@ -1711,13 +1902,13 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(loadGigs,100);
+  setTimeout(()=>{loadGigs();checkNotifications();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
   <div class="hdr-r">
     <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
-    ${ic('bell')}
+    <span onclick="showNotifications()" style="position:relative;cursor:pointer">${ic('bell')}<span id="notif-dot" style="display:none;position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#FF3B30"></span></span>
   </div>
 </div>
 <div class="pad">
@@ -1770,7 +1961,7 @@ ${isMgr()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;displa
 ${CP.length>0?`<div style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0d0d0d;color:#fff;font-size:13px;padding:12px 20px;border-radius:20px;z-index:100;display:flex;align-items:center;gap:12px;max-width:380px;width:calc(100% - 32px)"><span style="flex:1">${CP.length} artist${CP.length>1?'s':''} selected</span><button onclick="sendCP()" style="background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Invite to group</button><button onclick="clearCP()" style="background:transparent;border:none;color:#888;font-size:18px;cursor:pointer">✕</button></div>`:''}
 </div>`;}
 
-function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,priority){
+function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,priority,trusted){
   const sel=CP.includes(name);
   const priorityBadge=priority?{
     top:`<span class="tag tg" style="font-size:10px">🟢 Top priority</span>`,
@@ -1779,6 +1970,18 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
     unknown:`<span class="tag tf" style="font-size:10px">⚪ Unknown</span>`,
     never:`<span class="never-badge">🔴 Never again</span>`
   }[priority]||'':'';
+
+  // Contact info — only show if trusted connection
+  const contactInfo=isMgr()?(trusted?`
+    <div style="margin-top:8px;padding:8px 10px;background:#E1F5EE;border-radius:8px">
+      <div class="connected-badge" style="margin-bottom:4px">🔗 Connected</div>
+      <div style="font-size:12px;color:#085041;margin-top:4px;user-select:none" oncontextmenu="return false">📧 ${musicianEmail||'—'}</div>
+    </div>`:`
+    <div class="trust-locked" style="margin-top:8px">
+      <span>🔒</span>
+      <span style="flex:1">Contact info protected</span>
+      <button class="connect-btn" onclick="sendConnectionRequest('${musicianId}','${name}','${musicianEmail}')">Connect</button>
+    </div>`):'';
 
   return `<div class="card" style="${priority==='never'?'opacity:0.6':''}">
   <div style="display:flex;gap:12px;align-items:center">
@@ -1791,12 +1994,13 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:6px">${role}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">${tags.split(',').map(x=>`<span class="tag">${x.trim()}</span>`).join('')}${priorityBadge?` ${priorityBadge}`:''}</div>
+      ${contactInfo}
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
     <div style="font-size:12px;color:#aaa">⭐ ${rat}</div>
     <div style="display:flex;gap:6px">
-      <button class="bg" style="padding:6px 12px;font-size:11px" onclick="ts('Message sent to ${name}!')">Message</button>
+      ${trusted?`<button class="bg" style="padding:6px 12px;font-size:11px" onclick="ts('Message sent to ${name}!')">Message</button>`:''}
       ${isMgr()?`
         <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteOne('${name}')">+ Group</button>
         <button onclick="showRatingModal('${musicianId||name}','${musicianEmail||''}','${name}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#666;font-size:14px;cursor:pointer" title="Rate musician">⭐</button>
@@ -1806,7 +2010,7 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
   </div>
 </div>`;}
 
-// Load artist cards with ratings
+// Load artist cards with ratings AND trust status
 async function loadArtistCards(){
   const el=document.getElementById('artist-cards');if(!el)return;
   const artists=[
@@ -1819,16 +2023,25 @@ async function loadArtistCards(){
     {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Contemporary Dancer',avail:true,rat:'4.8',tags:'Dance,Contemporary,Teaching',id:'diego_lima',email:'diego@example.com'},
   ];
   
-  // Load this manager's ratings for all artists
   const priorities={};
+  const trusted={};
   if(isMgr()){
     try{
       const rs=await getDocs(query(collection(db,'ratings'),where('managerId','==',CU.uid)));
       rs.docs.forEach(d=>{priorities[d.data().musicianId]=d.data().priority;});
+      // Load trusted connections
+      const cs=await getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid),where('status','==','accepted')));
+      cs.docs.forEach(d=>{trusted[d.data().musicianId]=true;});
+      // Also auto-trust confirmed musicians
+      const apps=await getDocs(query(collection(db,'applications'),where('status','==','confirmed')));
+      // Check gigs owned by this manager
+      const myGigs=await getDocs(query(collection(db,'gigs'),where('userId','==',CU.uid)));
+      const myGigIds=new Set(myGigs.docs.map(d=>d.id));
+      apps.docs.forEach(d=>{if(myGigIds.has(d.data().gigId))trusted[d.data().userId]=true;});
     }catch(e){}
   }
   
-  el.innerHTML=artists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,priorities[a.id]||'')).join('');
+  el.innerHTML=artists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,priorities[a.id]||'',trusted[a.id]||false)).join('');
 }
 window.inviteOne=function(n){if(groups.length===0){ts('Create a group first!');return;}showGPicker([n]);}
 
@@ -2303,7 +2516,7 @@ function profileHTML(){
     <div class="av" style="width:58px;height:58px;font-size:18px;background:#B5D4F4;color:#0C447C">${ini}</div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:6px">${CU.email}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:6px;user-select:none" oncontextmenu="return false">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('artist')?'<span class="tag tg">Artist</span>':''}
         ${roles.includes('manager')?'<span class="tag tp">Agent / Manager</span>':''}
@@ -2344,6 +2557,15 @@ function profileHTML(){
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🔗 My Connections</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyConnections()">Refresh</span>
+    </div>
+    <div id="my-connections">
+      <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
     </div>
   </div>
   <div style="margin-bottom:18px">
