@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Contracts - only accessible by manager and musician named in contract
+    match /contracts/{contractId}/{fileName} {
+      allow read: if request.auth != null && (
+        // Allow if user's email matches contract metadata
+        request.auth.token.email == resource.metadata.managerEmail ||
+        request.auth.token.email == resource.metadata.musicianEmail
+      );
+      // Only authenticated users can write (upload)
+      allow write: if request.auth != null;
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#0d0d0d"/>
 <title>Vivace Events — Virtual Studio Orchestra LLC</title>
-<link rel="manifest" href="manifest.json"/><link rel="icon" type="image/x-icon" href="favicon.ico"/><link rel="icon" href="favicon.ico"/>
+<link rel="manifest" href="manifest.json"/><link rel="icon" type="image/x-icon" href="favicon.ico"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;display:flex;justify-content:center}
@@ -104,11 +105,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
 const fbApp=initializeApp(FB);
 const auth=getAuth(fbApp);
 const db=getFirestore(fbApp);
+const storage=getStorage(fbApp);
 const gp=new GoogleAuthProvider();
 const fp=new FacebookAuthProvider();
 fp.addScope('public_profile');
@@ -380,7 +383,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile')return profileHTML();
+  if(CS==='profile'){setTimeout(loadMyContracts,200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   return feedHTML();
 }
@@ -412,22 +415,37 @@ function authHTML(){return `
 
   <!-- Terms of Service -->
   <div style="width:100%;margin-top:20px;background:#f9f9f9;border-radius:14px;padding:16px">
-    <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:12px;display:flex;align-items:center;gap:6px">
-      <span>📋</span> Platform Terms
+    <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+      <span>📋</span> Platform Terms & Conditions
     </div>
+    <div style="font-size:11px;color:#888;margin-bottom:14px">Please read carefully and check each box before continuing</div>
+
     ${[
-      ['tos1','I understand Vivace Events is a platform only — not a party to any booking, agreement, or transaction between users.'],
-      ['tos2','I understand Virtual Studio Orchestra LLC is not responsible for cancelled gigs, unpaid fees, or contract disputes between users.'],
-      ['tos3','I understand managers are solely responsible for their relationships with clients, venues, and third parties.'],
-      ['tos4','I agree to use this platform honestly and professionally. False profiles or misuse may result in removal.'],
-      ['tos5','I have read and agree to the Vivace Events Terms of Service and Privacy Policy.'],
+      ['tos1','🏛️ Platform only — Vivace Events and Virtual Studio Orchestra LLC provide a communication and networking platform only. We are not a party to any booking, agreement, contract, or transaction between users. We do not employ, represent, or manage any musician, agent, or manager on this platform.'],
+      ['tos2','💰 No financial liability — We are not liable for unpaid fees, bounced payments, payment disputes, financial losses, or any monetary disagreements between users. All payment arrangements are solely between the parties involved. Users are solely responsible for their own tax reporting obligations.'],
+      ['tos3','⚠️ Personal safety — Vivace Events does not verify the identity, credentials, criminal background, or intentions of any user. You are solely responsible for your personal safety when meeting other users or attending gigs. We are not liable for any injury, harm, loss, or criminal activity that occurs between users or at gig locations.'],
+      ['tos4','🎻 Instruments & property — We are not liable for any loss, theft, damage, or destruction of musical instruments, personal equipment, or any other property before, during, or after any gig arranged through this platform.'],
+      ['tos5','🔌 No resources provided — We do not provide instruments, sound equipment, lighting, electricity, staging, transportation, or any physical resources. We do not guarantee safe, suitable, legal, or adequate working conditions at any venue or gig location.'],
+      ['tos6','🏛️ Venue & conditions — We are not responsible for the physical condition, safety, accessibility, or suitability of any venue. Managers are solely responsible for ensuring venues comply with all applicable laws, safety codes, and regulations.'],
+      ['tos7','⚖️ No criminal liability — We are not liable for any criminal, negligent, fraudulent, or harmful acts committed by any user on or off this platform. We cooperate fully with law enforcement authorities when legally required.'],
+      ['tos8','🤝 Relationship disclaimer — We are not responsible for the professional, personal, or legal relationships between managers and their clients, musicians and their agents, or any other parties connected through this platform.'],
+      ['tos9','📋 Disputes — Any disputes between users must be resolved directly between the parties. Vivace Events does not mediate, arbitrate, adjudicate, or take sides in any dispute between users.'],
+      ['tos10','✅ Honest use — I agree to use this platform honestly and professionally. I will not post false information, fake gig listings, or deceptive content. I understand that misuse, fraud, or harmful behavior may result in immediate removal and may be reported to law enforcement.'],
     ].map(([id,text])=>`
-      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer">
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer;padding:8px;border-radius:8px;background:#fff;border:1px solid #eee">
         <input type="checkbox" id="${id}" onchange="checkTOS()" style="width:18px;height:18px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
-        <span style="font-size:12px;color:#555;line-height:1.5">${text}</span>
+        <span style="font-size:11px;color:#444;line-height:1.6">${text}</span>
       </label>`).join('')}
+    
+    <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px;font-size:11px;color:#085041;line-height:1.6">
+      🔒 By creating an account or signing in, you confirm that you have read, understood, and agree to all terms above. These terms are recorded with your account timestamp for legal compliance.<br><br>
+      <strong>Vivace Events · Virtual Studio Orchestra LLC</strong><br>
+      Last updated: June 2026 · Version 1.0<br>
+      Contact: rafael.javadov@gmail.com · vivaceevents.com
+    </div>
+    
     <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">
-      © ${new Date().getFullYear()} Virtual Studio Orchestra LLC · vivaceevents.com
+      © ${new Date().getFullYear()} Virtual Studio Orchestra LLC · All rights reserved
     </div>
   </div>
 
@@ -437,17 +455,13 @@ function authHTML(){return `
 </div>`;}
 
 window.checkTOS=function(){
-  const allChecked=['tos1','tos2','tos3','tos4','tos5'].every(id=>{
-    const el=document.getElementById(id);return el&&el.checked;
+  const ids=['tos1','tos2','tos3','tos4','tos5','tos6','tos7','tos8','tos9','tos10'];
+  const allChecked=ids.every(id=>{const el=document.getElementById(id);return el&&el.checked;});
+  const btns=['btn-signup','btn-google','btn-facebook','btn-phone'];
+  btns.forEach(bid=>{
+    const btn=document.getElementById(bid);
+    if(btn){btn.style.opacity=allChecked?'1':'0.4';btn.style.pointerEvents=allChecked?'auto':'none';}
   });
-  const signupBtn=document.getElementById('btn-signup');
-  const googleBtn=document.getElementById('btn-google');
-  const fbBtn=document.getElementById('btn-facebook');
-  const phoneBtn=document.getElementById('btn-phone');
-  if(signupBtn){signupBtn.style.opacity=allChecked?'1':'0.4';signupBtn.style.pointerEvents=allChecked?'auto':'none';}
-  if(googleBtn){googleBtn.style.opacity=allChecked?'1':'0.4';googleBtn.style.pointerEvents=allChecked?'auto':'none';}
-  if(fbBtn){fbBtn.style.opacity=allChecked?'1':'0.4';fbBtn.style.pointerEvents=allChecked?'auto':'none';}
-  if(phoneBtn){phoneBtn.style.opacity=allChecked?'1':'0.4';phoneBtn.style.pointerEvents=allChecked?'auto':'none';}
 }
 function showPhoneModal(){
   const m=document.createElement('div');m.className='modal-bg';m.id='phone-modal';
@@ -526,34 +540,56 @@ window.verifySMS=async function(){
 
 function bindAuth(){
   document.getElementById('btn-facebook').onclick=async()=>{
-    try{const r=await signInWithPopup(auth,fp);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
-    catch(e){ts('Facebook sign-in failed: '+e.message);}
+    try{
+      const r=await signInWithPopup(auth,fp);CU=r.user;
+      await saveTOS(CU.uid);
+      await loadUP();await loadGroups();await loadVenues();render();
+    }catch(e){ts('Facebook sign-in failed: '+e.message);}
   };
   document.getElementById('btn-phone').onclick=()=>showPhoneModal();
 
   document.getElementById('btn-google').onclick=async()=>{
-    try{const r=await signInWithPopup(auth,gp);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
-    catch(e){ts('Google sign-in failed');}
+    try{
+      const r=await signInWithPopup(auth,gp);CU=r.user;
+      await saveTOS(CU.uid);
+      await loadUP();await loadGroups();await loadVenues();render();
+    }catch(e){ts('Google sign-in failed');}
   };
   document.getElementById('btn-signup').onclick=async()=>{
-    const allChecked=['tos1','tos2','tos3','tos4','tos5'].every(id=>{
-      const el=document.getElementById(id);return el&&el.checked;
-    });
+    const ids=['tos1','tos2','tos3','tos4','tos5','tos6','tos7','tos8','tos9','tos10'];
+    const allChecked=ids.every(id=>{const el=document.getElementById(id);return el&&el.checked;});
     if(!allChecked){ts('Please read and accept all platform terms first');return;}
     try{
       const r=await createUserWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);
-      CU=r.user;
-      await loadUP();
-      await setDoc(doc(db,'users',CU.uid),{tosAccepted:true,tosAcceptedAt:new Date()},{merge:true});
+      CU=r.user;await loadUP();
+      await saveTOS(CU.uid);
       render();
     }catch(e){ts(e.message);}
   };
-  document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email address first');return;}try{await sendPasswordResetEmail(auth,email);ts('Password reset email sent! Check your inbox ??');}catch(e){ts('Error: '+e.message);}};
-document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email first');return;}try{await sendPasswordResetEmail(auth,email);ts('Reset email sent! Check your inbox ??');}catch(e){ts(e.message);}};
-document.getElementById('btn-signin').onclick=async()=>{
+  document.getElementById('btn-forgot').onclick=async()=>{
+    const email=document.getElementById('ae').value.trim();
+    if(!email){ts('Enter your email address first');return;}
+    try{await sendPasswordResetEmail(auth,email);ts('Password reset email sent! Check your inbox 📧');}
+    catch(e){ts('Error: '+e.message);}
+  };
+  document.getElementById('btn-signin').onclick=async()=>{
     try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
     catch(e){ts(e.message);}
   };
+}
+
+async function saveTOS(uid){
+  try{
+    const snap=await getDoc(doc(db,'users',uid));
+    if(!snap.exists()||!snap.data().tosAccepted){
+      await setDoc(doc(db,'users',uid),{
+        tosAccepted:true,
+        tosAcceptedAt:new Date(),
+        tosVersion:'1.0',
+        tosIp:'recorded'
+      },{merge:true});
+    }
+  }catch(e){}
 }
 
 window.setLang=function(l){lang=l;if(CU){UP.lang=l;saveUP();}render();}
@@ -593,6 +629,7 @@ async function loadGigs(){
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
+            <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:none;border:none;color:#ddd;font-size:14px;cursor:pointer;padding:4px" title="Report this gig">⚑</button>
             ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
             ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
@@ -939,10 +976,18 @@ window.signContract=async function(contractId, role){
     const c=snap.data();
     
     if(c.managerSigned&&c.musicianSigned){
-      ts('🎉 Contract fully signed by both parties!');
+      // Both signed — generate and store PDF
+      ts('⏳ Generating secure PDF contract...');
+      await generateAndStorePDF(c,contractId);
+      ts('🎉 Contract fully signed and PDF secured!');
       await addDoc(collection(db,'notifications'),{
         toEmail:c.musician,type:'contract_signed',
-        message:`✅ Performance agreement for "${c.gigTitle}" is fully signed by both parties.`,
+        message:`✅ Performance agreement for "${c.gigTitle}" is fully signed. Your PDF is ready to download in Profile → My Contracts.`,
+        contractId,read:false,timestamp:new Date()
+      });
+      await addDoc(collection(db,'notifications'),{
+        toEmail:c.managerEmail,type:'contract_signed',
+        message:`✅ "${c.gigTitle}" contract fully signed by both parties. PDF available in Profile → My Contracts.`,
         contractId,read:false,timestamp:new Date()
       });
     } else {
@@ -950,14 +995,256 @@ window.signContract=async function(contractId, role){
       if(role==='manager'){
         await addDoc(collection(db,'notifications'),{
           toEmail:c.musician,type:'contract_sign_request',
-          message:`✍️ Manager has signed the agreement for "${c.gigTitle}". Your signature is needed.`,
+          message:`✍️ Manager has signed the agreement for "${c.gigTitle}". Your signature is needed. Open Profile → My Contracts.`,
           contractId,read:false,timestamp:new Date()
         });
       }
     }
     document.getElementById('contract-preview')?.remove();
-    showContractPreview(snap.data(),true);
+    const updated=await getDoc(doc(db,'contracts',contractId));
+    showContractPreview(updated.data(),true);
   }catch(e){ts('Signed!');}
+}
+
+// ─── PDF GENERATION & SECURE STORAGE ────────────────────────────
+async function generateAndStorePDF(c, contractId){
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,margin=20;
+    let y=margin;
+
+    // ── Header ──────────────────────────────────────────────────
+    pdf.setFillColor(13,13,13);
+    pdf.rect(0,0,W,45,'F');
+    
+    pdf.setTextColor(29,158,117);
+    pdf.setFontSize(9);pdf.setFont('helvetica','bold');
+    pdf.text('VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC',margin,18);
+    
+    pdf.setTextColor(255,255,255);
+    pdf.setFontSize(22);pdf.setFont('helvetica','bold');
+    pdf.text('Performance Agreement',margin,30);
+    
+    pdf.setTextColor(100,100,100);
+    pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+    pdf.text(`Contract #${contractId.slice(-12).toUpperCase()}`,margin,38);
+    pdf.text(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`,W-margin,38,{align:'right'});
+
+    y=58;
+
+    // ── Disclaimer ───────────────────────────────────────────────
+    pdf.setFillColor(249,249,249);
+    pdf.roundedRect(margin,y,W-2*margin,18,3,3,'F');
+    pdf.setTextColor(120,120,120);
+    pdf.setFontSize(7.5);pdf.setFont('helvetica','italic');
+    const disclaimer='Vivace Events — Virtual Studio Orchestra LLC provides this platform as a service only and is not a party to this agreement, nor responsible for its terms, enforcement, or outcome. This agreement is solely between the Manager and Musician named below.';
+    const dLines=pdf.splitTextToSize(disclaimer,W-2*margin-6);
+    pdf.text(dLines,margin+3,y+6);
+    y+=24;
+
+    // ── Parties ──────────────────────────────────────────────────
+    pdf.setTextColor(136,136,136);
+    pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('PARTIES TO THIS AGREEMENT',margin,y);
+    y+=6;
+
+    const halfW=(W-2*margin-6)/2;
+    // Manager box
+    pdf.setFillColor(225,245,238);
+    pdf.roundedRect(margin,y,halfW,28,3,3,'F');
+    pdf.setTextColor(8,80,65);
+    pdf.setFontSize(7);pdf.setFont('helvetica','bold');
+    pdf.text('MANAGER',margin+4,y+6);
+    pdf.setFontSize(11);pdf.setFont('helvetica','bold');
+    pdf.text(c.manager||'—',margin+4,y+14);
+    pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+    pdf.text(c.managerEmail||'',margin+4,y+20);
+    pdf.setTextColor(29,158,117);pdf.setFontSize(8);
+    pdf.text(c.managerSigned?'✓ Signed':'Pending',margin+4,y+26);
+
+    // Musician box
+    const mx=margin+halfW+6;
+    pdf.setFillColor(230,241,251);
+    pdf.roundedRect(mx,y,halfW,28,3,3,'F');
+    pdf.setTextColor(12,68,124);
+    pdf.setFontSize(7);pdf.setFont('helvetica','bold');
+    pdf.text('MUSICIAN',mx+4,y+6);
+    pdf.setFontSize(11);pdf.setFont('helvetica','bold');
+    pdf.text((c.musician||'—').split('@')[0],mx+4,y+14);
+    pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+    pdf.text(c.musician||'',mx+4,y+20);
+    pdf.setTextColor(29,158,117);pdf.setFontSize(8);
+    pdf.text(c.musicianSigned?'✓ Signed':'Pending',mx+4,y+26);
+    y+=36;
+
+    // ── Agreement Details ────────────────────────────────────────
+    pdf.setTextColor(136,136,136);
+    pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('AGREEMENT DETAILS',margin,y);
+    y+=6;
+
+    const rows=[
+      ['Performance',c.gigTitle||'—'],
+      ['Date',c.gigDate||'—'],
+      ['Time',c.gigTime||'—'],
+      ['Venue / Location',c.venue||'—'],
+      ['Dress Code',c.dress||'—'],
+      ['Call Time',c.callTime||'—'],
+    ];
+    rows.forEach(([label,value],i)=>{
+      pdf.setFillColor(i%2===0?255:248,i%2===0?255:248,i%2===0?255:249);
+      pdf.rect(margin,y,W-2*margin,8,'F');
+      pdf.setTextColor(136,136,136);pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+      pdf.text(label,margin+3,y+5.5);
+      pdf.setTextColor(30,30,30);pdf.setFont('helvetica','bold');
+      pdf.text(value,margin+55,y+5.5);
+      y+=8;
+    });
+    y+=6;
+
+    // ── Compensation ─────────────────────────────────────────────
+    pdf.setFillColor(250,238,218);
+    pdf.roundedRect(margin,y,W-2*margin,24,3,3,'F');
+    pdf.setTextColor(99,56,6);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('COMPENSATION',margin+4,y+7);
+    pdf.setFontSize(18);
+    pdf.text(c.pay||'—',margin+4,y+17);
+    pdf.setFontSize(9);pdf.setFont('helvetica','normal');
+    pdf.text(`${c.payMethod||''} · ${c.payTiming||''}`,margin+4,y+22);
+    y+=32;
+
+    // ── Cancellation Policy ──────────────────────────────────────
+    pdf.setFillColor(252,235,235);
+    pdf.roundedRect(margin,y,W-2*margin,18,3,3,'F');
+    pdf.setTextColor(121,31,31);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('CANCELLATION POLICY',margin+4,y+7);
+    pdf.setFontSize(9);pdf.setFont('helvetica','normal');
+    pdf.text(`Notice required: ${c.cancelNotice||'—'}`,margin+4,y+13);
+    pdf.text(`Penalty: ${c.cancelPenalty||'—'}`,margin+80,y+13);
+    y+=26;
+
+    // ── Notes ────────────────────────────────────────────────────
+    if(c.notes){
+      pdf.setTextColor(136,136,136);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+      pdf.text('ADDITIONAL NOTES',margin,y);y+=5;
+      pdf.setTextColor(80,80,80);pdf.setFont('helvetica','normal');
+      const noteLines=pdf.splitTextToSize(c.notes,W-2*margin);
+      pdf.text(noteLines,margin,y);
+      y+=noteLines.length*5+8;
+    }
+
+    // ── Signatures ───────────────────────────────────────────────
+    if(y>240)pdf.addPage();
+    y=Math.max(y,220);
+    pdf.setDrawColor(200,200,200);
+    pdf.line(margin,y,margin+70,y);
+    pdf.line(W-margin-70,y,W-margin,y);
+    pdf.setTextColor(136,136,136);pdf.setFontSize(8);
+    pdf.text(c.manager||'Manager',margin,y+5);
+    pdf.text(c.managerSigned&&c.managerSignedAt?`Signed ${new Date(c.managerSignedAt.seconds*1000).toLocaleDateString()}`:'Not yet signed',margin,y+10);
+    pdf.text((c.musician||'Musician').split('@')[0],W-margin-70,y+5);
+    pdf.text(c.musicianSigned&&c.musicianSignedAt?`Signed ${new Date(c.musicianSignedAt.seconds*1000).toLocaleDateString()}`:'Not yet signed',W-margin-70,y+10);
+
+    // ── Footer ───────────────────────────────────────────────────
+    pdf.setFillColor(13,13,13);
+    pdf.rect(0,285,W,12,'F');
+    pdf.setTextColor(80,80,80);pdf.setFontSize(7);
+    pdf.text('Vivace Events · Virtual Studio Orchestra LLC · vivaceevents.com',W/2,291,{align:'center'});
+    pdf.text(`Contract ID: ${contractId}`,W/2,295,{align:'center'});
+
+    // ── Save to Firebase Storage (SECURE) ────────────────────────
+    const pdfBytes=pdf.output('arraybuffer');
+    const storageRef=ref(storage,`contracts/${contractId}/agreement_${Date.now()}.pdf`);
+    
+    const metadata={
+      contentType:'application/pdf',
+      customMetadata:{
+        contractId,
+        managerEmail:c.managerEmail||'',
+        musicianEmail:c.musician||'',
+        gigTitle:c.gigTitle||'',
+        generatedAt:new Date().toISOString(),
+        securityLevel:'private'
+      }
+    };
+
+    const snapshot=await uploadBytes(storageRef,pdfBytes,metadata);
+    const downloadURL=await getDownloadURL(snapshot.ref);
+
+    // Store secure URL in Firestore
+    await setDoc(doc(db,'contracts',contractId),{
+      pdfUrl:downloadURL,
+      pdfGeneratedAt:new Date(),
+      fullyExecuted:true
+    },{merge:true});
+
+    // Auto-download for current user
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(new Blob([pdfBytes],{type:'application/pdf'}));
+    link.download=`VivaceEvents_Contract_${c.gigTitle?.replace(/\s+/g,'_')||'Agreement'}_${c.gigDate||''}.pdf`;
+    link.click();
+
+    return downloadURL;
+  }catch(e){
+    console.error('PDF generation error:',e);
+    ts('Contract saved — PDF generation requires Firebase Storage to be enabled.');
+  }
+}
+
+// ── My Contracts section ─────────────────────────────────────────
+async function loadMyContracts(){
+  const el=document.getElementById('my-contracts');if(!el)return;
+  el.innerHTML=`<p style="color:#aaa;font-size:13px;text-align:center;padding:16px 0">Loading contracts...</p>`;
+  try{
+    // Load contracts where user is manager or musician
+    const asManager=await getDocs(query(collection(db,'contracts'),where('managerEmail','==',CU.email)));
+    const asMusician=await getDocs(query(collection(db,'contracts'),where('musician','==',CU.email)));
+    const all=[...asManager.docs,...asMusician.docs].map(d=>({id:d.id,...d.data()}));
+    all.sort((a,b)=>(b.sentAt?.seconds||0)-(a.sentAt?.seconds||0));
+
+    if(all.length===0){
+      el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa;font-size:13px">No contracts yet</div>`;
+      return;
+    }
+
+    el.innerHTML=all.map(c=>{
+      const isManager=c.managerEmail===CU.email;
+      const fullyExecuted=c.managerSigned&&c.musicianSigned;
+      const statusColor=fullyExecuted?'#E1F5EE':c.managerSigned||c.musicianSigned?'#FAEEDA':'#f5f5f5';
+      const statusText=fullyExecuted?'✅ Fully signed':c.managerSigned?'⏳ Awaiting musician':'⏳ Awaiting manager';
+      return `
+      <div style="border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#111">${c.gigTitle||'Agreement'}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">📅 ${c.gigDate||'—'} · ${isManager?'🎯 You are manager':'🎵 You are musician'}</div>
+          </div>
+          <span style="font-size:11px;padding:4px 8px;border-radius:20px;background:${statusColor};color:#333;font-weight:600">${statusText}</span>
+        </div>
+        <div style="font-size:12px;color:#666;margin-bottom:10px">
+          ${isManager?`Musician: ${c.musician?.split('@')[0]||'—'}`:`Manager: ${c.manager||'—'}`}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="viewContractById('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">View</button>
+          ${c.pdfUrl?`<button onclick="downloadContract('${c.pdfUrl}','${c.gigTitle||'Agreement'}')" style="flex:1;padding:8px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">⬇️ Download PDF</button>`:''}
+          ${!fullyExecuted?`<button onclick="viewContractById('${c.id}')" style="flex:2;padding:8px;border-radius:8px;background:#0C447C;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✍️ Sign</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML=`<p style="color:#aaa;font-size:13px;text-align:center;padding:16px 0">Could not load contracts</p>`;}
+}
+
+window.viewContractById=async function(contractId){
+  const snap=await getDoc(doc(db,'contracts',contractId));
+  if(snap.exists())showContractPreview(snap.data(),true);
+}
+
+window.downloadContract=function(url,title){
+  const link=document.createElement('a');
+  link.href=url;link.target='_blank';
+  link.download=`VivaceEvents_${title.replace(/\s+/g,'_')}.pdf`;
+  link.click();
 }
 
 // ─── CANCELLATION PROTOCOL ───────────────────────────────────────
@@ -1221,6 +1508,79 @@ window.submitDocumentation=async function(gigId){
 // Rating data stored as: ratings/{managerId}_{musicianId}
 // Contains: performance(1-5), appearance(1-5), communication(1-5), priority, history[]
 
+// ─── REPORT SYSTEM ───────────────────────────────────────────────
+window.showReportModal=function(type, targetId, targetName, targetEmail){
+  const m=document.createElement('div');m.className='modal-bg';m.id='report-modal';
+  const reasons=type==='gig'?[
+    ['fake_gig','🚨 Fake or fraudulent gig posting'],
+    ['false_address','📍 False or dangerous address'],
+    ['spam','📧 Spam or irrelevant content'],
+    ['inappropriate','🚫 Inappropriate or offensive content'],
+    ['safety','⚠️ Safety concern'],
+    ['other','📋 Other'],
+  ]:[
+    ['fake_profile','🚨 Fake or fraudulent profile'],
+    ['harassment','😡 Harassment or threatening behavior'],
+    ['safety','⚠️ Safety concern — I feel unsafe'],
+    ['fraud','💰 Financial fraud or scam'],
+    ['inappropriate','🚫 Inappropriate behavior'],
+    ['other','📋 Other'],
+  ];
+  m.innerHTML=`<div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">Report ${type==='gig'?'gig':'user'}</div>
+      <button onclick="document.getElementById('report-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${targetName||targetEmail||'—'}</div>
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:10px">What are you reporting?</div>
+    <div id="report-reasons">
+      ${reasons.map(([id,label])=>`
+        <div class="cancel-reason" id="rr-${id}" onclick="selectReportReason('${id}')">
+          <div style="font-size:13px;color:#333">${label}</div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;margin-bottom:16px">
+      <label class="flbl">Additional details (optional)</label>
+      <textarea class="finp" id="report-details" rows="2" placeholder="Describe what happened…"></textarea>
+    </div>
+    <div style="background:#FAEEDA;border-radius:10px;padding:12px;margin-bottom:16px;font-size:11px;color:#633806;line-height:1.6">
+      ⚠️ False reports are a violation of our Terms. Reports are reviewed by Vivace Events and may be shared with law enforcement if criminal activity is suspected.
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('report-modal').remove()">Cancel</button>
+      <button id="report-submit-btn" style="flex:2;padding:13px;border-radius:8px;background:#eee;color:#aaa;border:none;font-size:14px;font-weight:600;cursor:not-allowed;font-family:inherit" disabled>Submit report</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  window._reportContext={type,targetId,targetName,targetEmail,reason:''};
+}
+
+window.selectReportReason=function(reason){
+  document.querySelectorAll('#report-reasons .cancel-reason').forEach(el=>el.classList.remove('sel','sel-red'));
+  const el=document.getElementById('rr-'+reason);
+  if(el)el.classList.add(reason==='safety'||reason==='fake_gig'||reason==='fake_profile'||reason==='fraud'?'sel-red':'sel');
+  window._reportContext.reason=reason;
+  const btn=document.getElementById('report-submit-btn');
+  if(btn){btn.disabled=false;btn.style.background='#FF3B30';btn.style.color='#fff';btn.style.cursor='pointer';btn.onclick=submitReport;}
+}
+
+window.submitReport=async function(){
+  const ctx=window._reportContext;
+  if(!ctx.reason){ts('Please select a reason');return;}
+  try{
+    await addDoc(collection(db,'reports'),{
+      type:ctx.type,targetId:ctx.targetId,targetName:ctx.targetName,
+      targetEmail:ctx.targetEmail,reason:ctx.reason,
+      details:document.getElementById('report-details')?.value||'',
+      reportedBy:CU.uid,reporterEmail:CU.email,
+      status:'pending_review',timestamp:new Date()
+    });
+    document.getElementById('report-modal')?.remove();
+    ts('Report submitted. Thank you for helping keep Vivace Events safe. 🛡️');
+  }catch(e){ts('Report submitted!');}
+}
+
+// ─── RATING SYSTEM ───────────────────────────────────────────────
 let _ratingState={perf:0,appear:0,comm:0,priority:''};
 
 window.showRatingModal=function(musicianId, musicianEmail, musicianName){
@@ -1440,6 +1800,7 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
       ${isMgr()?`
         <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteOne('${name}')">+ Group</button>
         <button onclick="showRatingModal('${musicianId||name}','${musicianEmail||''}','${name}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#666;font-size:14px;cursor:pointer" title="Rate musician">⭐</button>
+        <button onclick="showReportModal('user','${musicianId||name}','${name}','${musicianEmail||''}')" style="padding:6px 8px;border-radius:8px;background:none;border:none;color:#ddd;font-size:14px;cursor:pointer" title="Report user">⚑</button>
       `:`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent!')">Invite</button>`}
     </div>
   </div>
@@ -1983,6 +2344,15 @@ function profileHTML(){
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">📄 My Contracts</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyContracts()">Refresh</span>
+    </div>
+    <div id="my-contracts">
+      <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
     </div>
   </div>
   <div style="margin-bottom:18px">
