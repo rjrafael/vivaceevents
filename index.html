@@ -1586,10 +1586,11 @@ window.submitReport=async function(){
 // ─── NOTIFICATIONS ───────────────────────────────────────────────
 async function checkNotifications(){
   try{
-    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),where('read','==',false)));
+    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email)));
+    const hasUnread=s.docs.some(d=>d.data().read===false);
     const dot=document.getElementById('notif-dot');
-    if(dot)dot.style.display=s.empty?'none':'block';
-  }catch(e){}
+    if(dot)dot.style.display=hasUnread?'block':'none';
+  }catch(e){console.log('notif check error:',e);}
 }
 
 window.showNotifications=async function(){
