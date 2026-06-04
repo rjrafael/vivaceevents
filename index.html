@@ -453,7 +453,7 @@ function initRC(){
 }
 
 window.sendSMS=async function(){
-  const phone=document.getElementById('phone-input').value.trim();
+  const phone=document.getElementById('phone-input').value.trim().replace(/\s/g,'');
   if(!phone){ts('Please enter your phone number');return;}
   try{
     confirmResult=await signInWithPhoneNumber(auth,phone,window.recaptchaVerifier);
