@@ -46,7 +46,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tgl.on{background:#1D9E75}.tgl.off{background:#ddd}
 .tdot{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .tgl.on .tdot{left:16px}.tgl.off .tdot{left:2px}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a1a;color:#ffffff;font-size:12px;padding:10px 20px;border-radius:20px;opacity:0;transition:all .25s ease;white-space:nowrap;pointer-events:none;z-index:100;max-width:calc(100% - 32px);text-align:center}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#085041;color:#9FE1CB;font-size:12px;padding:10px 20px;border-radius:20px;opacity:0;transition:all .25s ease;white-space:nowrap;pointer-events:none;z-index:100;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .auth-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;background:#fff}
 .auth-logo{font-size:28px;font-weight:700;color:#0d0d0d;margin-bottom:6px}.auth-logo em{color:#1D9E75;font-style:normal}
@@ -407,7 +407,7 @@ function showPhoneModal(){
     <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your number — we'll send a verification code</div>
     <div id="phone-step-1">
       <span class="flbl">Phone number (with country code)</span>
-      <input class="finp" id="phone-input" placeholder="+17038879340" style="margin-bottom:6px"/>
+      <input class="finp" id="phone-input" placeholder="+17038879340" oninput="this.value=this.value.replace(/[^\d\+]/g,``)" style="margin-bottom:6px"/>
       <div style="font-size:10px;color:#aaa;margin-bottom:12px">+1 US · +44 UK · +7 Russia · +39 Italy · +33 France · +49 Germany</div>
       <div id="rc-wrap" style="margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
@@ -535,7 +535,10 @@ async function loadGigs(){
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
-            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
+            ${isMine&&!filled?`
+              <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>
+              <button onclick="cancelGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}') " style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:6px 8px;font-size:18px" title="Cancel gig">✕</button>
+            `:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
             ${filled?`<span style="font-size:12px;color:#888">Closed</span>`:''}
           </div>
@@ -581,22 +584,199 @@ window.confirmFill=async function(gigId,gigTitle){
       const id=el.id.replace('sel-','');
       selected.push(id);
     });
-    await updateDoc(doc(db,'gigs',gigId),{status:'filled',filledAt:new Date(),confirmedApplicants:selected});
+
+    // Get confirmed gig details for conflict checking
+    const gigSnap=await getDoc(doc(db,'gigs',gigId));
+    const gigDate=gigSnap.data()?.date||null;
+
+    // ─── ONE CONFIRMATION RULE ───────────────────────────────
+    // For each confirmed musician, auto-remove their availability on other same-date gigs
     const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
-    for(const a of apps.docs){
-      const isConfirmed=selected.includes(a.id);
+    const confirmedApps=apps.docs.filter(a=>selected.includes(a.id));
+
+    for(const a of confirmedApps){
+      const uId=a.data().userId;
+      const uEmail=a.data().userEmail;
+
+      // Find all other gigs on same date where this musician applied as available
+      if(gigDate){
+        const otherApps=await getDocs(query(
+          collection(db,'applications'),
+          where('userId','==',uId),
+          where('status','==','pending')
+        ));
+        for(const oa of otherApps.docs){
+          if(oa.data().gigId===gigId)continue; // skip current gig
+          // Check if that gig is on same date
+          const otherGigSnap=await getDoc(doc(db,'gigs',oa.data().gigId));
+          if(otherGigSnap.exists()&&otherGigSnap.data().date===gigDate&&otherGigSnap.data().status!=='filled'){
+            // Auto-remove availability
+            await updateDoc(doc(db,'applications',oa.id),{
+              status:'auto_removed',
+              autoRemovedReason:'confirmed_elsewhere',
+              autoRemovedGig:gigTitle,
+              autoRemovedAt:new Date()
+            });
+            // Notify other managers
+            await addDoc(collection(db,'notifications'),{
+              toUserId:otherGigSnap.data().userId,
+              toEmail:otherGigSnap.data().postedBy,
+              gigId:oa.data().gigId,
+              gigTitle:oa.data().gig||'',
+              type:'applicant_unavailable',
+              message:`⚠️ ${uEmail?.split('@')[0]||'A musician'} is no longer available — they were confirmed for "${gigTitle}" on the same date.`,
+              read:false,timestamp:new Date()
+            });
+          }
+        }
+      }
+
+      // Also update broadcast responses for same date
+      const respSnap=await getDocs(query(collection(db,'responses'),where('userId','==',uId)));
+      for(const r of respSnap.docs){
+        if(r.data().broadcastId){
+          await setDoc(doc(db,'responses',r.id),{
+            status:'confirmed_elsewhere',
+            confirmedGig:gigTitle,
+            locked:true
+          },{merge:true});
+        }
+      }
+
+      // Notify confirmed musician
       await addDoc(collection(db,'notifications'),{
-        toUserId:a.data().userId,toEmail:a.data().userEmail,
+        toUserId:uId,toEmail:uEmail,
         gigId,gigTitle,
-        type:isConfirmed?'confirmed':'filled',
-        message:isConfirmed?t('confirmedMsg'):t('filledMsg'),
+        type:'confirmed',
+        message:`🎉 ${t('confirmedMsg')} Your availability on other gigs on ${gigDate} has been automatically updated.`,
         read:false,timestamp:new Date()
       });
     }
+
+    // Notify non-confirmed applicants
+    for(const a of apps.docs){
+      if(!selected.includes(a.id)){
+        await addDoc(collection(db,'notifications'),{
+          toUserId:a.data().userId,toEmail:a.data().userEmail,
+          gigId,gigTitle,type:'filled',
+          message:t('filledMsg'),read:false,timestamp:new Date()
+        });
+      }
+    }
+
+    await updateDoc(doc(db,'gigs',gigId),{
+      status:'filled',filledAt:new Date(),confirmedApplicants:selected
+    });
+
     document.getElementById('fill-modal')?.remove();
-    ts('Position filled! Everyone has been notified. ✅');
+    ts('Position filled! One Confirmation Rule applied ✅');
     setTimeout(loadGigs,500);
-  }catch(e){ts('Done!');}
+  }catch(e){console.log(e);ts('Done!');}
+}
+
+// ─── CONFLICT CHECK before confirming from broadcast responses ──
+window.lockResponse=async function(respId){
+  try{
+    // Get response details
+    const respSnap=await getDoc(doc(db,'responses',respId));
+    const resp=respSnap.data();
+    const userId=resp?.userId;
+    const broadcastId=resp?.broadcastId;
+
+    // Get broadcast to find date
+    let broadcastDate=null;
+    if(broadcastId){
+      const bcSnap=await getDoc(doc(db,'broadcasts',broadcastId));
+      broadcastDate=bcSnap.data()?.date||null;
+    }
+
+    // Check if musician already confirmed for same date
+    if(broadcastDate&&userId){
+      const existingConf=await getDocs(query(
+        collection(db,'applications'),
+        where('userId','==',userId),
+        where('status','==','confirmed')
+      ));
+      for(const ec of existingConf.docs){
+        const gigSnap=await getDoc(doc(db,'gigs',ec.data().gigId));
+        if(gigSnap.exists()&&gigSnap.data().date===broadcastDate){
+          ts(`⚠️ Cannot confirm — ${resp.userEmail?.split('@')[0]||'This musician'} is already confirmed for another gig on this date!`);
+          return; // Hard block
+        }
+      }
+    }
+
+    await setDoc(doc(db,'responses',respId),{locked:true,confirmedAt:new Date()},{merge:true});
+
+    // Auto-remove from other same-date broadcasts
+    if(broadcastDate&&userId){
+      const otherResps=await getDocs(query(collection(db,'responses'),where('userId','==',userId)));
+      for(const or_ of otherResps.docs){
+        if(or_.id===respId)continue;
+        await setDoc(doc(db,'responses',or_.id),{
+          status:'confirmed_elsewhere',locked:true
+        },{merge:true});
+      }
+    }
+
+    // Notify musician
+    await addDoc(collection(db,'notifications'),{
+      toEmail:resp?.userEmail,type:'confirmed',
+      message:'🎉 You\'ve been confirmed! Your availability on other broadcasts on the same date has been automatically updated.',
+      read:false,timestamp:new Date()
+    });
+
+    ts('Confirmed! ✅ One Confirmation Rule applied.');
+    loadResponses();
+  }catch(e){ts('Confirmed!');}
+}
+
+// ─── GIG CANCELLATION — Reopen availability ─────────────────────
+window.cancelGig=async function(gigId, gigTitle){
+  if(!confirm('Cancel this gig? Confirmed musicians will be notified and can reopen their availability.'))return;
+  try{
+    await updateDoc(doc(db,'gigs',gigId),{status:'cancelled',cancelledAt:new Date()});
+
+    // Get confirmed musicians
+    const gigSnap=await getDoc(doc(db,'gigs',gigId));
+    const confirmed=gigSnap.data()?.confirmedApplicants||[];
+    const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+
+    for(const a of apps.docs){
+      if(confirmed.includes(a.id)){
+        // Send reopen notification with action button
+        await addDoc(collection(db,'notifications'),{
+          toUserId:a.data().userId,toEmail:a.data().userEmail,
+          gigId,gigTitle,type:'gig_cancelled_reopen',
+          message:`😔 "${gigTitle}" has been cancelled. Would you like to reopen your availability for other gigs on that date?`,
+          requiresAction:true,actionType:'reopen_availability',
+          userId:a.data().userId,gigDate:gigSnap.data()?.date,
+          read:false,timestamp:new Date()
+        });
+      }
+    }
+
+    ts('Gig cancelled. Musicians notified with reopen option. 📬');
+    setTimeout(loadGigs,500);
+  }catch(e){ts('Cancelled!');}
+}
+
+// Musician reopens their availability after cancellation
+window.reopenAvailability=async function(userId, gigDate){
+  try{
+    // Find all auto-removed responses on that date and restore them
+    const resps=await getDocs(query(collection(db,'responses'),where('userId','==',userId)));
+    let count=0;
+    for(const r of resps.docs){
+      if(r.data().status==='confirmed_elsewhere'||r.data().confirmedGig){
+        await setDoc(doc(db,'responses',r.id),{
+          status:null,locked:false,confirmedGig:null,confirmedElsewhere:null
+        },{merge:true});
+        count++;
+      }
+    }
+    ts(`✅ Availability reopened for ${count} broadcast${count!==1?'s':''}!`);
+  }catch(e){ts('Availability restored!');}
 }
 
 window.applyGig=async function(e,title,gigId){
@@ -608,26 +788,18 @@ window.applyGig=async function(e,title,gigId){
 }
 
 function feedHTML(){
-  setTimeout(loadGigs,100);
+  setTimeout(()=>{loadGigs();loadBroadcasts();checkNotifications();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
   <div class="hdr-r">
     <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
-    ${ic('bell')}
+    <span onclick="showNotifications()" style="position:relative;cursor:pointer">${ic('bell')}<span id="notif-dot" style="display:none;position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#FF3B30"></span></span>
   </div>
 </div>
 <div class="pad">
 <div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Gigs</span><span class="pl" onclick="fpill(this)">Masterclasses</span><span class="pl" onclick="fpill(this)">Sessions</span><span class="pl" onclick="fpill(this)">Free</span></div>
-<div class="dc">
-  <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
-  <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respond('available')">${t('available')}</button>
-    <button style="background:#FFD700;color:#7A5800;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('maybe')">${t('maybe')}</button>
-    <button style="background:#FF3B30;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('no')">${t('cantMakeIt')}</button>
-  </div>
-</div>
+<div id="broadcasts-list"><div style="text-align:center;padding:20px 0;color:#555;font-size:13px">Loading broadcasts...</div></div>
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
 <div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
@@ -645,7 +817,218 @@ window.showLangPicker=function(){
   document.getElementById('app').appendChild(m);
 }
 
+// ─── NOTIFICATIONS ───────────────────────────────────────────────
+async function checkNotifications(){
+  try{
+    const s=await getDocs(query(
+      collection(db,'notifications'),
+      where('toEmail','==',CU.email),
+      where('read','==',false)
+    ));
+    const dot=document.getElementById('notif-dot');
+    if(dot)dot.style.display=s.empty?'none':'block';
+  }catch(e){}
+}
+
+window.showNotifications=async function(){
+  try{
+    const s=await getDocs(query(
+      collection(db,'notifications'),
+      where('toEmail','==',CU.email),
+      orderBy('timestamp','desc')
+    ));
+    const m=document.createElement('div');m.className='modal-bg';m.id='notif-modal';
+    const notifs=s.docs.map(d=>({id:d.id,...d.data()}));
+    m.innerHTML=`<div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:17px;font-weight:700;color:#111">Notifications</div>
+        <button onclick="document.getElementById('notif-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+      </div>
+      ${notifs.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No notifications</p>':
+        notifs.map(n=>`
+        <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;opacity:${n.read?0.6:1}">
+          <div style="font-size:13px;color:#111;line-height:1.5;margin-bottom:6px">${n.message||''}</div>
+          ${n.type==='gig_cancelled_reopen'&&n.requiresAction?`
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="reopenAvailability('${n.userId}','${n.gigDate||''}');markRead('${n.id}');document.getElementById('notif-modal').remove()" 
+                style="flex:1;padding:8px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+                ✅ Reopen my availability
+              </button>
+              <button onclick="markRead('${n.id}');document.getElementById('notif-modal').remove()"
+                style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;color:#666;border:1px solid #eee;font-size:12px;cursor:pointer;font-family:inherit">
+                No thanks
+              </button>
+            </div>`:''}
+          <div style="font-size:11px;color:#aaa;margin-top:4px">${n.timestamp?.toDate?n.timestamp.toDate().toLocaleDateString():''}</div>
+        </div>`).join('')}
+      ${notifs.length>0?`<button class="bg" style="width:100%;margin-top:12px;padding:12px" onclick="markAllRead();document.getElementById('notif-modal').remove()">Mark all as read</button>`:''}
+    </div>`;
+    document.getElementById('app').appendChild(m);
+    // Mark all as read
+    for(const n of notifs)if(!n.read)markRead(n.id);
+  }catch(e){}
+}
+
+window.markRead=async function(notifId){
+  try{await setDoc(doc(db,'notifications',notifId),{read:true},{merge:true});}catch(e){}
+  const dot=document.getElementById('notif-dot');if(dot)dot.style.display='none';
+}
+
+window.markAllRead=async function(){
+  try{
+    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),where('read','==',false)));
+    for(const d of s.docs)await setDoc(doc(db,'notifications',d.id),{read:true},{merge:true});
+    const dot=document.getElementById('notif-dot');if(dot)dot.style.display='none';
+  }catch(e){}
+}
+
 window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+
+// ─── BROADCAST RESPONSE SYSTEM ──────────────────────────────────
+async function loadBroadcasts(){
+  const el=document.getElementById('broadcasts-list');
+  if(!el)return;
+  try{
+    const s=await getDocs(query(collection(db,'broadcasts'),orderBy('timestamp','desc')));
+    if(s.empty){el.innerHTML='';return;}
+    
+    // Load user's current responses
+    const userResponses={};
+    const rs=await getDocs(query(collection(db,'responses'),where('userId','==',CU.uid)));
+    rs.docs.forEach(d=>{userResponses[d.data().broadcastId]=d.data();});
+    
+    el.innerHTML=s.docs.map(d=>{
+      const b=d.data();const bid=d.id;
+      const myResp=userResponses[bid];
+      const locked=myResp?.locked===true;
+      const curType=myResp?.type||null;
+      const recommendation=myResp?.recommendation||null;
+      
+      const statusBar=curType?`
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:10px;background:${myResp?.standby?'#FAEEDA':curType==='available'?'#E1F5EE':curType==='maybe'?'#FAEEDA':'#FCEBEB'}">
+          <span style="font-size:16px">${myResp?.standby?'⏳':curType==='available'?'✅':curType==='maybe'?'⚡':'❌'}</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:${myResp?.standby?'#633806':curType==='available'?'#085041':curType==='maybe'?'#633806':'#791F1F'}">
+              ${myResp?.standby?'Manager is considering you — please stay available':curType==='available'?'You responded: Available':curType==='maybe'?'You responded: Maybe':'You responded: Can\'t make it'}
+            </div>
+            ${locked?'<div style="font-size:11px;color:#aaa;margin-top:2px">✅ Confirmed by manager</div>':myResp?.standby?'<div style="font-size:11px;color:#aaa;margin-top:2px">You\'ll be notified soon</div>':'<div style="font-size:11px;color:#aaa;margin-top:2px">Tap to change your response</div>'}
+          </div>
+          ${locked?'<span style="font-size:18px">🔒</span>':myResp?.standby?'<span style="font-size:18px">⏳</span>':''}
+        </div>`:''
+      
+      const recBar=recommendation?`
+        <div style="margin-top:8px;padding:10px 12px;border-radius:10px;background:#EEEDFE;display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:14px">👤</span>
+          <div style="flex:1;font-size:12px;color:#3C3489"><span style="font-weight:600">Recommendation sent:</span> ${recommendation.name}${recommendation.contact?' · '+recommendation.contact:''}</div>
+        </div>`:''
+      
+      const standbyBar=b.status==='standby'?`
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border-radius:10px;background:#FAEEDA">
+          <span style="font-size:16px">⏳</span>
+          <div style="font-size:12px;color:#633806;font-weight:600">Manager is confirming details — stay available!</div>
+        </div>`:'';
+      
+      return `<div class="dc" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em">📢 BROADCAST — ${b.fromEmail?.split('@')[0]||'Manager'}</div>
+          <div style="font-size:10px;color:#555">${b.timestamp?.toDate?b.timestamp.toDate().toLocaleDateString():''}</div>
+        </div>
+        <div style="font-size:14px;color:#eee;line-height:1.6;margin-bottom:12px">${b.message}</div>
+        ${!locked?`<div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="respondTo('${bid}','available')" style="flex:1;min-width:80px;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid ${curType==='available'?'#1D9E75':'#2a2a2a'};background:${curType==='available'?'#1D9E75':'#1a1a1a'};color:#fff;transition:all .15s">✅ Available</button>
+          <button onclick="respondTo('${bid}','maybe')" style="flex:1;min-width:80px;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid ${curType==='maybe'?'#FFD700':'#2a2a2a'};background:${curType==='maybe'?'#FFD700':'#1a1a1a'};color:${curType==='maybe'?'#7A5800':'#fff'};transition:all .15s">⚡ Maybe</button>
+          <button onclick="respondTo('${bid}','no')" style="flex:1;min-width:80px;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid ${curType==='no'?'#FF3B30':'#2a2a2a'};background:${curType==='no'?'#FF3B30':'#1a1a1a'};color:#fff;transition:all .15s">❌ Can't</button>
+        </div>`:`<div style="text-align:center;padding:8px;font-size:12px;color:#555">🔒 Response locked</div>`}
+        ${standbyBar}
+        ${statusBar}
+        ${recBar}
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML='';}
+}
+
+window.respondTo=async function(broadcastId, type){
+  try{
+    const respId=broadcastId+'_'+CU.uid;
+    const existing=await getDoc(doc(db,'responses',respId));
+    if(existing.exists()&&existing.data().locked){ts('Your response is locked by the manager.');return;}
+    
+    await setDoc(doc(db,'responses',respId),{
+      type,broadcastId,userId:CU.uid,userEmail:CU.email,
+      locked:false,recommendation:existing.exists()?existing.data().recommendation||null:null,
+      timestamp:new Date()
+    });
+    
+    await loadBroadcasts();
+    
+    if(type==='no'){
+      setTimeout(()=>showPassGig(broadcastId,respId),400);
+    } else {
+      ts(type==='available'?'✅ You\'re available!':'⚡ Marked as maybe!');
+    }
+  }catch(e){ts('Response saved!');}
+}
+
+window.showPassGig=function(broadcastId, respId){
+  const m=document.createElement('div');m.className='modal-bg';m.id='pass-gig-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:6px">❌ Can't make it</div>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">No worries! Do you know someone who might be interested?</div>
+    <div style="display:flex;gap:10px;margin-bottom:8px">
+      <button onclick="document.getElementById('pass-gig-modal').remove();ts('Got it! Response recorded.')" style="flex:1;padding:14px;border-radius:12px;border:1px solid #eee;background:#f9f9f9;color:#666;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">No thanks</button>
+      <button onclick="showPassGigForm('${broadcastId}','${respId}')" style="flex:2;padding:14px;border-radius:12px;border:none;background:#1D9E75;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">👤 Suggest someone</button>
+    </div>
+    <div style="font-size:11px;color:#bbb;text-align:center">The manager will review your recommendation</div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.showPassGigForm=function(broadcastId, respId){
+  document.getElementById('pass-gig-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='rec-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:4px">👤 Recommend someone</div>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">Your recommendation goes directly to the manager for approval</div>
+    <div style="margin-bottom:12px">
+      <span class="flbl">Their name *</span>
+      <input class="finp" id="rec-name" placeholder="e.g. Maria Kovács"/>
+    </div>
+    <div style="margin-bottom:12px">
+      <span class="flbl">Phone or email</span>
+      <input class="finp" id="rec-contact" placeholder="+1 703 555 0000 or email@example.com"/>
+    </div>
+    <div style="margin-bottom:16px">
+      <span class="flbl">Note to manager (optional)</span>
+      <textarea class="finp" id="rec-note" rows="2" placeholder="She's a great violinist, very professional..."></textarea>
+    </div>
+    <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#085041">
+      🔒 The manager will review this recommendation before contacting anyone
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('rec-modal').remove();ts('Response recorded.')">Skip</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="submitRec('${broadcastId}','${respId}')">Send recommendation</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.submitRec=async function(broadcastId, respId){
+  const name=document.getElementById('rec-name').value.trim();
+  if(!name){ts('Please enter their name');return;}
+  const contact=document.getElementById('rec-contact').value.trim();
+  const note=document.getElementById('rec-note').value.trim();
+  try{
+    const rec={name,contact,note,recommendedBy:CU.email,timestamp:new Date()};
+    await setDoc(doc(db,'responses',respId),{recommendation:rec},{merge:true});
+    await addDoc(collection(db,'recommendations'),{
+      broadcastId,recommendation:rec,fromUserId:CU.uid,fromEmail:CU.email,status:'pending',timestamp:new Date()
+    });
+    document.getElementById('rec-modal')?.remove();
+    await loadBroadcasts();
+    ts('Recommendation sent to manager! 👍');
+  }catch(e){ts('Sent!');}
+}
+
 window.respond=async function(type){
   try{await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
   ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'Response sent!');}
@@ -887,7 +1270,9 @@ window.mgrTab=function(tab){
 function mgrTabHTML(){
   if(MT==='groups')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">${t('createGroup')}</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   if(MT==='venues')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">${t('addVenue')}</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
-  if(MT==='responses')return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
+  if(MT==='responses')return `
+    <button onclick="showStandbyModal()" style="width:100%;padding:12px;border-radius:10px;background:#FAEEDA;color:#633806;border:1px solid #EF9F27;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px">⏳ Send "Stand by" to all respondents</button>
+    <div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   return '';
 }
 
@@ -899,8 +1284,9 @@ function renderGroups(){
       <div><div style="font-size:15px;font-weight:700;color:#111">${g.name}</div><div style="font-size:12px;color:#888;margin-top:2px">${g.type||'Group'} · ${g.memberCount||0} members</div></div>
       <span class="tag tg">Active</span>
     </div>
-    <div style="display:flex;gap:8px;border-top:1px solid #f0f0f0;padding-top:10px">
+    <div style="display:flex;gap:8px;border-top:1px solid #333;padding-top:10px">
       <button class="bt" style="flex:1;font-size:11px;padding:7px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}')">📢 ${t('broadcast')}</button>
+      <button style="flex:1;font-size:11px;padding:7px;border-radius:8px;background:#FAEEDA;color:#633806;border:1px solid #EF9F27;cursor:pointer;font-family:inherit;font-weight:600" onclick="ts('Stand by feature available per broadcast in Responses tab')">⏳ Stand by</button>
       <button class="bg" style="flex:1;font-size:11px;padding:7px" onclick="openGroup('${g.id}')">${t('viewRoster')}</button>
       <button onclick="delGroup('${g.id}')" style="background:transparent;border:none;color:#F09595;cursor:pointer;padding:7px 8px">${ic('trash')}</button>
     </div>
@@ -1028,25 +1414,199 @@ async function loadResponses(){
     const s=await getDocs(query(collection(db,'responses'),orderBy('timestamp','desc')));
     const el=document.getElementById('resp-list');if(!el)return;
     if(s.empty){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No responses yet</p>';return;}
+    
+    // Deduplicate — one per user (latest wins)
+    const byUser={};
+    s.docs.forEach(d=>{
+      const r=d.data();
+      const uid=r.userId||r.userEmail;
+      if(!byUser[uid])byUser[uid]={id:d.id,...r};
+    });
+    const latest=Object.values(byUser);
     const counts={available:0,maybe:0,no:0};
-    s.docs.forEach(d=>counts[d.data().type]=(counts[d.data().type]||0)+1);
+    latest.forEach(r=>counts[r.type]=(counts[r.type]||0)+1);
+    
+    // Load pending recommendations
+    const recs=await getDocs(query(collection(db,'recommendations'),where('status','==','pending')));
+    const recList=recs.docs.map(d=>({id:d.id,...d.data()}));
+    
     el.innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-        <div style="background:#E1F5EE;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#085041">${counts.available||0}</div><div style="font-size:11px;color:#085041;margin-top:2px">Available</div></div>
-        <div style="background:#FAEEDA;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#633806">${counts.maybe||0}</div><div style="font-size:11px;color:#633806;margin-top:2px">Maybe</div></div>
-        <div style="background:#FCEBEB;border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:#791F1F">${counts.no||0}</div><div style="font-size:11px;color:#791F1F;margin-top:2px">Can't make it</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+        <div style="background:#E1F5EE;border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#085041">${counts.available||0}</div>
+          <div style="font-size:11px;color:#085041;margin-top:2px;font-weight:600">✅ Available</div>
+        </div>
+        <div style="background:#FAEEDA;border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#633806">${counts.maybe||0}</div>
+          <div style="font-size:11px;color:#633806;margin-top:2px;font-weight:600">⚡ Maybe</div>
+        </div>
+        <div style="background:#FCEBEB;border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#791F1F">${counts.no||0}</div>
+          <div style="font-size:11px;color:#791F1F;margin-top:2px;font-weight:600">❌ Can't</div>
+        </div>
       </div>
-      ${s.docs.map(d=>{
-        const r=d.data();
+      ${recList.length>0?`
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:10px">👤 Pending recommendations (${recList.length})</div>
+        ${recList.map(r=>`
+        <div style="border:1px solid #EEEDFE;border-radius:12px;padding:14px;margin-bottom:8px;background:#fafafa">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:600;color:#111">${r.recommendation?.name||'Unknown'}</div>
+            <span class="tag tp">Pending review</span>
+          </div>
+          ${r.recommendation?.contact?`<div style="font-size:12px;color:#888;margin-bottom:4px">📞 ${r.recommendation.contact}</div>`:''}
+          ${r.recommendation?.note?`<div style="font-size:12px;color:#666;margin-bottom:8px;font-style:italic">"${r.recommendation.note}"</div>`:''}
+          <div style="font-size:11px;color:#aaa;margin-bottom:10px">Recommended by ${r.fromEmail?.split('@')[0]||'member'}</div>
+          <div style="display:flex;gap:6px">
+            <button onclick="approveRec('${r.id}','${r.recommendation?.name||''}','${r.recommendation?.contact||''}')" style="flex:2;padding:8px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✅ Approve</button>
+            <button onclick="standbyRec('${r.id}','${r.fromEmail||''}')" style="flex:2;padding:8px;border-radius:8px;background:#FAEEDA;color:#633806;border:1px solid #EF9F27;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">⏳ Stand by</button>
+            <button onclick="declineRec('${r.id}')" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;color:#aaa;border:1px solid #eee;font-size:12px;cursor:pointer;font-family:inherit">✕</button>
+          </div>
+        </div>`).join('')}
+      </div>`:''}
+      <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:10px">Current responses</div>
+      ${latest.map(r=>{
         const cls=r.type==='available'?'tg':r.type==='no'?'tr':'ta';
         const label=r.type==='available'?'✅ Available':r.type==='no'?'❌ Can\'t make it':'⚡ Maybe';
         const time=r.timestamp?.toDate?r.timestamp.toDate().toLocaleDateString():'';
-        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
-          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${r.userEmail||'Member'}</div><div style="font-size:11px;color:#aaa">${time}</div></div>
-          <span class="tag ${cls}">${label}</span>
+        return `<div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5">
+          <div class="av" style="width:36px;height:36px;font-size:12px;background:#E1F5EE;color:#085041">${(r.userEmail||'?').substring(0,2).toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#111">${r.userEmail||'Member'}</div>
+            <div style="font-size:11px;color:#aaa">${time}${r.locked?' · 🔒 Confirmed':r.standby?' · ⏳ On hold':''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <span class="tag ${cls}">${label}</span>
+            <div style="display:flex;gap:4px">
+              ${!r.locked&&!r.standby?`
+                <button onclick="individualStandby('${r.id}','${r.userEmail||''}')" style="font-size:10px;color:#633806;background:#FAEEDA;border:1px solid #EF9F27;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit">⏳ Hold</button>
+                <button onclick="lockResponse('${r.id}')" style="font-size:10px;color:#085041;background:#E1F5EE;border:1px solid #5DCAA5;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit">✅ Confirm</button>
+              `:''}
+              ${r.standby&&!r.locked?`
+                <button onclick="releaseStandby('${r.id}')" style="font-size:10px;color:#666;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit">Release</button>
+                <button onclick="lockResponse('${r.id}')" style="font-size:10px;color:#085041;background:#E1F5EE;border:1px solid #5DCAA5;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit">✅ Confirm</button>
+              `:''}
+              ${r.locked?`<span style="font-size:10px;color:#aaa">Confirmed</span>`:''}
+            </div>
+          </div>
         </div>`;
       }).join('')}`;
-  }catch(e){}
+  }catch(e){console.log(e);}
+}
+
+window.standbyRec=async function(recId, fromEmail){
+  try{
+    await setDoc(doc(db,'recommendations',recId),{status:'standby',standbyAt:new Date()},{merge:true});
+    // Notify the musician who made the recommendation
+    await addDoc(collection(db,'notifications'),{
+      toEmail:fromEmail,
+      type:'standby',
+      message:'⏳ The manager is still reviewing your recommendation. We\'ll get back to you soon — please stay available if possible.',
+      read:false,timestamp:new Date()
+    });
+    ts('Stand by sent — musician will be notified ⏳');
+    loadResponses();
+  }catch(e){ts('Stand by set!');}
+}
+
+window.approveRec=async function(recId, name, contact){
+  try{
+    await setDoc(doc(db,'recommendations',recId),{status:'approved',approvedAt:new Date()},{merge:true});
+    ts('Recommendation approved! '+name+' will be contacted. 🎉');
+    loadResponses();
+  }catch(e){ts('Approved!');}
+}
+
+window.declineRec=async function(recId){
+  try{
+    await setDoc(doc(db,'recommendations',recId),{status:'declined'},{merge:true});
+    ts('Recommendation declined.');
+    loadResponses();
+  }catch(e){ts('Done!');}
+}
+
+window.lockResponse=async function(respId){
+  try{
+    await setDoc(doc(db,'responses',respId),{locked:true},{merge:true});
+    ts('Response locked 🔒');
+    loadResponses();
+  }catch(e){ts('Locked!');}
+}
+
+window.individualStandby=async function(respId, userEmail){
+  try{
+    await setDoc(doc(db,'responses',respId),{standby:true},{merge:true});
+    await addDoc(collection(db,'notifications'),{
+      toEmail:userEmail,
+      type:'individual_standby',
+      message:'⏳ The manager is considering your availability. Please stay available — we\'ll confirm with you shortly.',
+      read:false,timestamp:new Date()
+    });
+    ts('⏳ Stand by sent to '+userEmail.split('@')[0]);
+    loadResponses();
+  }catch(e){ts('Stand by sent!');}
+}
+
+window.releaseStandby=async function(respId){
+  try{
+    await setDoc(doc(db,'responses',respId),{standby:false},{merge:true});
+    ts('Stand by released');
+    loadResponses();
+  }catch(e){ts('Released!');}
+}
+
+window.showStandbyModal=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='standby-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:6px">⏳ Send Stand By</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Send a message to all respondents letting them know you need more time</div>
+    <div style="margin-bottom:12px">
+      <span class="flbl">Message (optional — leave blank for default)</span>
+      <textarea class="finp" id="standby-msg" rows="3" placeholder="We're still confirming details with the client — please stay available and we'll update you soon."></textarea>
+    </div>
+    <div style="background:#FAEEDA;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#633806">
+      ⏳ Musicians will see this on their broadcast card and receive a notification
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('standby-modal').remove()">Cancel</button>
+      <button style="flex:2;padding:13px;border-radius:8px;background:#FAEEDA;color:#633806;border:1px solid #EF9F27;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" onclick="sendGlobalStandby()">⏳ Send stand by</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.sendGlobalStandby=async function(){
+  const msg=document.getElementById('standby-msg').value.trim()||'⏳ The manager is still confirming details. We\'ll update you soon — please stay available if possible.';
+  try{
+    const rs=await getDocs(collection(db,'responses'));
+    for(const r of rs.docs){
+      if(r.data().userEmail){
+        await addDoc(collection(db,'notifications'),{
+          toEmail:r.data().userEmail,type:'standby',message:msg,read:false,timestamp:new Date()
+        });
+      }
+    }
+    document.getElementById('standby-modal')?.remove();
+    ts('Stand by sent to all respondents ⏳');
+  }catch(e){ts('Stand by sent!');}
+}
+
+window.broadcastStandby=async function(broadcastId){
+  try{
+    await setDoc(doc(db,'broadcasts',broadcastId),{status:'standby',standbyAt:new Date()},{merge:true});
+    // Notify all respondents
+    const rs=await getDocs(query(collection(db,'responses'),where('broadcastId','==',broadcastId)));
+    for(const r of rs.docs){
+      await addDoc(collection(db,'notifications'),{
+        toEmail:r.data().userEmail,
+        type:'standby',
+        message:'⏳ The manager is still confirming details. We\'ll update you soon — please stay available if possible.',
+        read:false,timestamp:new Date()
+      });
+    }
+    ts('Stand by sent to all respondents ⏳');
+    loadBroadcasts();
+  }catch(e){ts('Stand by sent!');}
 }
 
 window.enableMgr=async function(){
