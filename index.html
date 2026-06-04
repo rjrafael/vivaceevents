@@ -1925,10 +1925,10 @@ function feedHTML(){
 <div class="dc">
   <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
   <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button class="bt" style="font-size:12px;padding:7px 14px" onclick="respond('available')">${t('available')}</button>
-    <button style="background:#FFD700;color:#7A5800;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('maybe')">${t('maybe')}</button>
-    <button style="background:#FF3B30;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer" onclick="respond('no')">${t('cantMakeIt')}</button>
+  <div style="display:flex;gap:8px;flex-wrap:wrap" id="demo-bc-btns">
+    <button id="demo-avail" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #2a2a2a;background:#1a1a1a;color:#fff;transition:all .15s" onclick="demoRespond('available')">${t('available')}</button>
+    <button id="demo-maybe" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #2a2a2a;background:#1a1a1a;color:#fff;transition:all .15s" onclick="demoRespond('maybe')">${t('maybe')}</button>
+    <button id="demo-no" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #2a2a2a;background:#1a1a1a;color:#fff;transition:all .15s" onclick="demoRespond('no')">${t('cantMakeIt')}</button>
   </div>
 </div>
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
@@ -1949,6 +1949,30 @@ window.showLangPicker=function(){
 }
 
 window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+
+window.demoRespond=async function(type){
+  // Visual feedback — highlight selected, fade others
+  const btns={available:'demo-avail',maybe:'demo-maybe',no:'demo-no'};
+  const colors={available:{bg:'#1D9E75',border:'#1D9E75',color:'#fff'},maybe:{bg:'#FFD700',border:'#FFD700',color:'#7A5800'},no:{bg:'#FF3B30',border:'#FF3B30',color:'#fff'}};
+  Object.entries(btns).forEach(([t,id])=>{
+    const btn=document.getElementById(id);if(!btn)return;
+    if(t===type){
+      btn.style.background=colors[t].bg;
+      btn.style.borderColor=colors[t].border;
+      btn.style.color=colors[t].color;
+      btn.style.opacity='1';
+    } else {
+      btn.style.background='#1a1a1a';
+      btn.style.borderColor='#2a2a2a';
+      btn.style.color='#555';
+      btn.style.opacity='0.5';
+    }
+  });
+  try{
+    await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
+    ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'❌ Response recorded');
+  }catch(e){ts('Response saved!');}
+}
 window.respond=async function(type){
   try{await addDoc(collection(db,'responses'),{type,userId:CU.uid,userEmail:CU.email,timestamp:new Date()});
   ts(type==='available'?'✅ '+t('available')+'!':type==='maybe'?'⚡ '+t('maybe')+'!':'Response sent!');}
