@@ -1649,12 +1649,6 @@ window.inviteToGig=async function(userId, userName, userEmail){
     ts(`Invite sent to ${userName}! 📨`);
   }catch(e){ts('Invite sent!');}
 }
-  const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
-  if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
-  else roles.push(role);
-  UP.roles=[...new Set(roles)];await saveUP();render();
-  ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
-}
 window.toggleRole=async function(role){
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
