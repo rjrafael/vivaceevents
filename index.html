@@ -956,6 +956,7 @@ function postHTML(){
 <div style="margin-bottom:14px"><span class="flbl">${t('notes')}</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
 ${isMgr()&&groups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="g-group"><option value="">— Don't notify a group —</option>${gopts}</select></div>`:''}
 <div style="display:flex;gap:8px">
+  <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="go('feed')">Cancel</button>
   <button class="bg" style="flex:1;padding:13px;font-size:13px" onclick="saveGig(true)">${t('saveGig')}</button>
   <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveGig(false)">${t('postToVivace')}</button>
 </div>
