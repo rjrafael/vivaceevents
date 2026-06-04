@@ -632,7 +632,7 @@ async function loadGigs(){
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
-            <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:none;border:none;color:#ddd;font-size:14px;cursor:pointer;padding:4px" title="Report this gig">⚑</button>
+            <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px" title="Report this gig">⚑ Report</button>
             ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
             ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
@@ -2004,7 +2004,7 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
       ${isMgr()?`
         <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteOne('${name}')">+ Group</button>
         <button onclick="showRatingModal('${musicianId||name}','${musicianEmail||''}','${name}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#666;font-size:14px;cursor:pointer" title="Rate musician">⭐</button>
-        <button onclick="showReportModal('user','${musicianId||name}','${name}','${musicianEmail||''}')" style="padding:6px 8px;border-radius:8px;background:none;border:none;color:#ddd;font-size:14px;cursor:pointer" title="Report user">⚑</button>
+        <button onclick="showReportModal('user','${musicianId||name}','${name}','${musicianEmail||''}')" style="padding:6px 8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:14px;cursor:pointer" title="Report user">⚑</button>
       `:`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent!')">Invite</button>`}
     </div>
   </div>
