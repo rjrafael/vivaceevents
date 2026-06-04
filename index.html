@@ -923,7 +923,7 @@ function postHTML(){
     <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#888">${t('multiDay')}</span><div class="tgl off" id="md-tgl" onclick="toggleMD()"><div class="tdot"></div></div></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div><span class="flbl">${t('date')}</span><input class="finp" id="g-date" type="date" oninput="calcDur()"/></div>
+    <div><span class="flbl">${t('date')}</span><input class="finp" id="g-date" type="date" oninput="calcDur();loadSmartSuggestions(this.value,document.getElementById('g-inst')?.value,document.getElementById('g-skills-needed')?.value)"/></div>
     <div><span class="flbl">${t('startTime')}</span><input class="finp" id="g-time" type="time" oninput="calcDur()"/></div>
   </div>
   <div id="end-row" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -952,7 +952,9 @@ function postHTML(){
   ${venues.length>0?`<select class="finp" id="g-vsel" onchange="fillV(this.value)" style="margin-bottom:6px"><option value="">— Select saved venue —</option>${vopts}</select>`:''}
   <input class="finp" id="g-loc" placeholder="Address or Remote"/>
 </div>
-<div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…"/></div>
+<div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,this.value,document.getElementById('g-skills-needed')?.value)"/></div>
+<div style="margin-bottom:12px"><span class="flbl">🎯 Skills needed (optional)</span><input class="finp" id="g-skills-needed" placeholder="Conductor, Arranger, Sound Engineer…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,document.getElementById('g-inst')?.value,this.value)"/></div>
+<div id="smart-suggestions" style="margin-bottom:12px"></div>
 <div style="margin-bottom:14px"><span class="flbl">${t('notes')}</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
 ${isMgr()&&groups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="g-group"><option value="">— Don't notify a group —</option>${gopts}</select></div>`:''}
 <div style="display:flex;gap:8px">
@@ -1014,7 +1016,8 @@ window.saveGig=async function(draft){
     await addDoc(collection(db,'gigs'),{
       title:title||'Draft',type,date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
       pay:document.getElementById('g-pay').value,location:document.getElementById('g-loc').value,
-      instruments:document.getElementById('g-inst').value,level:document.getElementById('g-level').value,
+      instruments:document.getElementById('g-inst').value,
+      skillsNeeded:document.getElementById('g-skills-needed')?.value||'',level:document.getElementById('g-level').value,
       notes:document.getElementById('g-notes').value,groupId:document.getElementById('g-group')?.value||'',
       status:'open',postedBy:CU.email,userId:CU.uid,draft,lang,timestamp:new Date()
     });
@@ -1388,12 +1391,270 @@ function profileHTML(){
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
     </div>
   </div>
-  <div>
-    <div class="st" style="margin-bottom:10px">Skills & disciplines</div>
-    ${[['Classical',80],['Chamber',70],['Sight-reading',75],['Teaching',65]].map(([s,p])=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:12px;color:#111;width:84px;flex-shrink:0">${s}</span><div class="skill-track"><div class="skill-fill" style="width:${p}%"></div></div><span style="font-size:11px;color:#aaa;width:34px;text-align:right">${p}%</span></div>`).join('')}
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎵 Instruments</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showInstrumentEditor()">Edit</span>
+    </div>
+    <div id="profile-instruments">
+      ${(UP.instruments||[]).length===0?
+        `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showInstrumentEditor()">+ Add your instruments</div>`:
+        `<div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${(UP.instruments||[]).map(i=>`<span class="tag${i.primary?' tg':''}" style="font-size:12px;padding:5px 10px">${i.primary?'★ ':''} ${i.name}</span>`).join('')}
+        </div>`
+      }
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎯 Skills</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showSkillEditor()">Edit</span>
+    </div>
+    <div id="profile-skills">
+      ${(UP.skills||[]).length===0?
+        `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showSkillEditor()">+ Add your skills</div>`:
+        `<div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${(UP.skills||[]).map(s=>`<span class="tag tb" style="font-size:12px;padding:5px 10px">${s}</span>`).join('')}
+        </div>`
+      }
+    </div>
   </div>
 </div>`;}
 
+// ─── INSTRUMENT EDITOR ───────────────────────────────────────────
+const INSTRUMENT_LIST=[
+  'Violin','Viola','Cello','Double Bass','Guitar','Bass Guitar',
+  'Piano','Harpsichord','Organ','Accordion',
+  'Trumpet','Trombone','French Horn','Tuba','Flugelhorn',
+  'Flute','Oboe','Clarinet','Bassoon','Saxophone',
+  'Drums','Percussion','Marimba','Vibraphone',
+  'Harp','Lute','Mandolin','Banjo','Ukulele',
+  'Voice — Soprano','Voice — Mezzo','Voice — Alto','Voice — Tenor','Voice — Baritone','Voice — Bass',
+  'Electronic / DJ','Synthesizer','Other'
+];
+
+const SKILL_LIST=[
+  'Conductor','Music Director','Assistant Conductor',
+  'Arranger','Composer','Orchestrator','Music Copyist',
+  'Music Producer','Recording Engineer','Sound Engineer','Mix Engineer',
+  'Choreographer','Dance Director',
+  'Stage Manager','Production Manager','Tour Manager',
+  'Music Educator','Private Teacher','Masterclass Coach',
+  'Music Therapist','Session Contractor','Casting Director',
+  'Other'
+];
+
+window.showInstrumentEditor=function(){
+  const current=UP.instruments||[];
+  const m=document.createElement('div');m.className='modal-bg';m.id='inst-modal';
+  m.innerHTML=`<div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🎵 My Instruments</div>
+      <button onclick="document.getElementById('inst-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Tap to add · Hold primary instrument to mark it ★</div>
+    
+    ${current.length>0?`
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Your instruments</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="my-inst-list">
+        ${current.map(i=>`
+          <div style="display:flex;align-items:center;gap:4px;background:${i.primary?'#E1F5EE':'#f5f5f5'};border:1px solid ${i.primary?'#5DCAA5':'#e0e0e0'};border-radius:20px;padding:5px 10px">
+            <span style="font-size:12px;color:${i.primary?'#085041':'#555'}">${i.primary?'★ ':''}${i.name}</span>
+            <button onclick="setPrimary('${i.name}')" style="background:none;border:none;color:#1D9E75;font-size:10px;cursor:pointer;padding:0 2px" title="Set as primary">★</button>
+            <button onclick="removeInst('${i.name}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:0 2px">×</button>
+          </div>`).join('')}
+      </div>
+    </div>`:''}
+    
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add instrument</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${INSTRUMENT_LIST.filter(i=>!current.find(c=>c.name===i)).map(i=>`
+        <button onclick="addInst('${i}')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
+      `).join('')}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="saveInstruments()">Save instruments</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.addInst=function(name){
+  if(!UP.instruments)UP.instruments=[];
+  if(!UP.instruments.find(i=>i.name===name)){
+    UP.instruments.push({name,primary:UP.instruments.length===0});
+    showInstrumentEditor();document.getElementById('inst-modal')?.remove();showInstrumentEditor();
+  }
+}
+
+window.removeInst=function(name){
+  UP.instruments=(UP.instruments||[]).filter(i=>i.name!==name);
+  if(UP.instruments.length>0&&!UP.instruments.find(i=>i.primary))UP.instruments[0].primary=true;
+  document.getElementById('inst-modal')?.remove();showInstrumentEditor();
+}
+
+window.setPrimary=function(name){
+  (UP.instruments||[]).forEach(i=>i.primary=i.name===name);
+  document.getElementById('inst-modal')?.remove();showInstrumentEditor();
+}
+
+window.saveInstruments=async function(){
+  await saveUP();document.getElementById('inst-modal')?.remove();
+  render();ts('Instruments saved! ✅');
+}
+
+// ─── SKILL EDITOR ────────────────────────────────────────────────
+window.showSkillEditor=function(){
+  const current=UP.skills||[];
+  const m=document.createElement('div');m.className='modal-bg';m.id='skill-modal';
+  m.innerHTML=`<div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🎯 My Skills</div>
+      <button onclick="document.getElementById('skill-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Non-performance skills and roles</div>
+    
+    ${current.length>0?`
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Your skills</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${current.map(s=>`
+          <div style="display:flex;align-items:center;gap:4px;background:#E6F1FB;border:1px solid #85B7EB;border-radius:20px;padding:5px 10px">
+            <span style="font-size:12px;color:#0C447C">${s}</span>
+            <button onclick="removeSkill('${s}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:0 2px">×</button>
+          </div>`).join('')}
+      </div>
+    </div>`:''}
+    
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add skill</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${SKILL_LIST.filter(s=>!current.includes(s)).map(s=>`
+        <button onclick="addSkill('${s}')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${s}</button>
+      `).join('')}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="saveSkills()">Save skills</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.addSkill=function(name){
+  if(!UP.skills)UP.skills=[];
+  if(!UP.skills.includes(name)){
+    UP.skills.push(name);
+    document.getElementById('skill-modal')?.remove();showSkillEditor();
+  }
+}
+
+window.removeSkill=function(name){
+  UP.skills=(UP.skills||[]).filter(s=>s!==name);
+  document.getElementById('skill-modal')?.remove();showSkillEditor();
+}
+
+window.saveSkills=async function(){
+  await saveUP();document.getElementById('skill-modal')?.remove();
+  render();ts('Skills saved! ✅');
+}
+
+// ─── SMART SUGGESTIONS ───────────────────────────────────────────
+window.loadSmartSuggestions=async function(date, neededInstruments, neededSkills){
+  const el=document.getElementById('smart-suggestions');if(!el)return;
+  if(!date){el.innerHTML='';return;}
+  
+  el.innerHTML=`<div style="padding:12px;text-align:center;font-size:13px;color:#aaa">Finding available artists...</div>`;
+  
+  try{
+    // Get all users with instruments/skills
+    const usersSnap=await getDocs(collection(db,'users'));
+    const allUsers=usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+    
+    // Get confirmed gigs on this date
+    const gigsSnap=await getDocs(query(collection(db,'gigs'),where('date','==',date),where('status','==','filled')));
+    const confirmedOnDate=new Set();
+    gigsSnap.docs.forEach(g=>{
+      (g.data().confirmedApplicants||[]).forEach(uid=>confirmedOnDate.add(uid));
+    });
+
+    // Get this manager's ratings
+    const ratingsSnap=await getDocs(query(collection(db,'ratings'),where('managerId','==',CU.uid)));
+    const ratings={};
+    ratingsSnap.docs.forEach(d=>{
+      ratings[d.data().musicianId]={priority:d.data().priority,average:d.data().average};
+    });
+
+    // Filter and score users
+    const needed=(neededInstruments||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
+    const neededSkillsList=(neededSkills||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
+
+    const suggestions=allUsers.filter(u=>{
+      if(u.id===CU.uid)return false; // not yourself
+      if(confirmedOnDate.has(u.id))return false; // already booked
+      if(ratings[u.id]?.priority==='never')return false; // never again
+      
+      // Match instruments or skills
+      const userInst=(u.instruments||[]).map(i=>i.name.toLowerCase());
+      const userSkills=(u.skills||[]).map(s=>s.toLowerCase());
+      
+      if(needed.length===0&&neededSkillsList.length===0)return true;
+      
+      const instMatch=needed.some(n=>userInst.some(i=>i.includes(n)||n.includes(i)));
+      const skillMatch=neededSkillsList.some(n=>userSkills.some(s=>s.includes(n)||n.includes(s)));
+      
+      return instMatch||skillMatch;
+    }).map(u=>{
+      const r=ratings[u.id];
+      const priority=r?.priority||'unknown';
+      const avg=r?.average||0;
+      const userInst=(u.instruments||[]);
+      const primaryInst=userInst.find(i=>i.primary)?.name||userInst[0]?.name||'';
+      const priorityOrder={top:0,medium:1,low:2,unknown:3};
+      return {...u,priority,avg,primaryInst,score:priorityOrder[priority]||3};
+    }).sort((a,b)=>a.score-b.score||(b.avg-a.avg));
+
+    if(suggestions.length===0){
+      el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">No matches from your roster for this date</div>`;
+      return;
+    }
+
+    const priorityColors={top:'#E1F5EE',medium:'#FAEEDA',low:'#E6F1FB',unknown:'#f5f5f5'};
+    const priorityLabels={top:'🟢 Top',medium:'🟡 Medium',low:'🔵 Low',unknown:'⚪ New'};
+
+    el.innerHTML=`
+      <div style="font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:8px;letter-spacing:.05em">✨ SMART SUGGESTIONS — ${suggestions.length} available</div>
+      ${suggestions.slice(0,5).map(u=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:${priorityColors[u.priority]||'#f5f5f5'};margin-bottom:6px">
+          <div class="av" style="width:38px;height:38px;font-size:13px;background:#B5D4F4;color:#0C447C;flex-shrink:0">${(u.name||u.email||'?').substring(0,2).toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#111">${u.name||u.email?.split('@')[0]||'Artist'}</div>
+            <div style="font-size:11px;color:#666">${u.primaryInst}${u.avg>0?' · ⭐ '+u.avg:''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <span style="font-size:10px;font-weight:600;color:#555">${priorityLabels[u.priority]||'⚪'}</span>
+            <button onclick="inviteToGig('${u.id}','${(u.name||u.email||'').replace(/'/g,"\\'")}','${u.email||''}')" 
+              style="font-size:11px;padding:4px 10px;border-radius:8px;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:inherit;font-weight:600">
+              Invite
+            </button>
+          </div>
+        </div>`).join('')}
+      ${suggestions.length>5?`<div style="font-size:12px;color:#aaa;text-align:center;padding:6px">+${suggestions.length-5} more available</div>`:''}
+    `;
+  }catch(e){el.innerHTML='';}
+}
+
+window.inviteToGig=async function(userId, userName, userEmail){
+  try{
+    await addDoc(collection(db,'invites'),{
+      toUserId:userId,toName:userName,toEmail:userEmail,
+      fromId:CU.uid,fromEmail:CU.email,
+      type:'gig_invite',status:'pending',timestamp:new Date()
+    });
+    ts(`Invite sent to ${userName}! 📨`);
+  }catch(e){ts('Invite sent!');}
+}
+  const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
+  if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
+  else roles.push(role);
+  UP.roles=[...new Set(roles)];await saveUP();render();
+  ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
+}
 window.toggleRole=async function(role){
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
