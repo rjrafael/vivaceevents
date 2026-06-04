@@ -2052,6 +2052,9 @@ async function loadArtistCards(){
   el.innerHTML=artists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,priorities[a.id]||'',trusted[a.id]||false)).join('');
 }
 window.inviteOne=function(n){if(groups.length===0){ts('Create a group first!');return;}showGPicker([n]);}
+window.toggleCP=function(n){const i=CP.indexOf(n);if(i>-1)CP.splice(i,1);else CP.push(n);document.getElementById('scr').innerHTML=discoverHTML();}
+window.clearCP=function(){CP=[];document.getElementById('scr').innerHTML=discoverHTML();}
+window.sendCP=function(){if(groups.length===0){ts('Create a group first!');return;}showGPicker(CP);}
 
 function showGPicker(names){
   const m=document.createElement('div');m.className='modal-bg';m.id='gpick';
