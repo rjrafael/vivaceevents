@@ -87,41 +87,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 <div id="app"></div>
-<script>
-// Data deletion page — served at /data-deletion (Facebook requirement)
-if(window.location.pathname.includes('data-deletion')){
-  document.getElementById('app').innerHTML=`
-  <div style="max-width:480px;margin:0 auto;padding:48px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-    <div style="font-size:22px;font-weight:700;color:#0d0d0d;margin-bottom:4px">Vivace <span style="color:#1D9E75">Events</span></div>
-    <div style="font-size:12px;color:#aaa;margin-bottom:40px">Virtual Studio Orchestra LLC</div>
-    <h1 style="font-size:20px;font-weight:700;color:#111;margin-bottom:12px">User Data Deletion</h1>
-    <p style="font-size:14px;color:#444;line-height:1.7;margin-bottom:16px">
-      You have the right to request deletion of your personal data stored by Vivace Events at any time.
-    </p>
-    <div style="background:#f5f5f5;border-radius:12px;padding:20px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">What data we store</div>
-      <ul style="font-size:13px;color:#555;line-height:1.8;padding-left:18px">
-        <li>Your name and email address (from sign-in)</li>
-        <li>Profile information you provide (roles, skills)</li>
-        <li>Gigs and opportunities you post or respond to</li>
-        <li>Groups and venues you create</li>
-      </ul>
-    </div>
-    <div style="background:#E1F5EE;border-radius:12px;padding:20px;margin-bottom:24px">
-      <div style="font-size:13px;font-weight:600;color:#085041;margin-bottom:8px">How to request deletion</div>
-      <p style="font-size:13px;color:#085041;line-height:1.7;margin:0">
-        Send an email to <strong>rafael.javadov@gmail.com</strong> with the subject line <strong>"Data Deletion Request"</strong> and include the email address associated with your account. We will permanently delete your data within <strong>30 days</strong> and confirm by email.
-      </p>
-    </div>
-    <p style="font-size:12px;color:#aaa;line-height:1.6">
-      You may also delete your account directly from within the app at any time. This will immediately remove all your data from our servers.<br><br>
-      © ${new Date().getFullYear()} Virtual Studio Orchestra LLC · <a href="https://vivaceevents.com/privacy" style="color:#1D9E75">Privacy Policy</a>
-    </p>
-  </div>`;
-  document.querySelector('body').style.background='#fff';
-  throw new Error('data-deletion page rendered — stop script');
-}
-</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -1131,40 +1096,61 @@ window.selectPlan=async function(planId){
   showStripeModal(planId);
 }
 
-function showStripeModal(planId){
-  const prices={pro:'$19/month',studio:'$49/month',agency:'$99/month'};
+// ─── STRIPE CHECKOUT ────────────────────────────────────────────
+const STRIPE_PK='pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32';
+const PRICE_IDS={pro:'price_1TeMN4R49hhPnbuaOxq4rftD',studio:'price_1TeMPQR49hhPnbua6qYhcqQ1',agency:'price_1TeMR8R49hhPnbuamR69UdH2'};
+const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCheckoutSession';
+
+// Handle return from Stripe Checkout
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  if(p.get('payment')==='success'){
+    window.history.replaceState({},'','/');
+    setTimeout(()=>ts('🎉 Subscription activated! Welcome aboard.'),500);
+  } else if(p.get('payment')==='cancelled'){
+    window.history.replaceState({},'','/');
+    setTimeout(()=>ts('Checkout cancelled — no charge made.'),500);
+  }
+})();
+
+async function showStripeModal(planId){
   const names={pro:'Agent Pro',studio:'Agent Studio',agency:'Agency'};
+  const prices={pro:'$19/month',studio:'$49/month',agency:'$149/month'};
   const m=document.createElement('div');m.className='modal-bg';m.id='stripe-modal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Subscribe to ${names[planId]}</div>
-    <div style="font-size:13px;color:#888;margin-bottom:20px">${prices[planId]} · 14-day free trial · Cancel anytime</div>
-    <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:16px">
-      <div style="font-size:12px;color:#888;margin-bottom:12px;font-weight:600">PAYMENT DETAILS</div>
-      <input class="finp" placeholder="Card number" style="margin-bottom:8px"/>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <input class="finp" placeholder="MM / YY"/>
-        <input class="finp" placeholder="CVC"/>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">${prices[planId]} · Cancel anytime</div>
+    <div style="background:#E1F5EE;border-radius:10px;padding:14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:20px">🔒</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:3px">Secure checkout via Stripe</div>
+        <div style="font-size:11px;color:#085041">You'll be taken to Stripe's secure payment page. Your card details are never stored on our servers.</div>
       </div>
-      <input class="finp" placeholder="Name on card"/>
-    </div>
-    <div style="font-size:12px;color:#aaa;margin-bottom:16px;display:flex;align-items:center;gap:6px">
-      🔒 Secured by Stripe · Your card is never stored on our servers
     </div>
     <div style="display:flex;gap:8px">
       <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('stripe-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}')">Start free trial</button>
+      <button class="bt" id="checkout-btn" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}')">Continue to checkout →</button>
     </div>
   </div>`;
   document.getElementById('app').appendChild(m);
 }
 
 window.processPlan=async function(planId){
-  document.getElementById('stripe-modal')?.remove();
-  UP.plan=planId;
-  if(!UP.roles.includes('manager'))UP.roles=[...UP.roles,'manager'];
-  await saveUP();
-  render();
-  ts('Welcome to '+(planId==='pro'?'Agent Pro':'planId'==='studio'?'Agent Studio':'Agency')+'! 🎉 Your 14-day trial has started.');
+  const btn=document.getElementById('checkout-btn');
+  if(btn){btn.textContent='Loading...';btn.disabled=true;}
+  try{
+    const res=await fetch(CF_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({priceId:PRICE_IDS[planId],userId:CU.uid,email:CU.email,plan:planId})
+    });
+    if(!res.ok)throw new Error('Server error');
+    const {url}=await res.json();
+    window.location.href=url;
+  }catch(e){
+    document.getElementById('stripe-modal')?.remove();
+    ts('Could not start checkout. Please try again.');
+  }
 }
 
 function profileHTML(){
