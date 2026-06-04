@@ -1091,7 +1091,7 @@ ${plans.map(p=>`
 </div>
 </div>`;}
 
-window.selectPlan=async function(planId){
+window.selectPlan=async function(planId){if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
   if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
   showStripeModal(planId);
