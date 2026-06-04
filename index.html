@@ -407,7 +407,7 @@ function showPhoneModal(){
     <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your number — we'll send a verification code</div>
     <div id="phone-step-1">
       <span class="flbl">Phone number (with country code)</span>
-      <input class="finp" id="phone-input" placeholder="+1 703 887 9340" style="margin-bottom:6px"/>
+      <input class="finp" id="phone-input" placeholder="+17038879340" oninput="this.value=this.value.replace(/[^\d\+]/g,``)" style="margin-bottom:6px"/>
       <div style="font-size:10px;color:#aaa;margin-bottom:12px">+1 US · +44 UK · +7 Russia · +39 Italy · +33 France · +49 Germany</div>
       <div id="rc-wrap" style="margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
