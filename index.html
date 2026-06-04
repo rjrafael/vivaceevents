@@ -1594,9 +1594,17 @@ async function checkNotifications(){
 
 window.showNotifications=async function(){
   try{
-    const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),orderBy('timestamp','desc')));
+    let notifs=[];
+    try{
+      const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email),orderBy('timestamp','desc')));
+      notifs=s.docs.map(d=>({id:d.id,...d.data()}));
+    }catch(e){
+      // Fallback without orderBy if index not ready
+      const s=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email)));
+      notifs=s.docs.map(d=>({id:d.id,...d.data()}));
+    }
     const m=document.createElement('div');m.className='modal-bg';m.id='notif-modal';
-    const notifs=s.docs.map(d=>({id:d.id,...d.data()}));
+    document.getElementById('notif-modal')?.remove();
     m.innerHTML=`<div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <div style="font-size:17px;font-weight:700;color:#111">Notifications</div>
