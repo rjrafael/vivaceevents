@@ -1951,21 +1951,25 @@ window.showLangPicker=function(){
 window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
 
 window.demoRespond=async function(type){
-  // Visual feedback — highlight selected, fade others
   const btns={available:'demo-avail',maybe:'demo-maybe',no:'demo-no'};
-  const colors={available:{bg:'#1D9E75',border:'#1D9E75',color:'#fff'},maybe:{bg:'#FFD700',border:'#FFD700',color:'#7A5800'},no:{bg:'#FF3B30',border:'#FF3B30',color:'#fff'}};
+  const active={
+    available:{bg:'#1D9E75',border:'#1D9E75',color:'#fff'},
+    maybe:{bg:'#FFD700',border:'#FFD700',color:'#7A5800'},
+    no:{bg:'#FF3B30',border:'#FF3B30',color:'#fff'}
+  };
+  const inactive={bg:'rgba(255,255,255,0.08)',border:'rgba(255,255,255,0.15)',color:'rgba(255,255,255,0.4)'};
   Object.entries(btns).forEach(([t,id])=>{
     const btn=document.getElementById(id);if(!btn)return;
     if(t===type){
-      btn.style.background=colors[t].bg;
-      btn.style.borderColor=colors[t].border;
-      btn.style.color=colors[t].color;
+      btn.style.background=active[t].bg;
+      btn.style.borderColor=active[t].border;
+      btn.style.color=active[t].color;
       btn.style.opacity='1';
     } else {
-      btn.style.background='#1a1a1a';
-      btn.style.borderColor='#2a2a2a';
-      btn.style.color='#555';
-      btn.style.opacity='0.5';
+      btn.style.background=inactive.bg;
+      btn.style.borderColor=inactive.border;
+      btn.style.color=inactive.color;
+      btn.style.opacity='1';
     }
   });
   try{
