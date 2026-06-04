@@ -393,7 +393,7 @@ function authHTML(){return `
     <input class="finp" id="ae" type="email" placeholder="Email address"/>
     <input class="finp" id="ap" type="password" placeholder="Password (min 6 chars)"/>
     <button class="auth-btn auth-email-btn" id="btn-signup">Create free account</button>
-    <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button><div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div>
+    <button class="auth-btn" style="background:#f5f5f5;color:#333;border:1px solid #ddd" id="btn-signin">Sign in</button><div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div><div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap">
     ${Object.keys(T).map(l=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')">${{en:'EN English',es:'ES Español',it:'IT Italiano',ru:'RU Русский',fr:'FR Français',de:'DE Deutsch'}[l]}</button>`).join('')}
@@ -407,7 +407,7 @@ function showPhoneModal(){
     <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your number — we'll send a verification code</div>
     <div id="phone-step-1">
       <span class="flbl">Phone number (with country code)</span>
-      <input class="finp" id="phone-input" placeholder="+1 703 887 9340" style="margin-bottom:6px"/>
+      <input class="finp" id="phone-input" placeholder="+17038879340" oninput="this.value=this.value.replace(/[^\d\+]/g,``)" style="margin-bottom:6px"/>
       <div style="font-size:10px;color:#aaa;margin-bottom:12px">+1 US · +44 UK · +7 Russia · +39 Italy · +33 France · +49 Germany</div>
       <div id="rc-wrap" style="margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
@@ -491,6 +491,7 @@ function bindAuth(){
     catch(e){ts(e.message);}
   };
   document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email address first');return;}try{await sendPasswordResetEmail(auth,email);ts('Password reset email sent! Check your inbox ??');}catch(e){ts('Error: '+e.message);}};
+document.getElementById('btn-forgot').onclick=async()=>{const email=document.getElementById('ae').value.trim();if(!email){ts('Enter your email first');return;}try{await sendPasswordResetEmail(auth,email);ts('Reset email sent! Check your inbox ??');}catch(e){ts(e.message);}};
 document.getElementById('btn-signin').onclick=async()=>{
     try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
     catch(e){ts(e.message);}
@@ -1091,7 +1092,7 @@ ${plans.map(p=>`
 </div>
 </div>`;}
 
-window.selectPlan=async function(planId){if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}
+window.selectPlan=async function(planId){if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
   if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
   showStripeModal(planId);
