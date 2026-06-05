@@ -2280,26 +2280,43 @@ function discoverHTML(){
   <span id="search-clear" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#aaa;cursor:pointer" onclick="clearSearch()">✕</span>
 </div>
 
-<!-- Filter pills - instruments -->
-<div class="pr" style="margin-bottom:8px" id="inst-pills">
-  <span class="pl on" onclick="selectPill(this,'inst')" data-filter="">All</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="violin">Violin</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="viola">Viola</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="cello">Cello</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="bass">Bass</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="piano">Piano</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="voice">Voice</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="guitar">Guitar</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="saxophone">Saxophone</span>
-  <span class="pl" onclick="selectPill(this,'inst')" data-filter="drums">Drums</span>
+<!-- Filter pills - instruments (scrollable) -->
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+  <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="inst-pills">
+    ${['All','Violin','Viola','Cello','Double Bass','Guitar','Bass Guitar','Piano','Keyboard','Harpsichord','Organ','Accordion',
+      'Trumpet','Trombone','French Horn','Tuba','Flute','Oboe','Clarinet','Bassoon','Saxophone',
+      'Drums','Percussion','Harp','Mandolin','Banjo','Ukulele',
+      'Voice — Soprano','Voice — Mezzo','Voice — Alto','Voice — Tenor','Voice — Baritone','Voice — Bass',
+      'Electronic / DJ','Synthesizer'].map((inst,i)=>`
+      <button onclick="selectPill(this,'inst')" data-filter="${inst==='All'?'':inst.toLowerCase()}"
+        style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${i===0?'#1D9E75':'#e0e0e0'};background:${i===0?'#1D9E75':'#fff'};color:${i===0?'#fff':'#555'};transition:all .15s">
+        ${inst}
+      </button>`).join('')}
+  </div>
+</div>
+
+<!-- Filter pills - skills (scrollable) -->
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+  <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="skill-pills">
+    ${['All Skills','Conductor','Music Director','Arranger','Composer','Music Producer','Sound Engineer',
+      'Choreographer','Stage Manager','Tour Manager','Music Educator','Private Teacher',
+      'Masterclass Coach','Music Therapist','Session Contractor'].map((skill,i)=>`
+      <button onclick="selectPill(this,'skill')" data-filter="${skill==='All Skills'?'':skill.toLowerCase()}"
+        style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${i===0?'#0C447C':'#e0e0e0'};background:${i===0?'#0C447C':'#fff'};color:${i===0?'#fff':'#555'};transition:all .15s">
+        ${skill}
+      </button>`).join('')}
+  </div>
 </div>
 
 <!-- Filter pills - roles -->
-<div class="pr" style="margin-bottom:12px" id="role-pills">
-  <span class="pl on" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="">Everyone</span>
-  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="artist">🎻 Artists</span>
-  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="teacher">👨‍🏫 Teachers</span>
-  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="available">✅ Available</span>
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+  <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="role-pills">
+    ${[['','Everyone'],['artist','🎻 Artists'],['teacher','👨‍🏫 Teachers'],['student','🎓 Students'],['available','✅ Available']].map(([filter,label],i)=>`
+      <button onclick="selectPill(this,'role')" data-filter="${filter}"
+        style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${i===0?'#555':'#e0e0e0'};background:${i===0?'#555':'#fff'};color:${i===0?'#fff':'#555'};transition:all .15s">
+        ${label}
+      </button>`).join('')}
+  </div>
 </div>
 
 <!-- Results count -->
@@ -2315,13 +2332,22 @@ ${isMgr()||isTeacher()?`<div class="card" style="background:#f9f9f9;margin-botto
 // ─── SEARCH & FILTER STATE ───────────────────────────────────────
 let _allArtists=[];
 let _instFilter='';
+let _skillFilter='';
 let _roleFilter='';
 
 window.selectPill=function(el, type){
-  const container=document.getElementById(type==='inst'?'inst-pills':'role-pills');
-  container.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
+  const container=document.getElementById(type==='inst'?'inst-pills':type==='skill'?'skill-pills':'role-pills');
+  const color=type==='inst'?'#1D9E75':type==='skill'?'#0C447C':'#555';
+  container.querySelectorAll('button').forEach(btn=>{
+    btn.style.background='#fff';
+    btn.style.borderColor='#e0e0e0';
+    btn.style.color='#555';
+  });
+  el.style.background=color;
+  el.style.borderColor=color;
+  el.style.color='#fff';
   if(type==='inst')_instFilter=el.dataset.filter||'';
+  else if(type==='skill')_skillFilter=el.dataset.filter||'';
   else _roleFilter=el.dataset.filter||'';
   filterArtists();
 }
@@ -2357,6 +2383,11 @@ window.filterArtists=function(){
     if(_instFilter){
       const hasInst=instruments.includes(_instFilter)||tags.includes(_instFilter)||role.includes(_instFilter);
       if(!hasInst)return false;
+    }
+
+    // Skill filter
+    if(_skillFilter){
+      if(!skills.includes(_skillFilter))return false;
     }
 
     // Role filter
