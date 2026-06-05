@@ -3515,47 +3515,49 @@ window.filterArtists=function(){
     const instruments=(a.instruments||[]).map(i=>i.name?.toLowerCase()||'').join(' ');
     const skills=(a.skills||[]).join(' ').toLowerCase();
     const roles=(a.roles||[]).join(' ').toLowerCase();
+    const genres=(a.genres||[]).join(' ').toLowerCase();
 
-    // Search filter
     if(query){
       const matches=name.includes(query)||role.includes(query)||tags.includes(query)||
-        instruments.includes(query)||skills.includes(query);
+        instruments.includes(query)||skills.includes(query)||genres.includes(query);
       if(!matches)return false;
     }
-
-    // Instrument filter
     if(_instFilter){
       const hasInst=instruments.includes(_instFilter)||tags.includes(_instFilter)||role.includes(_instFilter);
       if(!hasInst)return false;
     }
-
-    // Skill filter
     if(_skillFilter){
       if(!skills.includes(_skillFilter))return false;
     }
-
-    // Genre filter
     if(_genreFilter){
-      const userGenres=(a.genres||[]).join(' ').toLowerCase();
-      if(!userGenres.includes(_genreFilter))return false;
+      if(!genres.includes(_genreFilter))return false;
     }
-
-    // Role filter
     if(_roleFilter==='available'){
       if(!a.avail)return false;
     } else if(_roleFilter){
       if(!roles.includes(_roleFilter))return false;
     }
-
     return true;
   });
 
+  // If filtering by teacher and no real teachers found — show demo teachers
+  const demoTeachers=[
+    {ini:'LP',bg:'#F5C4B3',tc:'#712B13',name:'Lena Park',role:'Violist · Teacher',avail:false,rat:'5.0',tags:'Viola,Educator',id:'lena_park',email:'lena@example.com',instruments:[{name:'Viola',primary:true}],skills:['Music Educator'],roles:['artist','teacher'],genres:['🎼 Classical'],verified:true,featured:true,plan:'pro',priority:'',trusted:false},
+    {ini:'JO',bg:'#FAC775',tc:'#633806',name:'James Okafor',role:'Violinist · Teacher',avail:true,rat:'4.7',tags:'Violin,Masterclass',id:'james_okafor',email:'james@example.com',instruments:[{name:'Violin',primary:true}],skills:['Private Teacher'],roles:['artist','teacher'],genres:['🎼 Classical'],verified:false,featured:false,plan:'free',priority:'',trusted:false},
+    {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Choreographer · Teacher',avail:true,rat:'4.8',tags:'Dance,Contemporary',id:'diego_lima',email:'diego@example.com',instruments:[],skills:['Choreographer'],roles:['artist','teacher'],genres:['💃 Latin / Flamenco'],verified:false,featured:false,plan:'free',priority:'',trusted:false},
+  ];
+
+  let finalList=filtered;
+  if(_roleFilter==='teacher'&&filtered.filter(a=>(a.roles||[]).includes('teacher')).length===0){
+    finalList=[...filtered,...demoTeachers];
+  }
+
   const el=document.getElementById('artist-cards');
   const count=document.getElementById('search-count');
-  if(count)count.textContent=filtered.length>0?`${filtered.length} musician${filtered.length>1?'s':''} found`:'';
+  if(count)count.textContent=finalList.length>0?`${finalList.length} musician${finalList.length>1?'s':''} found`:'';
 
   if(!el)return;
-  if(filtered.length===0){
+  if(finalList.length===0){
     el.innerHTML=`<div style="text-align:center;padding:30px 0">
       <div style="font-size:32px;margin-bottom:10px">🔍</div>
       <div style="font-size:14px;color:#888">No musicians found</div>
@@ -3563,7 +3565,7 @@ window.filterArtists=function(){
     </div>`;
     return;
   }
-  el.innerHTML=filtered.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,a.priority,a.trusted)).join('');
+  el.innerHTML=finalList.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,a.priority,a.trusted)).join('');
 }
 function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,priority,trusted){
   const sel=CP.includes(name);
