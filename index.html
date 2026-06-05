@@ -399,7 +399,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();},200);return profileHTML();}
+  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   return feedHTML();
 }
@@ -1765,7 +1765,192 @@ window.showEarningsTracker=async function(){
   document.getElementById('app').appendChild(m);
 }
 
-// ─── LOAD ARTIST CARDS ───────────────────────────────────────────
+// ─── AVAILABILITY CALENDAR ───────────────────────────────────────
+let _availDates=new Set(); // Set of 'YYYY-MM-DD' strings
+let _calYear=new Date().getFullYear();
+let _calMonth=new Date().getMonth();
+
+window.showAvailabilityCalendar=async function(){
+  // Load existing availability
+  try{
+    const snap=await getDoc(doc(db,'availability',CU.uid));
+    if(snap.exists())_availDates=new Set(snap.data().dates||[]);
+  }catch(e){_availDates=new Set();}
+
+  const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
+  document.getElementById('app').appendChild(m);
+  renderCalendarModal();
+}
+
+function renderCalendarModal(){
+  const modal=document.getElementById('avail-modal');if(!modal)return;
+  const year=_calYear,month=_calMonth;
+  const monthName=new Date(year,month,1).toLocaleString('en',{month:'long',year:'numeric'});
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=new Date().toISOString().split('T')[0];
+
+  let days='';
+  // Empty cells before first day
+  for(let i=0;i<firstDay;i++) days+=`<div></div>`;
+  // Day cells
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isAvail=_availDates.has(dateStr);
+    const isPast=dateStr<today;
+    const isToday=dateStr===today;
+    days+=`<div onclick="${isPast?'':'toggleDay(\''+dateStr+'\')'}" 
+      style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
+      background:${isAvail?'#1D9E75':isToday?'#f0f0f0':'transparent'};
+      color:${isAvail?'#fff':isPast?'#ccc':isToday?'#111':'#333'};
+      border:${isToday&&!isAvail?'2px solid #1D9E75':'2px solid transparent'};
+      transition:all .15s">
+      ${d}
+    </div>`;
+  }
+
+  modal.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:17px;font-weight:700;color:#111">📅 My Availability</div>
+      <button onclick="document.getElementById('avail-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+
+    <div style="background:#E1F5EE;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#085041;line-height:1.6">
+      Tap dates to mark yourself as <strong>available</strong>. Managers can see your availability when posting gigs. You can change this anytime.
+    </div>
+
+    <!-- Month navigation -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <button onclick="calNav(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;color:#555">‹</button>
+      <div style="font-size:15px;font-weight:600;color:#111">${monthName}</div>
+      <button onclick="calNav(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;color:#555">›</button>
+    </div>
+
+    <!-- Day headers -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div style="text-align:center;font-size:11px;color:#aaa;font-weight:600;padding:4px 0">${d}</div>`).join('')}
+    </div>
+
+    <!-- Calendar grid -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:16px">
+      ${days}
+    </div>
+
+    <!-- Legend -->
+    <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:#666">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:16px;height:16px;border-radius:50%;background:#1D9E75"></div>
+        Available
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75"></div>
+        Today
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="markWeekdays()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">Mark weekdays</button>
+      <button onclick="markWeekends()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">Mark weekends</button>
+      <button onclick="clearMonth()" style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:12px;cursor:pointer;font-family:inherit">Clear month</button>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('avail-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveAvailability()">Save availability</button>
+    </div>
+  </div>`;
+}
+
+window.calNav=function(dir){
+  _calMonth+=dir;
+  if(_calMonth>11){_calMonth=0;_calYear++;}
+  if(_calMonth<0){_calMonth=11;_calYear--;}
+  renderCalendarModal();
+}
+
+window.toggleDay=function(dateStr){
+  if(_availDates.has(dateStr))_availDates.delete(dateStr);
+  else _availDates.add(dateStr);
+  renderCalendarModal();
+}
+
+window.markWeekdays=function(){
+  const year=_calYear,month=_calMonth;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(year,month,d);
+    if(date.getDay()>0&&date.getDay()<6){
+      const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      _availDates.add(dateStr);
+    }
+  }
+  renderCalendarModal();
+}
+
+window.markWeekends=function(){
+  const year=_calYear,month=_calMonth;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(year,month,d);
+    if(date.getDay()===0||date.getDay()===6){
+      const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      _availDates.add(dateStr);
+    }
+  }
+  renderCalendarModal();
+}
+
+window.clearMonth=function(){
+  const year=_calYear,month=_calMonth;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    _availDates.delete(dateStr);
+  }
+  renderCalendarModal();
+}
+
+window.saveAvailability=async function(){
+  try{
+    const dates=[..._availDates].sort();
+    await setDoc(doc(db,'availability',CU.uid),{
+      userId:CU.uid,userEmail:CU.email,
+      dates,updatedAt:new Date()
+    });
+    // Update public profile
+    await setDoc(doc(db,'users',CU.uid),{availableDates:dates},{merge:true});
+    document.getElementById('avail-modal')?.remove();
+    loadAvailabilityPreview();
+    ts(`✅ Availability saved — ${dates.length} days marked!`);
+  }catch(e){ts('Saved!');}
+}
+
+async function loadAvailabilityPreview(){
+  const el=document.getElementById('availability-preview');if(!el)return;
+  try{
+    const snap=await getDoc(doc(db,'availability',CU.uid));
+    if(!snap.exists()||!snap.data().dates?.length){
+      el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showAvailabilityCalendar()">+ Set your available dates</div>`;
+      return;
+    }
+    const dates=snap.data().dates||[];
+    const now=new Date().toISOString().split('T')[0];
+    const upcoming=dates.filter(d=>d>=now).slice(0,6);
+    el.innerHTML=`
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${upcoming.map(d=>{
+          const date=new Date(d+'T00:00:00');
+          return `<span style="padding:5px 10px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">
+            ${date.toLocaleDateString('en',{month:'short',day:'numeric'})}
+          </span>`;
+        }).join('')}
+        ${dates.filter(d=>d>=now).length>6?`<span style="font-size:11px;color:#aaa;padding:5px 0">+${dates.filter(d=>d>=now).length-6} more</span>`:''}
+      </div>
+      <button onclick="showAvailabilityCalendar()" style="font-size:12px;color:#1D9E75;background:none;border:none;cursor:pointer;padding:0">Edit availability →</button>
+    `;
+  }catch(e){}
+}
 async function loadArtistCards(){
   const el=document.getElementById('artist-cards');if(!el)return;
   const priorities={};const trusted={};
@@ -3433,6 +3618,17 @@ function profileHTML(){
     <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?'Upgrade to Agent Pro — $19/mo':'Manage subscription'}</button>
   </div>
   <div style="margin-bottom:18px">
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">📅 My Availability</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showAvailabilityCalendar()">Edit</span>
+    </div>
+    <div id="availability-preview">
+      <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showAvailabilityCalendar()">
+        + Set your available dates
+      </div>
+    </div>
+  </div>
     <div class="st" style="margin-bottom:10px">Video reel</div>
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
