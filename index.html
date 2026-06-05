@@ -4140,6 +4140,7 @@ window.testGreeting=function(type){
   const name=UP.name||CU?.displayName||'Rafael';
   showGreetingPopup(type,name);
 }
+window.toggleRole=async function(role){
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
   else roles.push(role);
