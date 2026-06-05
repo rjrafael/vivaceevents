@@ -2534,6 +2534,7 @@ window.shareCourse=function(courseId){
 }
 
 // ─── DOCUMENT UPLOAD SYSTEM ──────────────────────────────────────
+window.showDocUpload=function(gigId, gigTitle){
   document.getElementById('docup-modal')?.remove();
   const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
   m.innerHTML=`<div class="modal">
