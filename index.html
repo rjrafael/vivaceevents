@@ -113,7 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
@@ -660,11 +660,8 @@ async function saveTOS(uid){
 window.setLang=function(l){lang=l;if(CU){UP.lang=l;saveUP();}render();}
 
 // ─── GIG STATUS SYSTEM ──────────────────────────────────────────
-function gigStatusBadge(g){
-  const status=g.status||'open';
-  const filled=g.filled;
-  if(status==='cancelled') return `<span class="tag" style="background:#FCEBEB;border-color:#F09595;color:#C0392B">✕ Cancelled</span>`;
-  if(filled||status==='filled') return `<span class="tag status-filled">⚫ ${t('gigFilled')}</span>`;
+function gigStatusBadge(status){
+  if(status==='filled') return `<span class="tag status-filled">⚫ ${t('gigFilled')}</span>`;
   if(status==='confirmed') return `<span class="tag status-confirmed">✅ ${t('gigConfirmed')}</span>`;
   if(status==='pending') return `<span class="tag status-pending">⏳ ${t('gigPending')}</span>`;
   return `<span class="tag status-open">🟢 ${t('gigOpen')}</span>`;
@@ -680,15 +677,14 @@ async function loadGigs(){
       const free=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer')||g.pay.toLowerCase().includes('gratis')||g.pay.toLowerCase().includes('bесплатно'));
       const multiday=g.dateEnd&&g.dateEnd!==g.date&&g.dateEnd!=='';
       const isMine=g.userId===CU.uid;
-      const filled=g.filled||g.status==='filled';
-      const cancelled=g.status==='cancelled';
-      return `<div class="card" style="${filled?'opacity:0.7':''}${cancelled?'opacity:0.5;border-left:3px solid #F09595':''}">
+      const filled=g.status==='filled';
+      return `<div class="card" style="${filled?'opacity:0.7':''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <span class="tag tg">${g.type||'Gig'}</span>
           <span style="font-size:14px;font-weight:600;color:${free?'#1D9E75':'#BA7517'}">${g.pay||'TBD'}</span>
         </div>
         <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:6px">${g.title||'Untitled'}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${gigStatusBadge(g)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${gigStatusBadge(g.status)}</div>
         <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
           ${g.date?`<span>📅 ${g.date}${g.time?' at '+g.time:''}${multiday?' → '+g.dateEnd+(g.timeEnd?' at '+g.timeEnd:''):''}</span>`:''}
           ${g.duration?`<span>⏱ ${g.duration}</span>`:''}
@@ -696,117 +692,65 @@ async function loadGigs(){
         </div>
         ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}${g.ensembleFormat?`<span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span>`:''}</div>`:
           g.ensembleFormat?`<div style="margin-bottom:8px"><span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span></div>`:''}
-        <div style="border-top:1px solid #f0f0f0;padding-top:10px;margin-top:6px">
-          ${isMine?`
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${!filled&&g.status!=='cancelled'?`
-                <button onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" class="bt" style="flex:1;padding:8px;font-size:12px;background:#0C447C">✓ Fill position</button>
-                <button onclick="showEditGig('${gid}')" style="padding:8px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
-                <button onclick="showCancelGigModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}')" style="padding:8px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#C0392B;font-size:12px;cursor:pointer;font-family:inherit">✕ Cancel</button>
-              `:''}
-              ${filled?`
-                <button class="bt" style="flex:1;padding:8px;font-size:12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                <button onclick="showEditGig('${gid}')" style="padding:8px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
-                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:8px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:12px;cursor:pointer;font-family:inherit">🚗</button>`:''}
-                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:8px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">📥</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:8px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;animation:pulse-red 2s infinite">🚨</button>
-              `:''}
-              ${g.status==='cancelled'?`<span style="font-size:12px;padding:6px 12px;border-radius:20px;background:#FCEBEB;color:#C0392B;font-weight:600">✕ Cancelled</span>`:''}
-            </div>
-          `:`
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;padding:6px 10px;border-radius:8px">⚑ Report</button>
-              ${!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
-              ${filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
-                <div style="display:flex;gap:6px">
-                  ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗</button>`:''}
-                  ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️</button>`:''}
-                  <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥</button>
-                  <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Cancel</button>
-                  <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;animation:pulse-red 2s infinite">🚨</button>
-                </div>
-              `:''}
-              ${filled&&!(g.confirmedApplicants||[]).includes(CU?.uid||'')?`<span style="font-size:12px;color:#888">Position filled</span>`:''}
-            </div>
-          `}
-          <div style="margin-top:6px;font-size:11px;color:#bbb">by ${g.postedBy||'member'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
+          <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
+          <div style="display:flex;gap:6px">
+            <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px" title="Report this gig">⚑ Report</button>
+            ${isMine?`
+              <button onclick="showEditGig('${gid}')" style="padding:4px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
+              <button onclick="confirmDeleteGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:4px 10px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;font-family:inherit">🗑️</button>
+            `:''}
+            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
+            ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
+            ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
+            ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
+                ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️ Vehicle info</button>`:''}
+                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
+                <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
+              </div>
+            `:''}
+            ${isMine&&filled?`
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
+                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
+                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
+              </div>
+            `:''}
+            ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
+          </div>
         </div>
       </div>`;
     }).join('');
   }catch(e){console.log(e);}
 }
 
-// ─── CANCEL GIG (manager side) ───────────────────────────────────
-window.showCancelGigModal=function(gigId, gigTitle){
-  const m=document.createElement('div');m.className='modal-bg';m.id='cancel-gig-modal';
+// ─── DELETE GIG ──────────────────────────────────────────────────
+window.confirmDeleteGig=function(gigId, gigTitle){
+  const m=document.createElement('div');m.className='modal-bg';m.id='delete-gig-modal';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
-  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:24px 20px 32px">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Cancel this gig?</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">"${gigTitle}"</div>
-    
-    <div style="background:#FFF8E7;border:1px solid #EF9F27;border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:#633806;line-height:1.6">
-      ⚠️ The gig record will be preserved forever. All applications, contracts and history remain intact. This cannot be undone.
-    </div>
-
-    <div style="margin-bottom:16px">
-      <label class="flbl">Reason for cancellation</label>
-      <select class="finp" id="cancel-gig-reason">
-        <option>Client cancelled the event</option>
-        <option>Event postponed — new date TBD</option>
-        <option>Venue unavailable</option>
-        <option>Budget cut</option>
-        <option>Force majeure / Emergency</option>
-        <option>Other</option>
-      </select>
-    </div>
-
-    <div style="margin-bottom:16px">
-      <label class="flbl">Message to applicants (optional)</label>
-      <textarea class="finp" id="cancel-gig-message" rows="2" placeholder="e.g. We apologize for the inconvenience. The client cancelled last minute."></textarea>
-    </div>
-
+  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:24px 20px 32px;text-align:center">
+    <div style="font-size:32px;margin-bottom:12px">🗑️</div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px">Delete this gig?</div>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">"${gigTitle}"<br>This cannot be undone. All applications will be lost.</div>
     <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cancel-gig-modal').remove()">Go back</button>
-      <button style="flex:2;padding:13px;border-radius:10px;background:#FF3B30;border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="cancelGig('${gigId}')">Cancel this gig</button>
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('delete-gig-modal').remove()">Cancel</button>
+      <button style="flex:1;padding:13px;border-radius:10px;background:#FF3B30;border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="deleteGig('${gigId}')">Delete</button>
     </div>
   </div>`;
   document.getElementById('app').appendChild(m);
 }
 
-window.cancelGig=async function(gigId){
-  const reason=document.getElementById('cancel-gig-reason')?.value||'Cancelled by manager';
-  const message=document.getElementById('cancel-gig-message')?.value||'';
+window.deleteGig=async function(gigId){
   try{
-    // Mark as cancelled — NEVER delete
-    await updateDoc(doc(db,'gigs',gigId),{
-      status:'cancelled',
-      cancelledAt:new Date(),
-      cancelledBy:CU.email,
-      cancelReason:reason,
-      cancelMessage:message
-    });
-
-    // Notify all applicants
-    const appsSnap=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
-    const gigSnap=await getDoc(doc(db,'gigs',gigId));
-    const gigTitle=gigSnap.data()?.title||'Gig';
-    
-    for(const app of appsSnap.docs){
-      const d=app.data();
-      if(d.applicantEmail){
-        await addDoc(collection(db,'notifications'),{
-          toEmail:d.applicantEmail,
-          type:'gig_cancelled',
-          message:`📢 "${gigTitle}" has been cancelled by the manager. Reason: ${reason}${message?' — '+message:''}`,
-          gigId,read:false,timestamp:new Date()
-        });
-      }
-    }
-
-    document.getElementById('cancel-gig-modal')?.remove();
-    ts('Gig cancelled — all applicants notified 📢');
+    await deleteDoc(doc(db,'gigs',gigId));
+    document.getElementById('delete-gig-modal')?.remove();
+    ts('🗑️ Gig deleted!');
     loadFeed();
-  }catch(e){ts('Done!');}
+  }catch(e){ts('Deleted!');}
 }
 
 // ─── EDIT GIG ────────────────────────────────────────────────────
@@ -815,7 +759,6 @@ window.showEditGig=async function(gigId){
     const snap=await getDoc(doc(db,'gigs',gigId));
     if(!snap.exists()){ts('Gig not found');return;}
     const g=snap.data();
-    const confirmed=g.filled||(g.confirmedApplicants||[]).length>0;
 
     const m=document.createElement('div');m.className='modal-bg';m.id='edit-gig-modal';
     m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
@@ -824,12 +767,8 @@ window.showEditGig=async function(gigId){
         <button onclick="document.getElementById('edit-gig-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
       </div>
 
-      ${confirmed?`<div style="background:#FAEEDA;border:1px solid #EF9F27;border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:#633806;line-height:1.6">
-        ⚠️ This gig has confirmed musicians. Any changes will automatically notify them.
-      </div>`:''}
-
       <div style="margin-bottom:10px"><label class="flbl">Title</label>
-        <input class="finp" id="eg-title" value="${(g.title||'').replace(/"/g,'&quot;')}"/></div>
+        <input class="finp" id="eg-title" value="${g.title||''}"/></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div><label class="flbl">Date</label>
@@ -839,43 +778,38 @@ window.showEditGig=async function(gigId){
       </div>
 
       <div style="margin-bottom:10px"><label class="flbl">Location / Venue</label>
-        <input class="finp" id="eg-location" value="${(g.location||'').replace(/"/g,'&quot;')}"/></div>
+        <input class="finp" id="eg-location" value="${g.location||''}"/></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div><label class="flbl">Duration</label>
-          <input class="finp" id="eg-duration" value="${(g.duration||'').replace(/"/g,'&quot;')}"/></div>
-        <div><label class="flbl">Pay</label>
-          <input class="finp" id="eg-pay" value="${(g.pay||'').replace(/"/g,'&quot;')}"/></div>
+          <input class="finp" id="eg-duration" value="${g.duration||''}"/></div>
+        <div><label class="flbl">Pay / Compensation</label>
+          <input class="finp" id="eg-pay" value="${g.pay||''}"/></div>
       </div>
 
       <div style="margin-bottom:10px"><label class="flbl">Instruments needed</label>
-        <input class="finp" id="eg-inst" value="${(g.instruments||'').replace(/"/g,'&quot;')}"/></div>
+        <input class="finp" id="eg-inst" value="${g.instruments||''}"/></div>
 
       <div style="margin-bottom:10px"><label class="flbl">Dress code</label>
-        <input class="finp" id="eg-dress" value="${(g.dressCode||'').replace(/"/g,'&quot;')}"/></div>
+        <input class="finp" id="eg-dress" value="${g.dressCode||''}"/></div>
 
       <div style="margin-bottom:16px"><label class="flbl">Notes</label>
         <textarea class="finp" id="eg-notes" rows="3">${g.notes||''}</textarea></div>
 
-      ${confirmed?`<div style="margin-bottom:16px"><label class="flbl">Reason for changes (will be sent to musicians)</label>
-        <input class="finp" id="eg-reason" placeholder="e.g. Date changed due to venue availability"/></div>`:''}
-
       <div style="display:flex;gap:8px">
         <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('edit-gig-modal').remove()">Cancel</button>
-        <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveEditGig('${gigId}',${confirmed})">Save changes</button>
+        <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveEditGig('${gigId}')">Save changes</button>
       </div>
     </div>`;
     document.getElementById('app').appendChild(m);
   }catch(e){ts('Could not load gig');}
 }
 
-window.saveEditGig=async function(gigId, confirmed){
+window.saveEditGig=async function(gigId){
   const title=document.getElementById('eg-title')?.value?.trim();
   if(!title){ts('Please enter a title');return;}
-  const reason=document.getElementById('eg-reason')?.value||'';
-  
   try{
-    const updates={
+    await updateDoc(doc(db,'gigs',gigId),{
       title,
       date:document.getElementById('eg-date')?.value||'',
       time:document.getElementById('eg-time')?.value||'',
@@ -885,38 +819,13 @@ window.saveEditGig=async function(gigId, confirmed){
       instruments:document.getElementById('eg-inst')?.value||'',
       dressCode:document.getElementById('eg-dress')?.value||'',
       notes:document.getElementById('eg-notes')?.value||'',
-      updatedAt:new Date(),
-      updatedBy:CU.email,
-      editHistory:arrayUnion({editedAt:new Date().toISOString(),editedBy:CU.email,reason:reason||'Details updated'})
-    };
-
-    await updateDoc(doc(db,'gigs',gigId),updates);
-
-    // Notify confirmed musicians
-    if(confirmed){
-      const appsSnap=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId),where('status','==','confirmed')));
-      for(const app of appsSnap.docs){
-        const d=app.data();
-        if(d.applicantEmail){
-          await addDoc(collection(db,'notifications'),{
-            toEmail:d.applicantEmail,
-            type:'gig_updated',
-            message:`📝 "${title}" has been updated by the manager.${reason?' Reason: '+reason:''} Please review the changes.`,
-            gigId,read:false,timestamp:new Date()
-          });
-        }
-      }
-      ts(`✅ Gig updated — ${appsSnap.size} musician${appsSnap.size!==1?'s':''} notified!`);
-    } else {
-      ts('✅ Gig updated!');
-    }
-
+      updatedAt:new Date()
+    });
     document.getElementById('edit-gig-modal')?.remove();
+    ts('✅ Gig updated!');
     loadFeed();
   }catch(e){ts('Saved!');}
 }
-
-window.showFillGig=async function(gigId,gigTitle){
   try{
     const s=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
     const apps=s.docs.map(d=>({id:d.id,...d.data()}));
@@ -4671,13 +4580,37 @@ function billingHTML(){
 <div class="pad">
 
 <!-- Current plan badge -->
-<div style="background:#E1F5EE;border-radius:12px;padding:12px 14px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
+<div style="background:#E1F5EE;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
   <div>
     <div style="font-size:12px;color:#085041;font-weight:600">Your current plan</div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-top:2px">${{free:'Free',pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'}[plan]||'Free'}</div>
   </div>
   <span class="tag tg">Active</span>
 </div>
+
+${plan==='free'&&!UP.trialUsed?`
+<div style="background:#0d0d0d;border-radius:16px;padding:18px;margin-bottom:16px">
+  <div style="font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:0.12em;margin-bottom:8px">🏆 FOUNDING MEMBER OFFER</div>
+  <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px">First 3 months — $1/month</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:14px;line-height:1.6">No credit card to start your 14-day trial. Pay $1 when you choose a plan.</div>
+  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+    <span style="color:rgba(255,255,255,0.4)">Months 1–3</span>
+    <span style="color:#1D9E75;font-weight:700">$1/month</span>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:12px">
+    <span style="color:rgba(255,255,255,0.4)">Month 4+</span>
+    <span style="color:rgba(255,255,255,0.5)">Regular price</span>
+  </div>
+</div>`:''}
+
+${plan==='free'?`
+<div style="background:#FAEEDA;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div style="font-size:12px;color:#633806;font-weight:600">Free trial</div>
+    <div style="font-size:14px;font-weight:700;color:#111">${getTrialDaysLeft()} days remaining</div>
+  </div>
+  <div style="font-size:11px;color:#EF9F27;font-weight:600">14-day full access</div>
+</div>`:''}
 
 <!-- Agent Plans -->
 <div style="margin-bottom:8px">
@@ -4735,18 +4668,104 @@ window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
   if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
-  showStripeModal(planId);
+  // Use trial price if eligible
+  const trialKey=planId+'_trial';
+  const isEligible=!UP.trialUsed&&planId!=='agency';
+  const priceId=isEligible&&PRICE_IDS[trialKey]?PRICE_IDS[trialKey]:PRICE_IDS[planId];
+  showStripeModal(planId, priceId, isEligible);
+}
+
+// ─── TRIAL SYSTEM ────────────────────────────────────────────────
+function getTrialDaysLeft(){
+  if(!UP.trialStarted)return 14;
+  const start=UP.trialStarted?.toDate?UP.trialStarted.toDate():new Date(UP.trialStarted);
+  const days=14-Math.floor((new Date()-start)/(1000*60*60*24));
+  return Math.max(0,days);
+}
+
+async function checkTrialStatus(){
+  if(!CU||!UP||UP.plan!=='free')return;
+  if(!UP.trialStarted){
+    // Start trial on first login
+    await setDoc(doc(db,'users',CU.uid),{trialStarted:new Date()},{merge:true});
+    UP.trialStarted=new Date();
+  }
+  const daysLeft=getTrialDaysLeft();
+  if(daysLeft<=4&&daysLeft>0){
+    showTrialBanner(daysLeft);
+  } else if(daysLeft===0&&!UP.trialExpiredShown){
+    showTrialExpiredModal();
+  }
+}
+
+function showTrialBanner(daysLeft){
+  if(document.getElementById('trial-banner'))return;
+  const banner=document.createElement('div');
+  banner.id='trial-banner';
+  banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:#0d0d0d;border-bottom:1px solid #1D9E75;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px';
+  const d=document.createElement('div');
+  d.style.cssText='display:flex;align-items:center;gap:10px;flex:1';
+  d.innerHTML=`<span style="font-size:13px;color:#fff;font-weight:600">⏳ ${daysLeft} day${daysLeft>1?'s':''} left in your free trial</span><button onclick="go('billing')" style="padding:6px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Upgrade — $1/month</button>`;
+  const close=document.createElement('button');
+  close.style.cssText='background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:0;flex-shrink:0';
+  close.textContent='✕';
+  close.onclick=function(){banner.remove();};
+  banner.appendChild(d);
+  banner.appendChild(close);
+  document.body.insertBefore(banner,document.body.firstChild);
+}
+
+function showTrialExpiredModal(){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const d=document.createElement('div');
+  d.style.cssText='background:#0d0d0d;border:1px solid #1D9E75;border-radius:20px;padding:28px 24px;width:100%;max-width:340px;text-align:center';
+  d.innerHTML=`
+    <div style="font-size:40px;margin-bottom:12px">⏰</div>
+    <div style="font-size:8px;color:#1D9E75;font-weight:700;letter-spacing:0.15em;margin-bottom:12px">VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC</div>
+    <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:8px">Your free trial has ended</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:20px">
+      Thank you for trying Vivace Events!<br>
+      Continue with just <strong style="color:#1D9E75">$1/month</strong> for your first 3 months.
+    </div>
+    <div style="background:#111;border-radius:12px;padding:14px;margin-bottom:20px;text-align:left">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:#aaa">Months 1–3</span>
+        <span style="font-size:16px;font-weight:700;color:#1D9E75">$1/month</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;color:#aaa">Month 4+</span>
+        <span style="font-size:14px;color:#fff">Regular price</span>
+      </div>
+    </div>
+    <button onclick="go('billing');this.closest('div[style*=fixed]').remove()" 
+      style="width:100%;padding:14px;border-radius:10px;background:#1D9E75;border:none;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
+      Continue for $1/month
+    </button>
+    <button onclick="this.closest('div[style*=fixed]').remove()" 
+      style="width:100%;padding:12px;border-radius:10px;background:transparent;border:1px solid #333;color:#666;font-size:13px;cursor:pointer;font-family:inherit">
+      Maybe later
+    </button>
+  `;
+  m.appendChild(d);
+  document.body.appendChild(m);
+  setDoc(doc(db,'users',CU.uid),{trialExpiredShown:true},{merge:true});
 }
 
 // ─── STRIPE CHECKOUT ────────────────────────────────────────────
 const STRIPE_PK='pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32';
 const PRICE_IDS={
-  pro:'price_1TeMN4R49hhPnbuaOxq4rftD',
+  pro:'price_1Tf6RyR49hhPnbuaD6Qkpyti',
   studio:'price_1TeMPQR49hhPnbua6qYhcqQ1',
   agency:'price_1TeMR8R49hhPnbuamR69UdH2',
-  teacher_basic:'price_teacher_basic',
-  teacher_pro:'price_teacher_pro',
-  teacher_studio:'price_teacher_studio'
+  teacher_basic:'price_1Tf63ER49hhPnbuaOOqXr1G8',
+  teacher_pro:'price_1Tf68wR49hhPnbuamIFfJa3s',
+  teacher_studio:'price_1Tf6D2R49hhPnbuackRYKuS2',
+  pro_trial:'price_1Tf6UTR49hhPnbua5ncx7UCN',
+  studio_trial:'price_1Tf5XsR49hhPnbuaO2d5lGKP',
+  teacher_basic_trial:'price_1Tf66yR49hhPnbua9R0d4v3D',
+  teacher_pro_trial:'price_1Tf6AwR49hhPnbua8ajQIDYO',
+  teacher_studio_trial:'price_1Tf6E1R49hhPnbuaZZsACQs5',
 };
 const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCheckoutSession';
 
@@ -4762,39 +4781,55 @@ const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCh
   }
 })();
 
-async function showStripeModal(planId){
+async function showStripeModal(planId, priceId, isTrial){
   const names={pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'};
-  const prices={pro:'$19/month',studio:'$49/month',agency:'$99/month',teacher_basic:'$9/month',teacher_pro:'$19/month',teacher_studio:'$49/month'};
+  const prices={pro:'$19/month',studio:'$49/month',agency:'$149/month',teacher_basic:'$9/month',teacher_pro:'$19/month',teacher_studio:'$49/month'};
   const m=document.createElement('div');m.className='modal-bg';m.id='stripe-modal';
   m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Subscribe to ${names[planId]}</div>
-    <div style="font-size:13px;color:#888;margin-bottom:20px">${prices[planId]} · Cancel anytime</div>
-    <div style="background:#E1F5EE;border-radius:10px;padding:14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
-      <div style="font-size:20px">🔒</div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">${isTrial?'🎉 Launch offer — ':''}${names[planId]}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${isTrial?'$1/month for 3 months, then '+prices[planId]:prices[planId]} · Cancel anytime</div>
+    ${isTrial?`
+    <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;color:#085041">Months 1–3</span>
+        <span style="font-size:14px;font-weight:700;color:#1D9E75">$1/month</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:12px;color:#085041">Month 4+</span>
+        <span style="font-size:13px;color:#085041">${prices[planId]}</span>
+      </div>
+    </div>`:''}
+    <div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:18px">🔒</div>
       <div>
-        <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:3px">Secure checkout via Stripe</div>
-        <div style="font-size:11px;color:#085041">You'll be taken to Stripe's secure payment page. Your card details are never stored on our servers.</div>
+        <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px">Secure checkout via Stripe</div>
+        <div style="font-size:11px;color:#888">Your card details are never stored on our servers.</div>
       </div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('stripe-modal').remove()">Cancel</button>
-      <button class="bt" id="checkout-btn" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}')">Continue to checkout →</button>
+      <button class="bt" id="checkout-btn" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}','${priceId||PRICE_IDS[planId]}',${isTrial||false})">
+        ${isTrial?'Start for $1/month →':'Continue to checkout →'}
+      </button>
     </div>
   </div>`;
   document.getElementById('app').appendChild(m);
 }
 
-window.processPlan=async function(planId){
+window.processPlan=async function(planId, priceId, isTrial){
   const btn=document.getElementById('checkout-btn');
   if(btn){btn.textContent='Loading...';btn.disabled=true;}
   try{
     const res=await fetch(CF_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({priceId:PRICE_IDS[planId],userId:CU.uid,email:CU.email,plan:planId})
+      body:JSON.stringify({priceId:priceId||PRICE_IDS[planId],userId:CU.uid,email:CU.email,plan:planId,isTrial:isTrial||false})
     });
     if(!res.ok)throw new Error('Server error');
     const {url}=await res.json();
+    if(isTrial){
+      await setDoc(doc(db,'users',CU.uid),{trialUsed:true},{merge:true});
+    }
     window.location.href=url;
   }catch(e){
     document.getElementById('stripe-modal')?.remove();
@@ -5526,7 +5561,7 @@ onAuthStateChanged(auth,async user=>{
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
-    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();},1000);
+    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();},1500);
   } else {
     render();
   }
