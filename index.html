@@ -142,7 +142,10 @@ const T={
     myGroups:'My Groups',venues:'Venues',responses:'Responses',
     createGroup:'+ Create new group',addVenue:'+ Add new venue',
     broadcast:'Broadcast',viewRoster:'View roster',
-    myRoles:'My roles',artist:'Artist',agentMgr:'Agent / Manager',
+    myRoles:'My roles',artist:'Artist',agentMgr:'Agent / Manager',teacher:'Teacher',student:'Student',
+    multipleRoles:'You can hold multiple roles simultaneously',
+    myAvailability:'My Availability',birthdayGreetings:'Birthday & Greetings',
+    videoReel:'Video reel',tapUploadReel:'Tap to upload your reel',
     free:'Free',pro:'Pro',studio:'Studio',agency:'Agency',
     perMonth:'/month',startFree:'Start free',getStarted:'Get started',upgrade:'Upgrade',
     currentPlan:'Current plan',
@@ -180,7 +183,10 @@ const T={
     myGroups:'Mis Grupos',venues:'Lugares',responses:'Respuestas',
     createGroup:'+ Crear nuevo grupo',addVenue:'+ Añadir lugar',
     broadcast:'Difundir',viewRoster:'Ver lista',
-    myRoles:'Mis roles',artist:'Artista',agentMgr:'Agente / Manager',
+    myRoles:'Mis roles',artist:'Artista',agentMgr:'Agente / Manager',teacher:'Profesor',student:'Estudiante',
+    multipleRoles:'Puedes tener múltiples roles simultáneamente',
+    myAvailability:'Mi disponibilidad',birthdayGreetings:'Cumpleaños y saludos',
+    videoReel:'Video reel',tapUploadReel:'Toca para subir tu video',
     free:'Gratis',pro:'Pro',studio:'Studio',agency:'Agencia',
     perMonth:'/mes',startFree:'Empezar gratis',getStarted:'Comenzar',upgrade:'Mejorar',
     currentPlan:'Plan actual',language:'Idioma',
@@ -216,7 +222,10 @@ const T={
     myGroups:'I miei gruppi',venues:'Luoghi',responses:'Risposte',
     createGroup:'+ Crea nuovo gruppo',addVenue:'+ Aggiungi luogo',
     broadcast:'Trasmetti',viewRoster:'Vedi lista',
-    myRoles:'I miei ruoli',artist:'Artista',agentMgr:'Agente / Manager',
+    myRoles:'I miei ruoli',artist:'Artista',agentMgr:'Agente / Manager',teacher:'Insegnante',student:'Studente',
+    multipleRoles:'Puoi avere più ruoli contemporaneamente',
+    myAvailability:'La mia disponibilità',birthdayGreetings:'Compleanno e auguri',
+    videoReel:'Video reel',tapUploadReel:'Tocca per caricare il tuo video',
     free:'Gratuito',pro:'Pro',studio:'Studio',agency:'Agenzia',
     perMonth:'/mese',startFree:'Inizia gratis',getStarted:'Inizia',upgrade:'Aggiorna',
     currentPlan:'Piano attuale',language:'Lingua',
@@ -252,7 +261,10 @@ const T={
     myGroups:'Мои группы',venues:'Площадки',responses:'Ответы',
     createGroup:'+ Создать группу',addVenue:'+ Добавить площадку',
     broadcast:'Рассылка',viewRoster:'Список участников',
-    myRoles:'Мои роли',artist:'Артист',agentMgr:'Агент / Менеджер',
+    myRoles:'Мои роли',artist:'Артист',agentMgr:'Агент / Менеджер',teacher:'Преподаватель',student:'Студент',
+    multipleRoles:'Вы можете иметь несколько ролей одновременно',
+    myAvailability:'Моя доступность',birthdayGreetings:'День рождения и поздравления',
+    videoReel:'Видео-ролик',tapUploadReel:'Нажмите для загрузки видео',
     free:'Бесплатно',pro:'Про',studio:'Студио',agency:'Агентство',
     perMonth:'/мес',startFree:'Начать бесплатно',getStarted:'Начать',upgrade:'Улучшить',
     currentPlan:'Текущий план',language:'Язык',
@@ -288,7 +300,10 @@ const T={
     myGroups:'Mes Groupes',venues:'Lieux',responses:'Réponses',
     createGroup:'+ Créer un groupe',addVenue:'+ Ajouter un lieu',
     broadcast:'Diffuser',viewRoster:'Voir liste',
-    myRoles:'Mes rôles',artist:'Artiste',agentMgr:'Agent / Manager',
+    myRoles:'Mes rôles',artist:'Artiste',agentMgr:'Agent / Manager',teacher:'Professeur',student:'Étudiant',
+    multipleRoles:'Vous pouvez avoir plusieurs rôles simultanément',
+    myAvailability:'Ma disponibilité',birthdayGreetings:'Anniversaire et vœux',
+    videoReel:'Vidéo reel',tapUploadReel:'Appuyez pour télécharger votre vidéo',
     free:'Gratuit',pro:'Pro',studio:'Studio',agency:'Agence',
     perMonth:'/mois',startFree:'Commencer gratuitement',getStarted:'Commencer',upgrade:'Améliorer',
     currentPlan:'Plan actuel',language:'Langue',
@@ -324,7 +339,10 @@ const T={
     myGroups:'Meine Gruppen',venues:'Veranstaltungsorte',responses:'Antworten',
     createGroup:'+ Neue Gruppe erstellen',addVenue:'+ Ort hinzufügen',
     broadcast:'Senden',viewRoster:'Liste ansehen',
-    myRoles:'Meine Rollen',artist:'Künstler',agentMgr:'Agent / Manager',
+    myRoles:'Meine Rollen',artist:'Künstler',agentMgr:'Agent / Manager',teacher:'Lehrer',student:'Student',
+    multipleRoles:'Sie können mehrere Rollen gleichzeitig haben',
+    myAvailability:'Meine Verfügbarkeit',birthdayGreetings:'Geburtstag & Glückwünsche',
+    videoReel:'Video-Reel',tapUploadReel:'Tippen Sie zum Hochladen',
     free:'Kostenlos',pro:'Pro',studio:'Studio',agency:'Agentur',
     perMonth:'/Monat',startFree:'Kostenlos starten',getStarted:'Loslegen',upgrade:'Upgraden',
     currentPlan:'Aktueller Plan',language:'Sprache',
@@ -4327,6 +4345,11 @@ async function checkFounderAccess(){
     await saveUP();
     ts('👑 Founder access — all roles enabled!');
   }
+  // Fix duplicate ensembles
+  if(UP.ensembles){
+    const fixed=[...new Set(UP.ensembles.map(e=>e.replace('🎻🎻🎻🎻 Quartet','4️⃣ Quartet')))];
+    if(fixed.join()!==UP.ensembles.join()){UP.ensembles=fixed;await saveUP();}
+  }
 }
 
 // ─── BILLING SCREEN ─────────────────────────────────────────────
@@ -4542,10 +4565,10 @@ function profileHTML(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <button class="role-btn${roles.includes('artist')?' on':''}" onclick="toggleRole('artist')">🎻 ${t('artist')}</button>
       <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 ${t('agentMgr')}</button>
-      <button class="role-btn${roles.includes('teacher')?' on':''}" onclick="toggleRole('teacher')">👨‍🏫 Teacher</button>
-      <button class="role-btn${roles.includes('student')?' on':''}" onclick="toggleRole('student')">🎓 Student</button>
+      <button class="role-btn${roles.includes('teacher')?' on':''}" onclick="toggleRole('teacher')">👨‍🏫 ${t('teacher')||'Teacher'}</button>
+      <button class="role-btn${roles.includes('student')?' on':''}" onclick="toggleRole('student')">🎓 ${t('student')||'Student'}</button>
     </div>
-    <div style="font-size:11px;color:#aaa">You can hold multiple roles simultaneously</div>
+    <div style="font-size:11px;color:#aaa">${t('multipleRoles')||'You can hold multiple roles simultaneously'}</div>
   </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('language')}</div>
@@ -4563,7 +4586,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div class="st">📅 My Availability</div>
+      <div class="st">${t('myAvailability')||'My Availability'}</div>
       <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showAvailabilityCalendar()">Edit</span>
     </div>
     <div id="availability-preview">
@@ -4573,7 +4596,7 @@ function profileHTML(){
     </div>
   </div>
   <div style="margin-bottom:18px">
-    <div class="st" style="margin-bottom:12px">🎂 Birthday & Greetings</div>
+    <div class="st" style="margin-bottom:12px">🎂 ${t('birthdayGreetings')||'Birthday & Greetings'}</div>
     <div style="background:#f9f9f9;border-radius:12px;padding:14px">
       <div style="margin-bottom:12px">
         <label class="flbl">Your birthday (optional)</label>
@@ -4604,10 +4627,10 @@ function profileHTML(){
       </label>
     </div>
   </div>
-    <div class="st" style="margin-bottom:10px">Video reel</div>
+    <div class="st" style="margin-bottom:10px">${t('videoReel')||'Video reel'}</div>
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
-      <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
+      <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">${t('tapUploadReel')||'Tap to upload your reel'}</div>
     </div>
   </div>
   ${isTeacher()?`
