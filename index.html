@@ -4021,42 +4021,101 @@ window.enableMgr=async function(){
 // ─── BILLING SCREEN ─────────────────────────────────────────────
 function billingHTML(){
   const plan=UP.plan||'free';
-  const plans=[
-    {id:'free',name:t('free'),price:'0',color:'#888',features:['Artist profile & video reel','Apply to gigs & opportunities','Join groups when invited','Browse all opportunities'],btn:t('currentPlan'),current:plan==='free'},
-    {id:'pro',name:'Agent Pro',price:'19',color:'#1D9E75',features:['Everything in Free','Unlimited groups & rosters','Unlimited venue database','Broadcast to all groups','Cherry-pick individual artists','Response analytics dashboard','Post unlimited opportunities'],btn:plan==='pro'?t('currentPlan'):t('getStarted'),current:plan==='pro',featured:true},
-    {id:'studio',name:'Agent Studio',price:'49',color:'#BA7517',features:['Everything in Pro','Featured opportunities (top of feed)','Custom group branding','Export roster to CSV','Priority support','Multi-language broadcasts','Analytics & reporting'],btn:plan==='studio'?t('currentPlan'):t('upgrade'),current:plan==='studio'},
-    {id:'agency',name:'Agency',price:'99',color:'#3C3489',features:['Everything in Studio','Unlimited sub-agents','White-label option','API access','Dedicated account manager','Custom contracts & billing','SLA support'],btn:plan==='agency'?t('currentPlan'):t('upgrade'),current:plan==='agency'}
+
+  const agentPlans=[
+    {id:'free',name:'Free',price:'0',color:'#888',
+      features:['Artist profile & video reel','Apply to gigs & opportunities','Join groups when invited','Browse all opportunities','Availability calendar','Public performance listings'],
+      btn:plan==='free'?'Current plan':'Downgrade',current:plan==='free'},
+    {id:'pro',name:'Agent Pro',price:'19',color:'#1D9E75',
+      features:['Everything in Free','Unlimited groups & rosters','Unlimited venue database','Broadcast to all groups','Cherry-pick individual artists','Response analytics dashboard','Post unlimited opportunities'],
+      btn:plan==='pro'?'Current plan':'Get started',current:plan==='pro',featured:true},
+    {id:'studio',name:'Agent Studio',price:'49',color:'#BA7517',
+      features:['Everything in Pro','Featured opportunities (top of feed)','Custom group branding','Export roster to CSV','Priority support','Multi-language broadcasts','Analytics & reporting'],
+      btn:plan==='studio'?'Current plan':'Upgrade',current:plan==='studio'},
+    {id:'agency',name:'Agency',price:'99',color:'#3C3489',
+      features:['Everything in Studio','Unlimited sub-agents','White-label option','API access','Dedicated account manager','Custom contracts & billing','SLA support'],
+      btn:plan==='agency'?'Current plan':'Upgrade',current:plan==='agency'}
   ];
+
+  const teacherPlans=[
+    {id:'teacher_basic',name:'Teacher Basic',price:'9',color:'#7C3AED',
+      features:['Post up to 5 lessons/month','Student booking requests','Lesson calendar','Basic profile listing','In-app messaging with students'],
+      btn:plan==='teacher_basic'?'Current plan':'Get started',current:plan==='teacher_basic'},
+    {id:'teacher_pro',name:'Teacher Pro',price:'19',color:'#6D28D9',featured:true,
+      features:['Unlimited lesson postings','Priority listing in Find tab','Student roster management','Lesson history & notes','✓ Verified Teacher badge','Video reel upload','Custom lesson packages'],
+      btn:plan==='teacher_pro'?'Current plan':'Get started',current:plan==='teacher_pro'},
+    {id:'teacher_studio',name:'Teacher Studio',price:'49',color:'#4C1D95',
+      features:['Everything in Teacher Pro','Group classes (up to 20 students)','Masterclass hosting','Course builder','Student progress tracking','Custom booking page','Analytics & revenue reports'],
+      btn:plan==='teacher_studio'?'Current plan':'Upgrade',current:plan==='teacher_studio'}
+  ];
+
   return `
 <div class="hdr"><div class="logo" style="font-size:15px">Plans & Billing</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
 <div class="pad">
-<div style="text-align:center;margin-bottom:24px">
-  <div style="font-size:22px;font-weight:700;color:#111;margin-bottom:6px">Choose your plan</div>
-  <div style="font-size:14px;color:#888">Artists are always free. Agents pay only for the tools they use.</div>
+
+<!-- Current plan badge -->
+<div style="background:#E1F5EE;border-radius:12px;padding:12px 14px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div style="font-size:12px;color:#085041;font-weight:600">Your current plan</div>
+    <div style="font-size:16px;font-weight:700;color:#111;margin-top:2px">${{free:'Free',pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'}[plan]||'Free'}</div>
+  </div>
+  <span class="tag tg">Active</span>
 </div>
-${plans.map(p=>`
+
+<!-- Agent Plans -->
+<div style="margin-bottom:8px">
+  <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">🎯 For Agents & Managers</div>
+  <div style="font-size:13px;color:#888;margin-bottom:14px">Post gigs, manage rosters, broadcast to artists</div>
+</div>
+${agentPlans.map(p=>`
 <div class="plan-card${p.featured?' featured':''}">
   ${p.featured?`<div class="plan-badge">Most popular</div>`:''}
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
     <div>
-      <div style="font-size:18px;font-weight:700;color:#111">${p.name}</div>
-      ${p.current?`<span class="tag tg" style="margin-top:4px">${t('currentPlan')}</span>`:''}
+      <div style="font-size:17px;font-weight:700;color:#111">${p.name}</div>
+      ${p.current?`<span class="tag tg" style="margin-top:4px">Current plan</span>`:''}
     </div>
     <div style="text-align:right">
-      <div class="plan-price" style="color:${p.color}">$${p.price}<span>${t('perMonth')}</span></div>
+      <div class="plan-price" style="color:${p.color}">$${p.price}<span>/mo</span></div>
     </div>
   </div>
   <div style="margin-bottom:16px">${p.features.map(f=>`<div class="plan-feature">${f}</div>`).join('')}</div>
   <button style="width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:${p.current?'#f5f5f5':p.id==='free'?'#f5f5f5':p.color};color:${p.current?'#888':p.id==='free'?'#666':'#fff'};border:${p.current||p.id==='free'?'1px solid #ddd':'none'}" onclick="selectPlan('${p.id}')">${p.btn}</button>
 </div>`).join('')}
-<div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
-  14-day free trial on Pro and Studio · Cancel anytime · Secure payment via Stripe
+
+<!-- Divider -->
+<div style="border-top:2px solid #f0f0f0;margin:24px 0"></div>
+
+<!-- Teacher Plans -->
+<div style="margin-bottom:8px">
+  <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">👨‍🏫 For Teachers & Educators</div>
+  <div style="font-size:13px;color:#888;margin-bottom:14px">Manage students, post lessons, build your teaching practice</div>
 </div>
-<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2025 Virtual Studio Orchestra LLC · vivaceevents.com · All rights reserved</div>
+${teacherPlans.map(p=>`
+<div class="plan-card${p.featured?' featured':''}" style="${p.featured?'border-color:#7C3AED':''}">
+  ${p.featured?`<div class="plan-badge" style="background:#7C3AED">Most popular</div>`:''}
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+    <div>
+      <div style="font-size:17px;font-weight:700;color:#111">${p.name}</div>
+      ${p.current?`<span class="tag" style="margin-top:4px;background:#f5f0ff;color:#7C3AED;border-color:#7C3AED44">Current plan</span>`:''}
+    </div>
+    <div style="text-align:right">
+      <div class="plan-price" style="color:${p.color}">$${p.price}<span>/mo</span></div>
+    </div>
+  </div>
+  <div style="margin-bottom:16px">${p.features.map(f=>`<div class="plan-feature">${f}</div>`).join('')}</div>
+  <button style="width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:${p.current?'#f5f5f5':p.color};color:${p.current?'#888':'#fff'};border:${p.current?'1px solid #ddd':'none'}" onclick="selectPlan('${p.id}')">${p.btn}</button>
+</div>`).join('')}
+
+<div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
+  14-day free trial on all paid plans · Cancel anytime · Secure payment via Stripe
+</div>
+<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com</div>
 </div>
 </div>`;}
 
-window.selectPlan=async function(planId){if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ?');return;}
+window.selectPlan=async function(planId){
+  if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
   if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
   showStripeModal(planId);
@@ -4064,7 +4123,14 @@ window.selectPlan=async function(planId){if(CU.email==='rafael.javadov@gmail.com
 
 // ─── STRIPE CHECKOUT ────────────────────────────────────────────
 const STRIPE_PK='pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32';
-const PRICE_IDS={pro:'price_1TeMN4R49hhPnbuaOxq4rftD',studio:'price_1TeMPQR49hhPnbua6qYhcqQ1',agency:'price_1TeMR8R49hhPnbuamR69UdH2'};
+const PRICE_IDS={
+  pro:'price_1TeMN4R49hhPnbuaOxq4rftD',
+  studio:'price_1TeMPQR49hhPnbua6qYhcqQ1',
+  agency:'price_1TeMR8R49hhPnbuamR69UdH2',
+  teacher_basic:'price_teacher_basic',
+  teacher_pro:'price_teacher_pro',
+  teacher_studio:'price_teacher_studio'
+};
 const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCheckoutSession';
 
 // Handle return from Stripe Checkout
@@ -4080,8 +4146,8 @@ const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCh
 })();
 
 async function showStripeModal(planId){
-  const names={pro:'Agent Pro',studio:'Agent Studio',agency:'Agency'};
-  const prices={pro:'$19/month',studio:'$49/month',agency:'$149/month'};
+  const names={pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'};
+  const prices={pro:'$19/month',studio:'$49/month',agency:'$99/month',teacher_basic:'$9/month',teacher_pro:'$19/month',teacher_studio:'$49/month'};
   const m=document.createElement('div');m.className='modal-bg';m.id='stripe-modal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Subscribe to ${names[planId]}</div>
@@ -4124,7 +4190,7 @@ function profileHTML(){
   const ini=name.substring(0,2).toUpperCase();
   const roles=UP.roles||['artist'];
   const plan=UP.plan||'free';
-  const planLabels={free:'Free',pro:'Agent Pro 🟢',studio:'Agent Studio 🟡',agency:'Agency 🟣'};
+  const planLabels={free:'Free',pro:'Agent Pro 🟢',studio:'Agent Studio 🟡',agency:'Agency 🟣',teacher_basic:'Teacher Basic 🟣',teacher_pro:'Teacher Pro 🟣',teacher_studio:'Teacher Studio 🟣'};
   return `
 <div style="background:#0d0d0d;padding:20px 16px 22px">
   <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:18px">
@@ -4181,7 +4247,7 @@ function profileHTML(){
       <div class="st">Subscription</div>
       <span class="tag ${plan==='free'?'tf':plan==='pro'?'tg':plan==='studio'?'ta':'tp'}">${planLabels[plan]}</span>
     </div>
-    <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?'Upgrade to Agent Pro — $19/mo':'Manage subscription'}</button>
+    <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?(isTeacher()?'Upgrade to Teacher Pro — $19/mo':'Upgrade to Agent Pro — $19/mo'):'Manage subscription'}</button>
   </div>
   <div style="margin-bottom:18px">
   <div style="margin-bottom:18px">
