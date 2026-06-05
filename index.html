@@ -642,7 +642,8 @@ async function loadGigs(){
           ${g.duration?`<span>⏱ ${g.duration}</span>`:''}
           ${g.location?`<span>📍 ${g.location}</span>`:''}
         </div>
-        ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}</div>`:''}
+        ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}${g.ensembleFormat?`<span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span>`:''}</div>`:
+          g.ensembleFormat?`<div style="margin-bottom:8px"><span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span></div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
           <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
           <div style="display:flex;gap:6px">
@@ -3060,6 +3061,13 @@ function postHTML(){
   <input class="finp" id="g-loc" placeholder="Address or Remote"/>
 </div>
 <div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,this.value,document.getElementById('g-skills-needed')?.value)"/></div>
+<div style="margin-bottom:12px">
+  <span class="flbl">🎼 Ensemble format needed</span>
+  <select class="finp" id="g-ensemble">
+    <option value="">— Any format —</option>
+    ${ENSEMBLE_LIST.map(e=>`<option value="${e}">${e}</option>`).join('')}
+  </select>
+</div>
 <div style="margin-bottom:12px"><span class="flbl">🎯 Skills needed (optional)</span><input class="finp" id="g-skills-needed" placeholder="Conductor, Arranger, Sound Engineer…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,document.getElementById('g-inst')?.value,this.value)"/></div>
 <div id="smart-suggestions" style="margin-bottom:12px"></div>
 
@@ -3231,6 +3239,7 @@ window.saveGig=async function(draft){
       title:title||'Draft',type,date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
       pay:document.getElementById('g-pay').value,location:document.getElementById('g-loc').value,
       instruments:document.getElementById('g-inst').value,
+      ensembleFormat:document.getElementById('g-ensemble')?.value||'',
       skillsNeeded:document.getElementById('g-skills-needed')?.value||'',
       onlinePlatform:document.getElementById('g-online-platform')?.value||'',
       onlineLink:document.getElementById('g-online-link')?.value||'',
@@ -3817,6 +3826,20 @@ function profileHTML(){
   </div>
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎼 Ensemble formats</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEnsembleEditor()">Edit</span>
+    </div>
+    <div id="profile-ensembles">
+      ${(UP.ensembles||[]).length===0?
+        `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showEnsembleEditor()">+ Add ensemble formats</div>`:
+        `<div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${(UP.ensembles||[]).map(e=>`<span class="tag" style="font-size:12px;padding:5px 10px;background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${e}</span>`).join('')}
+        </div>`
+      }
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">🎵 Instruments</div>
       <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showInstrumentEditor()">Edit</span>
     </div>
@@ -3847,6 +3870,75 @@ function profileHTML(){
     </div>
   </div>
 </div>`;}
+
+// ─── ENSEMBLE SIZE EDITOR ────────────────────────────────────────
+const ENSEMBLE_LIST=[
+  '🎻 Solo','🎻🎻 Duo','🎻🎻🎻 Trio','🎻🎻🎻🎻 Quartet','🎵 Quintet',
+  '🎼 Sextet','🎼 Septet','🎼 Octet','🎼 Small Ensemble (6-10)',
+  '🎼 Chamber Orchestra (10-20)','🎼 Full Orchestra (20+)',
+  '🎤 Band','🎹 Accompanist','🎤 Chorus / Choir',
+  '🥁 Rhythm Section','🎷 Jazz Combo','🎸 Rock Band',
+  '🎻 String Quartet','🎺 Brass Quartet','🪗 Folk Ensemble',
+  '🌍 World Music Ensemble'
+];
+
+window.showEnsembleEditor=function(){
+  const current=UP.ensembles||[];
+  const m=document.createElement('div');m.className='modal-bg';m.id='ensemble-modal';
+  m.innerHTML=`<div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🎼 Ensemble formats</div>
+      <button onclick="document.getElementById('ensemble-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">What formats do you perform in?</div>
+    
+    ${current.length>0?`
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Your formats</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${current.map(e=>`
+          <div style="display:flex;align-items:center;gap:4px;background:#FFF8E7;border:1px solid #C9A84C;border-radius:20px;padding:5px 10px">
+            <span style="font-size:12px;color:#7A5800">${e}</span>
+            <button onclick="removeEnsemble('${e.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:0 2px">×</button>
+          </div>`).join('')}
+      </div>
+    </div>`:''}
+    
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add format</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${ENSEMBLE_LIST.filter(e=>!current.includes(e)).map(e=>`
+        <button onclick="addEnsemble('${e.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" 
+          style="padding:6px 12px;border-radius:20px;border:1px solid #C9A84C;background:#FFF8E7;color:#7A5800;font-size:12px;cursor:pointer;font-family:inherit">
+          + ${e}
+        </button>
+      `).join('')}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="saveEnsembles()">Save formats</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.addEnsemble=function(name){
+  if(!UP.ensembles)UP.ensembles=[];
+  if(!UP.ensembles.includes(name)){
+    UP.ensembles.push(name);
+    document.getElementById('ensemble-modal')?.remove();
+    showEnsembleEditor();
+  }
+}
+
+window.removeEnsemble=function(name){
+  UP.ensembles=(UP.ensembles||[]).filter(e=>e!==name);
+  document.getElementById('ensemble-modal')?.remove();
+  showEnsembleEditor();
+}
+
+window.saveEnsembles=async function(){
+  await saveUP();
+  document.getElementById('ensemble-modal')?.remove();
+  render();
+  ts('Ensemble formats saved! 🎼');
+}
 
 // ─── INSTRUMENT EDITOR ───────────────────────────────────────────
 const INSTRUMENT_LIST=[
