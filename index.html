@@ -2243,18 +2243,19 @@ function showResponseConfirm({emoji,title,body,confirmLabel,confirmColor,confirm
   document.getElementById('resp-confirm')?.remove();
   const m=document.createElement('div');
   m.className='modal-bg';m.id='resp-confirm';
-  m.innerHTML=`<div class="modal" style="text-align:center">
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:0';
+  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;text-align:center">
     <div style="font-size:40px;margin-bottom:12px">${emoji}</div>
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:10px">${title}</div>
     <div style="font-size:13px;color:#666;line-height:1.7;margin-bottom:20px;white-space:pre-line">${body}</div>
     <button onclick="document.getElementById('resp-confirm').remove();(window._respConfirmOk&&window._respConfirmOk())" 
-      style="width:100%;padding:14px;border-radius:10px;background:${confirmColor};color:${confirmTextColor||'#fff'};border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">
+      style="width:100%;padding:14px;border-radius:10px;background:${confirmColor};color:${confirmTextColor||'#fff'};border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
       ${confirmLabel}
     </button>
-    ${cancelLabel?`<button onclick="document.getElementById('resp-confirm').remove()" 
-      style="width:100%;padding:12px;border-radius:10px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;cursor:pointer;font-family:inherit">
-      ${cancelLabel}
-    </button>`:''}
+    <button onclick="document.getElementById('resp-confirm').remove()" 
+      style="width:100%;padding:13px;border-radius:10px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:14px;cursor:pointer;font-family:inherit">
+      ${cancelLabel||'Go back'}
+    </button>
   </div>`;
   window._respConfirmOk=onConfirm;
   document.getElementById('app').appendChild(m);
