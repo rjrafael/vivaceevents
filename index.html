@@ -3824,7 +3824,10 @@ function profileHTML(){
       ${(UP.instruments||[]).length===0?
         `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showInstrumentEditor()">+ Add your instruments</div>`:
         `<div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${(UP.instruments||[]).map(i=>`<span class="tag${i.primary?' tg':''}" style="font-size:12px;padding:5px 10px">${i.primary?'★ ':''} ${i.name}</span>`).join('')}
+          ${(UP.instruments||[]).map(i=>`
+            <span class="tag${i.primary?' tg':''}" style="font-size:12px;padding:5px 10px">
+              ${i.primary?'★ ':''} ${i.name}${i.part&&i.part!=='No preference'?` · <span style="color:#0C447C;font-weight:700">${i.part}</span>`:''}
+            </span>`).join('')}
         </div>`
       }
     </div>
@@ -3870,36 +3873,54 @@ const SKILL_LIST=[
 
 window.showInstrumentEditor=function(){
   const current=UP.instruments||[];
+  const parts=['No preference','Principal / Solo','First','Second','Third','Fourth','Associate Principal','Assistant Principal','Section'];
   const m=document.createElement('div');m.className='modal-bg';m.id='inst-modal';
   m.innerHTML=`<div class="modal" style="max-height:85vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div style="font-size:17px;font-weight:700;color:#111">🎵 My Instruments</div>
       <button onclick="document.getElementById('inst-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">Tap to add · Hold primary instrument to mark it ★</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Add instruments and set your preferred chair/part</div>
     
     ${current.length>0?`
     <div style="margin-bottom:16px">
       <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Your instruments</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px" id="my-inst-list">
-        ${current.map(i=>`
-          <div style="display:flex;align-items:center;gap:4px;background:${i.primary?'#E1F5EE':'#f5f5f5'};border:1px solid ${i.primary?'#5DCAA5':'#e0e0e0'};border-radius:20px;padding:5px 10px">
-            <span style="font-size:12px;color:${i.primary?'#085041':'#555'}">${i.primary?'★ ':''}${i.name}</span>
-            <button onclick="setPrimary('${i.name}')" style="background:none;border:none;color:#1D9E75;font-size:10px;cursor:pointer;padding:0 2px" title="Set as primary">★</button>
-            <button onclick="removeInst('${i.name}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:0 2px">×</button>
-          </div>`).join('')}
-      </div>
+      ${current.map(i=>`
+        <div style="background:${i.primary?'#E1F5EE':'#f9f9f9'};border:1px solid ${i.primary?'#5DCAA5':'#eee'};border-radius:12px;padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;font-weight:600;color:${i.primary?'#085041':'#111'}">${i.primary?'★ ':''}${i.name}</span>
+              ${i.part&&i.part!=='No preference'?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#0C447C;color:#fff;font-weight:600">${i.part}</span>`:''}
+            </div>
+            <div style="display:flex;gap:4px">
+              <button onclick="setPrimary('${i.name.replace(/'/g,"\\'")}'')" style="background:none;border:none;color:#1D9E75;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px;background:#E1F5EE" title="Set as primary">★ Primary</button>
+              <button onclick="removeInst('${i.name.replace(/'/g,"\\'")}'')" style="background:none;border:1px solid #F09595;color:#F09595;font-size:11px;cursor:pointer;padding:2px 8px;border-radius:6px">Remove</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;flex-shrink:0">Chair preference:</span>
+            <select onchange="setInstPart('${i.name.replace(/'/g,"\\'")}', this.value)" 
+              style="flex:1;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;color:#111;font-family:inherit;background:#fff">
+              ${parts.map(p=>`<option value="${p}" ${(i.part||'No preference')===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </div>`).join('')}
     </div>`:''}
     
     <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add instrument</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
       ${INSTRUMENT_LIST.filter(i=>!current.find(c=>c.name===i)).map(i=>`
-        <button onclick="addInst('${i}')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
+        <button onclick="addInst('${i.replace(/'/g,"\\'")}'')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
       `).join('')}
     </div>
     <button class="bt" style="width:100%;padding:13px" onclick="saveInstruments()">Save instruments</button>
   </div>`;
   document.getElementById('app').appendChild(m);
+}
+
+window.setInstPart=function(name, part){
+  const inst=(UP.instruments||[]).find(i=>i.name===name);
+  if(inst){inst.part=part;}
 }
 
 window.addInst=function(name){
