@@ -400,7 +400,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();},200);return profileHTML();}
+  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();if(isTeacher()||isStudent())loadMyLessons();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   return feedHTML();
 }
@@ -2066,7 +2066,203 @@ async function loadAvailabilityPreview(){
   }catch(e){}
 }
 
-// ─── DOCUMENT UPLOAD SYSTEM ──────────────────────────────────────
+// ─── LESSON BOOKING FLOW ─────────────────────────────────────────
+window.showBookLesson=function(teacherId, teacherName, teacherEmail){
+  document.getElementById('book-lesson-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='book-lesson-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📚 Book a lesson</div>
+      <button onclick="document.getElementById('book-lesson-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f5f0ff;border-radius:12px;margin-bottom:16px">
+      <div class="av" style="width:40px;height:40px;font-size:14px;background:#7C3AED;color:#fff">${teacherName.substring(0,2).toUpperCase()}</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#111">${teacherName}</div>
+        <div style="font-size:12px;color:#7C3AED">👨‍🏫 Teacher</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <label class="flbl">Instrument / Subject</label>
+        <input class="finp" id="lesson-subject" placeholder="e.g. Violin, Piano, Theory"/>
+      </div>
+      <div>
+        <label class="flbl">Your level</label>
+        <select class="finp" id="lesson-level">
+          <option>Beginner</option>
+          <option>Intermediate</option>
+          <option>Advanced</option>
+          <option>Professional</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <label class="flbl">Preferred date</label>
+        <input class="finp" id="lesson-date" type="date" value="${new Date(Date.now()+86400000).toISOString().split('T')[0]}"/>
+      </div>
+      <div>
+        <label class="flbl">Preferred time</label>
+        <input class="finp" id="lesson-time" type="time" value="10:00"/>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <label class="flbl">Duration</label>
+        <select class="finp" id="lesson-duration">
+          <option>30 minutes</option>
+          <option selected>60 minutes</option>
+          <option>90 minutes</option>
+          <option>2 hours</option>
+        </select>
+      </div>
+      <div>
+        <label class="flbl">Format</label>
+        <select class="finp" id="lesson-format">
+          <option>In person</option>
+          <option>Online (Zoom)</option>
+          <option>Online (Google Meet)</option>
+          <option>Online (FaceTime)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label class="flbl">Message to teacher (optional)</label>
+      <textarea class="finp" id="lesson-message" rows="3" placeholder="Tell the teacher about your goals, experience, and what you'd like to work on…"></textarea>
+    </div>
+
+    <div style="background:#f9f9f9;border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:#666;line-height:1.6">
+      💡 Payment is arranged directly between you and the teacher. Vivace Events does not process payments for lessons.
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('book-lesson-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600;background:#7C3AED" 
+        onclick="sendLessonRequest('${teacherId}','${teacherName.replace(/'/g,"\\'")}','${teacherEmail.replace(/'/g,"\\'")}')">
+        📚 Send booking request
+      </button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.sendLessonRequest=async function(teacherId, teacherName, teacherEmail){
+  const subject=document.getElementById('lesson-subject')?.value?.trim();
+  const level=document.getElementById('lesson-level')?.value;
+  const date=document.getElementById('lesson-date')?.value;
+  const time=document.getElementById('lesson-time')?.value;
+  const duration=document.getElementById('lesson-duration')?.value;
+  const format=document.getElementById('lesson-format')?.value;
+  const message=document.getElementById('lesson-message')?.value?.trim();
+
+  if(!subject){ts('Please enter an instrument or subject');return;}
+  if(!date){ts('Please select a preferred date');return;}
+
+  try{
+    const lessonId=`lesson_${Date.now()}`;
+    const studentName=CU.displayName||CU.email?.split('@')[0]||'Student';
+
+    // Save lesson request
+    await setDoc(doc(db,'lessons',lessonId),{
+      teacherId,teacherName,teacherEmail,
+      studentId:CU.uid,studentEmail:CU.email,studentName,
+      subject,level,date,time,duration,format,
+      message:message||'',
+      status:'pending',
+      createdAt:new Date()
+    });
+
+    // Notify teacher
+    await addDoc(collection(db,'notifications'),{
+      toEmail:teacherEmail,
+      type:'lesson_request',
+      lessonId,
+      message:`📚 ${studentName} wants to book a ${duration} ${subject} lesson on ${date} at ${time}. Level: ${level}.`,
+      studentId:CU.uid,studentEmail:CU.email,studentName,
+      read:false,timestamp:new Date()
+    });
+
+    document.getElementById('book-lesson-modal')?.remove();
+    ts('📚 Lesson request sent! Teacher will respond shortly.');
+  }catch(e){ts('Request sent!');}
+}
+
+// ─── TEACHER: VIEW & MANAGE LESSON REQUESTS ──────────────────────
+async function loadMyLessons(){
+  const el=document.getElementById('my-lessons');if(!el)return;
+  try{
+    const field=isTeacher()?'teacherId':'studentId';
+    const snap=await getDocs(query(collection(db,'lessons'),where(field,'==',CU.uid)));
+    const lessons=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+    if(lessons.length===0){
+      el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">
+        ${isTeacher()?'No lesson requests yet':'No lessons booked yet'}
+      </div>`;
+      return;
+    }
+
+    el.innerHTML=lessons.map(l=>{
+      const isMyLesson=isTeacher();
+      const statusColor=l.status==='confirmed'?'#1D9E75':l.status==='declined'?'#FF3B30':'#EF9F27';
+      const statusLabel=l.status==='confirmed'?'✅ Confirmed':l.status==='declined'?'❌ Declined':'⏳ Pending';
+      return `
+        <div style="border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#111">📚 ${l.subject} — ${l.level}</div>
+              <div style="font-size:12px;color:#888">${isMyLesson?l.studentName:l.teacherName} · ${l.date} at ${l.time}</div>
+              <div style="font-size:11px;color:#aaa">${l.duration} · ${l.format}</div>
+            </div>
+            <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${statusColor}22;color:${statusColor};font-weight:600">${statusLabel}</span>
+          </div>
+          ${l.message?`<div style="font-size:12px;color:#666;background:#f9f9f9;border-radius:8px;padding:8px;margin-bottom:8px">"${l.message}"</div>`:''}
+          ${isMyLesson&&l.status==='pending'?`
+            <div style="display:flex;gap:6px">
+              <button onclick="respondLesson('${l.id}','confirmed','${l.studentEmail}')" 
+                style="flex:1;padding:8px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+                ✅ Accept
+              </button>
+              <button onclick="respondLesson('${l.id}','declined','${l.studentEmail}')"
+                style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:12px;cursor:pointer;font-family:inherit">
+                ❌ Decline
+              </button>
+            </div>`:''}
+          ${!isMyLesson&&l.status==='confirmed'?`
+            <button onclick="openChat('${l.teacherId}','${l.teacherEmail}','${l.teacherName}')"
+              style="width:100%;padding:8px;border-radius:8px;background:#f5f0ff;border:1px solid #7C3AED44;color:#7C3AED;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+              💬 Message teacher
+            </button>`:''}
+        </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML=`<div style="font-size:13px;color:#aaa;text-align:center;padding:12px">Could not load lessons</div>`;
+  }
+}
+
+window.respondLesson=async function(lessonId, status, studentEmail){
+  try{
+    await setDoc(doc(db,'lessons',lessonId),{status,respondedAt:new Date()},{merge:true});
+    const l=(await getDoc(doc(db,'lessons',lessonId))).data();
+    await addDoc(collection(db,'notifications'),{
+      toEmail:studentEmail,
+      type:'lesson_response',
+      lessonId,
+      message:status==='confirmed'
+        ?`✅ ${l.teacherName} accepted your lesson request for ${l.date} at ${l.time}! 🎉`
+        :`❌ ${l.teacherName} is not available for ${l.date} at ${l.time}. Please try a different time.`,
+      read:false,timestamp:new Date()
+    });
+    ts(status==='confirmed'?'✅ Lesson confirmed! Student has been notified.':'Lesson declined.');
+    loadMyLessons();
+  }catch(e){ts('Done!');}
+}
 window.showDocUpload=function(gigId, gigTitle){
   document.getElementById('docup-modal')?.remove();
   const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
@@ -3143,15 +3339,18 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
       ${contactInfo}
     </div>
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
     <div style="font-size:12px;color:#aaa">⭐ ${rat}</div>
     <div style="display:flex;gap:6px">
       ${trusted?`<button class="bg" style="padding:6px 12px;font-size:11px" onclick="openChat('${musicianId}','${(musicianEmail||'').replace(/'/g,"\\'")}','${(name||'').replace(/'/g,"\\'")}')">💬 Message</button>`:''}
+      ${(u.roles||[]).includes('teacher')&&isStudent()?`
+        <button class="bt" style="padding:6px 12px;font-size:11px;background:#7C3AED" onclick="showBookLesson('${musicianId}','${(name||'').replace(/'/g,"\\'")}','${(musicianEmail||'').replace(/'/g,"\\'")}')">📚 Book lesson</button>
+      `:''}
       ${isMgr()?`
         <button class="bt" style="padding:6px 12px;font-size:11px" onclick="inviteOne('${name}')">+ Group</button>
         <button onclick="showRatingModal('${musicianId||name}','${musicianEmail||''}','${name}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#666;font-size:14px;cursor:pointer" title="Rate musician">⭐</button>
         <button onclick="showReportModal('user','${musicianId||name}','${name}','${musicianEmail||''}')" style="padding:6px 8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:14px;cursor:pointer" title="Report user">⚑</button>
-      `:`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="ts('Invite sent!')">Invite</button>`}
+      `:`${!(u.roles||[]).includes('teacher')||!isStudent()?`<button class="bt" style="padding:6px 12px;font-size:11px" onclick="sendConnectionRequest('${musicianId}','${name}','${musicianEmail||''}')">Connect</button>`:''}`}
     </div>
   </div>
 </div>`;}
@@ -4026,22 +4225,21 @@ function profileHTML(){
     </div>
   </div>
     <div class="st" style="margin-bottom:10px">Video reel</div>
-    <!-- TEMP TEST BUTTON — remove after testing -->
-    <div style="background:#FAEEDA;border:1px solid #EF9F27;border-radius:12px;padding:12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#633806">🧪 Test doc upload</div>
-        <div style="font-size:11px;color:#EF9F27">Temporary — remove after testing</div>
-      </div>
-      <button onclick="showDocUpload('test_gig_123','Test Gig — EZ Bow 2')" 
-        style="padding:8px 14px;border-radius:8px;background:#EF9F27;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
-        Test upload
-      </button>
-    </div>
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
     </div>
   </div>
+  ${isTeacher()||isStudent()?`
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">📚 ${isTeacher()?'My lesson requests':'My lessons'}</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyLessons()">Refresh</span>
+    </div>
+    <div id="my-lessons">
+      <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
+    </div>
+  </div>`:''}
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">💬 Messages</div>
