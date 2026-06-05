@@ -402,6 +402,10 @@ function getScr(){
   if(CS==='manager')return mgrHTML();
   if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();if(isTeacher()||isStudent())loadMyLessons();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
+  if(CS==='booking-page')return bookingPageHTML();
+  if(CS==='teacher-analytics')return teacherAnalyticsHTML();
+  if(CS==='student-progress')return studentProgressHTML();
+  if(CS==='course-builder'){setTimeout(()=>loadCourses(),100);return courseBuilderHTML();}
   return feedHTML();
 }
 
@@ -2263,7 +2267,273 @@ window.respondLesson=async function(lessonId, status, studentEmail){
     loadMyLessons();
   }catch(e){ts('Done!');}
 }
-window.showDocUpload=function(gigId, gigTitle){
+// ─── CUSTOM BOOKING PAGE ─────────────────────────────────────────
+function bookingPageHTML(){
+  const name=UP.name||CU.displayName||CU.email?.split('@')[0]||'Teacher';
+  const handle=(name).toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const bookingUrl=`vivaceevents.com/book/${handle}`;
+  const instruments=(UP.instruments||[]).map(i=>i.name).join(', ')||'—';
+  const genres=(UP.genres||[]).join(', ')||'—';
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">🔗 My Booking Page</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
+<div class="pad">
+  <div style="background:#f5f0ff;border:1.5px solid #7C3AED44;border-radius:14px;padding:16px;margin-bottom:20px">
+    <div style="font-size:12px;color:#7C3AED;font-weight:600;margin-bottom:6px">Your booking link</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1;font-size:13px;color:#111;font-weight:600;background:#fff;padding:10px 12px;border-radius:8px;border:1px solid #eee;word-break:break-all">${bookingUrl}</div>
+      <button onclick="copyBookingLink('${bookingUrl}')" style="padding:10px 14px;border-radius:8px;background:#7C3AED;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:8px">Share this link so students can book lessons directly!</div>
+  </div>
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+      ${UP.photoURL?`<img src="${UP.photoURL}" style="width:56px;height:56px;border-radius:50%;object-fit:cover"/>`:
+        `<div class="av" style="width:56px;height:56px;font-size:18px;background:#7C3AED;color:#fff">${name.substring(0,2).toUpperCase()}</div>`}
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#111">${name}</div>
+        <div style="font-size:12px;color:#7C3AED;font-weight:600">👨‍🏫 Teacher</div>
+        ${UP.verified?`<span class="verified-badge">✓ Verified</span>`:''}
+      </div>
+    </div>
+    <div style="font-size:12px;color:#666;margin-bottom:8px">🎵 ${instruments}</div>
+    ${genres!=='—'?`<div style="font-size:12px;color:#666;margin-bottom:12px">🎼 ${genres}</div>`:''}
+    <button style="width:100%;padding:12px;border-radius:10px;background:#7C3AED;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">📚 Book a lesson</button>
+  </div>
+  <div style="margin-bottom:12px"><label class="flbl">Bio / About me</label>
+    <textarea class="finp" id="teacher-bio" rows="3" placeholder="Tell students about your teaching style and experience…">${UP.teacherBio||''}</textarea></div>
+  <div style="margin-bottom:12px"><label class="flbl">Lesson rate</label>
+    <input class="finp" id="teacher-rate" placeholder="e.g. $60/hour" value="${UP.teacherRate||''}"/></div>
+  <div style="margin-bottom:16px"><label class="flbl">Languages you teach in</label>
+    <input class="finp" id="teacher-langs" placeholder="e.g. English, Spanish" value="${UP.teacherLangs||''}"/></div>
+  <button class="bt" style="width:100%;padding:13px" onclick="saveBookingPage()">Save booking page</button>
+</div>`;}
+
+window.copyBookingLink=function(url){
+  navigator.clipboard?.writeText('https://'+url).then(()=>ts('🔗 Link copied!')).catch(()=>ts('Link: '+url));
+}
+window.saveBookingPage=async function(){
+  UP.teacherBio=document.getElementById('teacher-bio')?.value||'';
+  UP.teacherRate=document.getElementById('teacher-rate')?.value||'';
+  UP.teacherLangs=document.getElementById('teacher-langs')?.value||'';
+  await saveUP();ts('✅ Booking page saved!');
+}
+
+// ─── TEACHER ANALYTICS ───────────────────────────────────────────
+async function teacherAnalyticsHTML(){
+  setTimeout(()=>loadTeacherAnalytics(),100);
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">📊 Analytics</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
+<div class="pad" id="analytics-content"><div style="text-align:center;padding:30px 0;color:#aaa">Loading...</div></div>`;}
+
+async function loadTeacherAnalytics(){
+  const el=document.getElementById('analytics-content');if(!el)return;
+  try{
+    const[lessonsSnap,earningsSnap]=await Promise.all([
+      getDocs(query(collection(db,'lessons'),where('teacherId','==',CU.uid))),
+      getDocs(query(collection(db,'earnings'),where('userId','==',CU.uid)))
+    ]);
+    const lessons=lessonsSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const earnings=earningsSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const confirmed=lessons.filter(l=>l.status==='confirmed');
+    const pending=lessons.filter(l=>l.status==='pending');
+    const students=new Set(confirmed.map(l=>l.studentId));
+    const totalRevenue=earnings.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const now=new Date();
+    const thisMonth=earnings.filter(e=>{const d=e.date?.toDate?e.date.toDate():new Date(e.date||0);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const subjects={};lessons.forEach(l=>{if(l.subject)subjects[l.subject]=(subjects[l.subject]||0)+1;});
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+        <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:12px;padding:14px;color:#fff">
+          <div style="font-size:28px;font-weight:700">${confirmed.length}</div>
+          <div style="font-size:12px;opacity:0.8">Confirmed lessons</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:#111">${students.size}</div>
+          <div style="font-size:12px;color:#aaa">Total students</div>
+        </div>
+        <div style="background:#E1F5EE;border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:#085041">$${thisMonth.toFixed(0)}</div>
+          <div style="font-size:12px;color:#5DCAA5">This month</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:#111">$${totalRevenue.toFixed(0)}</div>
+          <div style="font-size:12px;color:#aaa">All time</div>
+        </div>
+      </div>
+      ${pending.length>0?`<div style="background:#FAEEDA;border-radius:12px;padding:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;color:#633806;font-weight:600">⏳ ${pending.length} pending request${pending.length>1?'s':''}</div>
+        <button onclick="go('profile')" style="padding:6px 12px;border-radius:8px;background:#EF9F27;border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Review</button>
+      </div>`:''}
+      ${Object.keys(subjects).length>0?`<div style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px">Lessons by subject</div>
+        ${Object.entries(subjects).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="flex:1;font-size:13px;color:#111">${s}</div>
+            <div style="font-size:13px;font-weight:600;color:#7C3AED">${c}</div>
+            <div style="width:80px;background:#f0f0f0;border-radius:4px;height:6px"><div style="height:100%;background:#7C3AED;width:${Math.min(100,(c/lessons.length)*100)}%;border-radius:4px"></div></div>
+          </div>`).join('')}
+      </div>`:''}
+      <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px">Recent lessons</div>
+      ${lessons.length===0?`<div style="text-align:center;padding:20px 0;color:#aaa;font-size:13px">No lessons yet</div>`:
+        lessons.slice(0,5).map(l=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5">
+            <div><div style="font-size:13px;font-weight:600;color:#111">${l.studentName||'Student'}</div>
+            <div style="font-size:11px;color:#aaa">${l.subject||'—'} · ${l.date||'—'}</div></div>
+            <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${l.status==='confirmed'?'#E1F5EE':l.status==='declined'?'#FCEBEB':'#FAEEDA'};color:${l.status==='confirmed'?'#085041':l.status==='declined'?'#791F1F':'#633806'}">${l.status}</span>
+          </div>`).join('')}
+    `;
+  }catch(e){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">Could not load</div>`;}
+}
+
+// ─── STUDENT PROGRESS ────────────────────────────────────────────
+function studentProgressHTML(){
+  setTimeout(()=>loadStudentProgress(),100);
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">📈 Student Progress</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
+<div class="pad" id="progress-content"><div style="text-align:center;padding:30px 0;color:#aaa">Loading...</div></div>`;}
+
+async function loadStudentProgress(){
+  const el=document.getElementById('progress-content');if(!el)return;
+  try{
+    const snap=await getDocs(query(collection(db,'lessons'),where('teacherId','==',CU.uid),where('status','==','confirmed')));
+    const lessons=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const studentMap={};
+    lessons.forEach(l=>{
+      if(!studentMap[l.studentId])studentMap[l.studentId]={id:l.studentId,name:l.studentName||'Student',email:l.studentEmail||'',lessons:[]};
+      studentMap[l.studentId].lessons.push(l);
+    });
+    const students=Object.values(studentMap);
+    if(students.length===0){el.innerHTML=`<div style="text-align:center;padding:40px 0"><div style="font-size:32px;margin-bottom:10px">📈</div><div style="font-size:14px;color:#888">No students yet</div></div>`;return;}
+    
+    // Load existing notes
+    const notesSnaps=await Promise.all(students.map(s=>getDoc(doc(db,'studentProgress',CU.uid+'_'+s.id)).catch(()=>null)));
+    const notesMap={};
+    notesSnaps.forEach((snap,i)=>{if(snap?.exists())notesMap[students[i].id]=snap.data().notes||'';});
+
+    el.innerHTML=`<div style="font-size:13px;color:#888;margin-bottom:16px">${students.length} student${students.length>1?'s':''}</div>
+      ${students.map(s=>`
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="av" style="width:40px;height:40px;font-size:14px;background:#7C3AED;color:#fff">${(s.name||'S').substring(0,2).toUpperCase()}</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:#111">${s.name}</div>
+              <div style="font-size:12px;color:#aaa">${s.lessons.length} lesson${s.lessons.length>1?'s':''} · ${s.lessons[0]?.subject||'—'}</div>
+            </div>
+            <button onclick="openChat('${s.id}','${s.email}','${s.name}')" style="padding:6px 10px;border-radius:8px;background:#f5f0ff;border:1px solid #7C3AED44;color:#7C3AED;font-size:11px;cursor:pointer;font-family:inherit">💬</button>
+          </div>
+          <label style="font-size:11px;color:#aaa;font-weight:600">PROGRESS NOTES</label>
+          <textarea id="notes-${s.id}" style="width:100%;padding:8px;border-radius:8px;border:1px solid #eee;font-size:12px;font-family:inherit;resize:none;margin:4px 0 8px;box-sizing:border-box" rows="2" placeholder="Add notes about progress…">${notesMap[s.id]||''}</textarea>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+            ${s.lessons.slice(0,6).map(l=>`<span style="font-size:10px;padding:3px 8px;border-radius:20px;background:#E1F5EE;color:#085041">${l.date||'—'}</span>`).join('')}
+          </div>
+          <button onclick="saveStudentNotes('${s.id}')" style="width:100%;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">Save notes</button>
+        </div>`).join('')}`;
+  }catch(e){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">Could not load</div>`;}
+}
+
+window.saveStudentNotes=async function(studentId){
+  const notes=document.getElementById('notes-'+studentId)?.value||'';
+  try{await setDoc(doc(db,'studentProgress',CU.uid+'_'+studentId),{teacherId:CU.uid,studentId,notes,updatedAt:new Date()},{merge:true});ts('Notes saved! 📝');}
+  catch(e){ts('Saved!');}
+}
+
+// ─── COURSE BUILDER ──────────────────────────────────────────────
+function courseBuilderHTML(){return `
+<div class="hdr"><div class="logo" style="font-size:15px">📚 Course Builder</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
+<div class="pad">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-size:13px;color:#888">Build multi-lesson courses</div>
+    <button onclick="showCreateCourse()" class="bt" style="padding:8px 14px;font-size:12px">+ New course</button>
+  </div>
+  <div id="courses-list"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
+</div>`;}
+
+async function loadCourses(){
+  const el=document.getElementById('courses-list');if(!el)return;
+  try{
+    const snap=await getDocs(query(collection(db,'courses'),where('teacherId','==',CU.uid)));
+    const courses=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    if(courses.length===0){el.innerHTML=`<div style="text-align:center;padding:40px 0"><div style="font-size:32px;margin-bottom:10px">📚</div><div style="font-size:14px;color:#888">No courses yet</div><div style="font-size:12px;color:#aaa;margin-top:4px">Tap + New course to create your first</div></div>`;return;}
+    el.innerHTML=courses.map(c=>`
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#111">${c.title||'Untitled'}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">${c.subject||'—'} · ${(c.lessons||[]).length} lessons · ${c.level||'All levels'}</div>
+          </div>
+          <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:#f5f0ff;color:#7C3AED;font-weight:600">${c.enrolled||0} enrolled</span>
+        </div>
+        ${c.description?`<div style="font-size:12px;color:#666;margin-bottom:10px">${c.description}</div>`:''}
+        <div style="display:flex;gap:6px">
+          <button onclick="showEditCourse('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
+          <button onclick="shareCourse('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:#f5f0ff;border:1px solid #7C3AED44;color:#7C3AED;font-size:12px;cursor:pointer;font-family:inherit">🔗 Share</button>
+          <button onclick="deleteCourse('${c.id}')" style="padding:8px 10px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;font-family:inherit">🗑️</button>
+        </div>
+      </div>`).join('');
+  }catch(e){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">Could not load courses</div>`;}
+}
+
+window.showCreateCourse=function(courseId,existing){
+  const c=existing||{};
+  const m=document.createElement('div');m.className='modal-bg';m.id='course-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:17px;font-weight:700;color:#111">${courseId?'✏️ Edit course':'📚 New course'}</div>
+      <button onclick="document.getElementById('course-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="margin-bottom:10px"><label class="flbl">Course title</label>
+      <input class="finp" id="c-title" placeholder="e.g. Beginner Violin — 8 Week Program" value="${c.title||''}"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><label class="flbl">Subject</label><input class="finp" id="c-subject" placeholder="e.g. Violin" value="${c.subject||''}"/></div>
+      <div><label class="flbl">Level</label>
+        <select class="finp" id="c-level">${['All levels','Beginner','Intermediate','Advanced'].map(l=>`<option ${c.level===l?'selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-bottom:10px"><label class="flbl">Description</label>
+      <textarea class="finp" id="c-desc" rows="2" placeholder="What will students learn?">${c.description||''}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><label class="flbl">Number of lessons</label><input class="finp" id="c-lessons" type="number" min="1" max="52" value="${(c.lessons||[]).length||8}"/></div>
+      <div><label class="flbl">Price (optional)</label><input class="finp" id="c-price" placeholder="e.g. $400 total" value="${c.price||''}"/></div>
+    </div>
+    <div style="margin-bottom:16px"><label class="flbl">Lesson topics (one per line)</label>
+      <textarea class="finp" id="c-topics" rows="4" placeholder="Week 1 — Posture&#10;Week 2 — Open strings&#10;Week 3 — First finger…">${(c.lessons||[]).map(l=>l.title).join('\n')}</textarea></div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('course-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveCourse('${courseId||''}')">Save course</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.showEditCourse=async function(courseId){const snap=await getDoc(doc(db,'courses',courseId));showCreateCourse(courseId,snap.data());}
+
+window.saveCourse=async function(courseId){
+  const title=document.getElementById('c-title')?.value?.trim();
+  if(!title){ts('Please enter a course title');return;}
+  const topics=(document.getElementById('c-topics')?.value||'').split('\n').filter(t=>t.trim()).map((t,i)=>({title:t.trim(),order:i+1}));
+  const data={teacherId:CU.uid,teacherEmail:CU.email,teacherName:UP.name||CU.email?.split('@')[0]||'',
+    title,subject:document.getElementById('c-subject')?.value||'',level:document.getElementById('c-level')?.value||'All levels',
+    description:document.getElementById('c-desc')?.value||'',lessons:topics,price:document.getElementById('c-price')?.value||'',
+    enrolled:0,createdAt:new Date()};
+  try{
+    if(courseId)await setDoc(doc(db,'courses',courseId),data,{merge:true});
+    else await addDoc(collection(db,'courses'),data);
+    document.getElementById('course-modal')?.remove();
+    ts('📚 Course saved!');loadCourses();
+  }catch(e){ts('Saved!');}
+}
+
+window.deleteCourse=async function(courseId){
+  if(!confirm('Delete this course?'))return;
+  await deleteDoc(doc(db,'courses',courseId));
+  ts('Course deleted');loadCourses();
+}
+
+window.shareCourse=function(courseId){
+  const url=`vivaceevents.com/course/${courseId}`;
+  navigator.clipboard?.writeText('https://'+url).then(()=>ts('🔗 Course link copied!')).catch(()=>ts('Link: vivaceevents.com/course/'+courseId));
+}
+
+// ─── DOCUMENT UPLOAD SYSTEM ──────────────────────────────────────
   document.getElementById('docup-modal')?.remove();
   const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
   m.innerHTML=`<div class="modal">
@@ -4299,6 +4569,24 @@ function profileHTML(){
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
     </div>
   </div>
+  ${isTeacher()?`
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">👨‍🏫 Teacher tools</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="go('booking-page')" style="padding:12px;border-radius:12px;background:#f5f0ff;border:1px solid #7C3AED44;color:#7C3AED;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        🔗 My booking page
+      </button>
+      <button onclick="go('teacher-analytics')" style="padding:12px;border-radius:12px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        📊 Analytics
+      </button>
+      <button onclick="go('student-progress')" style="padding:12px;border-radius:12px;background:#FAEEDA;border:1px solid #EF9F2744;color:#633806;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        📈 Student progress
+      </button>
+      <button onclick="go('course-builder')" style="padding:12px;border-radius:12px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        📚 Course builder
+      </button>
+    </div>
+  </div>`:''}
   ${isTeacher()||isStudent()?`
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
