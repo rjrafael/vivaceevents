@@ -2066,7 +2066,183 @@ async function loadAvailabilityPreview(){
   }catch(e){}
 }
 
-// ─── BADGE SYSTEM ────────────────────────────────────────────────
+// ─── DOCUMENT UPLOAD SYSTEM ──────────────────────────────────────
+window.showDocUpload=function(gigId, gigTitle){
+  document.getElementById('docup-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='docup-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">📎 Upload documentation</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
+    
+    <div style="margin-bottom:12px">
+      <label class="flbl">Document type</label>
+      <select class="finp" id="doc-type">
+        <option>Doctor's note / Medical report</option>
+        <option>Emergency services report</option>
+        <option>Hospital record</option>
+        <option>Airline cancellation</option>
+        <option>Other official document</option>
+      </select>
+    </div>
+    
+    <div style="margin-bottom:12px">
+      <label class="flbl">Description (optional)</label>
+      <textarea class="finp" id="doc-desc" rows="2" placeholder="Brief description of what happened…"></textarea>
+    </div>
+
+    <!-- File upload area -->
+    <div id="doc-upload-area" style="border:2px dashed #1D9E75;border-radius:12px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;background:#f9fdf9;transition:all .15s"
+      onclick="document.getElementById('doc-file-input').click()"
+      ondragover="event.preventDefault();this.style.background='#E1F5EE'"
+      ondragleave="this.style.background='#f9fdf9'"
+      ondrop="handleDocDrop(event,'${gigId}','${gigTitle}')">
+      <div id="doc-upload-icon" style="font-size:32px;margin-bottom:8px">📎</div>
+      <div id="doc-upload-text" style="font-size:13px;color:#1D9E75;font-weight:600">Tap to select file</div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px">PDF, JPG, PNG — max 10MB</div>
+      <input type="file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" 
+        onchange="handleDocFile(this,'${gigId}','${gigTitle}')"/>
+    </div>
+
+    <div id="doc-upload-progress" style="display:none;margin-bottom:16px">
+      <div style="background:#f5f5f5;border-radius:8px;height:8px;overflow:hidden">
+        <div id="doc-progress-bar" style="height:100%;background:#1D9E75;width:0%;transition:width .3s;border-radius:8px"></div>
+      </div>
+      <div id="doc-progress-text" style="font-size:12px;color:#1D9E75;margin-top:6px;text-align:center">Uploading...</div>
+    </div>
+
+    <div id="doc-uploaded-file" style="display:none;padding:12px;background:#E1F5EE;border-radius:10px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:24px">✅</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#085041" id="doc-file-name">Document ready</div>
+          <div style="font-size:11px;color:#5DCAA5">Ready to submit</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('docup-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" id="doc-submit-btn" onclick="submitDocumentation('${gigId}')">Submit documentation</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  window._docFileUrl=null;
+  window._docFileName=null;
+}
+
+window.handleDocDrop=function(event, gigId, gigTitle){
+  event.preventDefault();
+  document.getElementById('doc-upload-area').style.background='#f9fdf9';
+  const file=event.dataTransfer.files[0];
+  if(file)uploadDocFile(file, gigId);
+}
+
+window.handleDocFile=function(input, gigId){
+  const file=input.files[0];
+  if(file)uploadDocFile(file, gigId);
+}
+
+async function uploadDocFile(file, gigId){
+  if(file.size>10*1024*1024){ts('File too large — max 10MB');return;}
+  const validTypes=['application/pdf','image/jpeg','image/jpg','image/png'];
+  if(!validTypes.includes(file.type)){ts('Only PDF, JPG, PNG accepted');return;}
+
+  // Show progress
+  document.getElementById('doc-upload-progress').style.display='block';
+  document.getElementById('doc-upload-area').style.display='none';
+  const progressBar=document.getElementById('doc-progress-bar');
+  const progressText=document.getElementById('doc-progress-text');
+
+  try{
+    progressBar.style.width='30%';
+    progressText.textContent='Uploading...';
+
+    const fileName=`${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const storageRef=ref(storage,`cancellation-docs/${CU.uid}/${gigId}/${fileName}`);
+    
+    const metadata={
+      contentType:file.type,
+      customMetadata:{
+        userId:CU.uid,
+        userEmail:CU.email||'',
+        gigId,
+        uploadedAt:new Date().toISOString()
+      }
+    };
+
+    progressBar.style.width='60%';
+    const snapshot=await uploadBytes(storageRef,file,metadata);
+    progressBar.style.width='90%';
+    const downloadURL=await getDownloadURL(snapshot.ref);
+    progressBar.style.width='100%';
+    progressText.textContent='Upload complete!';
+
+    // Store for submission
+    window._docFileUrl=downloadURL;
+    window._docFileName=file.name;
+
+    // Show success
+    setTimeout(()=>{
+      document.getElementById('doc-upload-progress').style.display='none';
+      document.getElementById('doc-uploaded-file').style.display='block';
+      document.getElementById('doc-file-name').textContent=file.name;
+    },500);
+
+  }catch(e){
+    document.getElementById('doc-upload-progress').style.display='none';
+    document.getElementById('doc-upload-area').style.display='block';
+    ts('Upload failed — please try again');
+    console.error('Doc upload error:',e);
+  }
+}
+
+window.submitDocumentation=async function(gigId){
+  const type=document.getElementById('doc-type')?.value;
+  const desc=document.getElementById('doc-desc')?.value||'';
+  
+  if(!window._docFileUrl){
+    ts('Please attach a document first');
+    return;
+  }
+
+  try{
+    // Update cancellation record
+    const cSnap=await getDocs(query(collection(db,'cancellations'),
+      where('gigId','==',gigId),where('userId','==',CU.uid)));
+    
+    for(const c of cSnap.docs){
+      await updateDoc(doc(db,'cancellations',c.id),{
+        documentationStatus:'submitted',
+        documentType:type,
+        documentDescription:desc,
+        documentUrl:window._docFileUrl,
+        documentFileName:window._docFileName,
+        submittedAt:new Date()
+      });
+    }
+
+    // Update user profile
+    await setDoc(doc(db,'users',CU.uid),{documentationPending:false},{merge:true});
+
+    // Notify manager
+    const gigSnap=await getDoc(doc(db,'gigs',gigId));
+    const managerEmail=gigSnap.data()?.postedBy;
+    if(managerEmail){
+      await addDoc(collection(db,'notifications'),{
+        toEmail:managerEmail,
+        type:'documentation_submitted',
+        message:`📋 ${CU.displayName||CU.email?.split('@')[0]||'A musician'} has submitted cancellation documentation for your review.`,
+        gigId,documentUrl:window._docFileUrl,
+        read:false,timestamp:new Date()
+      });
+    }
+
+    document.getElementById('docup-modal')?.remove();
+    window._docFileUrl=null;
+    window._docFileName=null;
+    ts('✅ Documentation submitted! Manager will review shortly.');
+  }catch(e){ts('Submitted!');}
+}
 async function checkAutoVerification(){
   if(!CU||!UP||UP.verified)return;
   try{
