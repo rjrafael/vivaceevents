@@ -154,7 +154,12 @@ const T={
     pay:'Pay / Compensation',venue:'Venue / Location',
     instruments:'Instruments / Skills needed',notes:'Notes',
     musiciansNeeded:'Artists needed',level:'Level',anyLevel:'Any level',
-    gigType1:'🎵 Performance / Gig',gigType2:'🎓 Masterclass',gigType3:'🎙 Recording session',gigType4:'💬 Consultation',gigType5:'🎭 Audition',gigType6:'🎨 Exhibition',
+    gigType1:'🎵 Gig / Performance',gigType2:'🎼 Concert',gigType3:'🎻 Recital',gigType4:'🎤 Show / Live',
+    gigType5:'📚 Private Lesson',gigType6:'👥 Group Class',gigType7:'🎓 Masterclass',gigType8:'🏫 Workshop',
+    gigType9:'💬 Consultation',gigType10:'🎯 Audition',gigType11:'🎪 Exhibition',
+    gigType12:'🎙️ Recording Session',gigType13:'🎚️ Studio Session',gigType14:'🎬 Video Recording',
+    gigType15:'📋 Rehearsal',gigType16:'🌐 Online Session',gigType17:'⭐ Special Event',
+    gigType18:'🎵 Session',gigType19:'🎹 Free / Open',gigType20:'📖 Seminar',
     paidGig:'Paid — enter amount',freeVol:'Free / Volunteer',freeDoor:'Free entry — door deal',revShare:'Revenue share',tbd:'To be discussed',
   },
   es:{
@@ -341,6 +346,9 @@ function ts(m){
 }
 
 function isMgr(){return UP.roles&&UP.roles.includes('manager');}
+function isTeacher(){return UP.roles&&UP.roles.includes('teacher');}
+function isStudent(){return UP.roles&&UP.roles.includes('student');}
+function canPostAudition(){return UP.roles&&(UP.roles.includes('manager')||UP.roles.includes('teacher')||UP.roles.includes('artist'));}
 
 async function loadUP(){
   try{
@@ -387,7 +395,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();},200);return profileHTML();}
+  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   return feedHTML();
 }
@@ -474,7 +482,7 @@ function showPhoneModal(){
     <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your number — we'll send a verification code</div>
     <div id="phone-step-1">
       <span class="flbl">Phone number (with country code)</span>
-      <input class="finp" id="phone-input" placeholder="+17038879340" oninput="this.value=this.value.replace(/[^\d\+]/g,``)" style="margin-bottom:6px"/>
+      <input class="finp" id="phone-input" placeholder="+17038879340" style="margin-bottom:6px"/>
       <div style="font-size:10px;color:#aaa;margin-bottom:12px">+1 US · +44 UK · +7 Russia · +39 Italy · +33 France · +49 Germany</div>
       <div id="rc-wrap" style="margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
@@ -537,6 +545,7 @@ window.verifySMS=async function(){
     const r=await confirmResult.confirm(code);
     CU=r.user;
     document.getElementById('phone-modal')?.remove();
+    await saveTOS(CU.uid);
     await loadUP();await loadGroups();await loadVenues();render();
     ts('Phone verified! Welcome to Vivace Events 🎉');
   }catch(e){ts('Invalid code. Please try again.');}
@@ -638,17 +647,20 @@ async function loadGigs(){
             ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
             ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
-              <div style="display:flex;gap:6px">
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
+                ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️ Vehicle info</button>`:''}
+                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
                 <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
               </div>
             `:''}
             ${isMine&&filled?`
-              <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-                <div style="display:flex;gap:6px">
-                  <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                  <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
-                </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
+                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
+                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
               </div>
             `:''}
             ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
@@ -1509,7 +1521,146 @@ window.markAllRead=async function(){
   }catch(e){}
 }
 
-// ─── TRUST NETWORK / CONNECTION SYSTEM ──────────────────────────
+// ─── EARNINGS TRACKER ────────────────────────────────────────────
+async function loadEarningsSummary(){
+  const el=document.getElementById('earnings-summary');if(!el)return;
+  try{
+    const snap=await getDocs(query(collection(db,'earnings'),where('userId','==',CU.uid)));
+    const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const now=new Date();
+    const thisMonth=all.filter(e=>{
+      const d=e.date?.toDate?e.date.toDate():new Date(e.date);
+      return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+    });
+    const monthTotal=thisMonth.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const allTotal=all.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:#E1F5EE;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:#085041">$${monthTotal.toFixed(0)}</div>
+          <div style="font-size:11px;color:#5DCAA5;margin-top:2px">This month</div>
+        </div>
+        <div style="background:#f5f5f5;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:#111">$${allTotal.toFixed(0)}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px">All time</div>
+        </div>
+      </div>
+      <button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">+ Log payment received</button>
+    `;
+  }catch(e){
+    el.innerHTML=`<button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">+ Log payment received</button>`;
+  }
+}
+
+window.showAddEarning=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='earning-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">💰 Log payment</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Record income from a gig or lesson</div>
+    <div style="margin-bottom:10px"><label class="flbl">Amount</label>
+      <input class="finp" id="earn-amount" type="number" placeholder="$0.00" style="font-size:18px;font-weight:600"/></div>
+    <div style="margin-bottom:10px"><label class="flbl">Description</label>
+      <input class="finp" id="earn-desc" placeholder="e.g. Wedding gig — string quartet"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><label class="flbl">Date</label>
+        <input class="finp" id="earn-date" type="date" value="${new Date().toISOString().split('T')[0]}"/></div>
+      <div><label class="flbl">Payment method</label>
+        <select class="finp" id="earn-method">
+          <option>Cash</option><option>Check</option><option>Venmo</option>
+          <option>Zelle</option><option>Wire</option><option>PayPal</option>
+        </select></div>
+    </div>
+    <div style="margin-bottom:16px"><label class="flbl">Category</label>
+      <select class="finp" id="earn-category">
+        <option>🎵 Gig / Performance</option>
+        <option>📚 Private Lesson</option>
+        <option>🎓 Masterclass</option>
+        <option>🎙️ Recording Session</option>
+        <option>🎼 Concert</option>
+        <option>🎻 Recital</option>
+        <option>💬 Consultation</option>
+        <option>⭐ Other</option>
+      </select></div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('earning-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveEarning()">Save payment</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.saveEarning=async function(){
+  const amount=document.getElementById('earn-amount').value;
+  const desc=document.getElementById('earn-desc').value;
+  const date=document.getElementById('earn-date').value;
+  const method=document.getElementById('earn-method').value;
+  const category=document.getElementById('earn-category').value;
+  if(!amount){ts('Please enter an amount');return;}
+  try{
+    await addDoc(collection(db,'earnings'),{
+      userId:CU.uid,userEmail:CU.email,
+      amount:parseFloat(amount),description:desc,
+      date:new Date(date),method,category,
+      createdAt:new Date()
+    });
+    document.getElementById('earning-modal')?.remove();
+    ts(`💰 $${parseFloat(amount).toFixed(2)} logged!`);
+    loadEarningsSummary();
+  }catch(e){ts('Saved!');}
+}
+
+window.showEarningsTracker=async function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='earnings-modal';
+  try{
+    const snap=await getDocs(query(collection(db,'earnings'),where('userId','==',CU.uid)));
+    const all=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
+      const da=a.date?.toDate?a.date.toDate():new Date(a.date||0);
+      const db2=b.date?.toDate?b.date.toDate():new Date(b.date||0);
+      return db2-da;
+    });
+    const total=all.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+
+    // Group by month
+    const byMonth={};
+    all.forEach(e=>{
+      const d=e.date?.toDate?e.date.toDate():new Date(e.date||0);
+      const key=d.toLocaleString('en',{month:'long',year:'numeric'});
+      if(!byMonth[key])byMonth[key]=[];
+      byMonth[key].push(e);
+    });
+
+    m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:17px;font-weight:700;color:#111">💰 Earnings Tracker</div>
+        <button onclick="document.getElementById('earnings-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+      </div>
+      <div style="font-size:13px;color:#888;margin-bottom:16px">All time total: <strong style="color:#1D9E75">$${total.toFixed(2)}</strong></div>
+      ${Object.entries(byMonth).map(([month,entries])=>`
+        <div style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:600;color:#111">${month}</div>
+            <div style="font-size:13px;font-weight:600;color:#1D9E75">$${entries.reduce((s,e)=>s+(parseFloat(e.amount)||0),0).toFixed(2)}</div>
+          </div>
+          ${entries.map(e=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5">
+              <div>
+                <div style="font-size:13px;color:#111">${e.description||e.category||'Payment'}</div>
+                <div style="font-size:11px;color:#aaa">${e.category||''} · ${e.method||''}</div>
+              </div>
+              <div style="font-size:14px;font-weight:600;color:#085041">$${parseFloat(e.amount||0).toFixed(2)}</div>
+            </div>`).join('')}
+        </div>`).join('')}
+      ${all.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No earnings logged yet</p>':''}
+      <button onclick="showAddEarning();document.getElementById('earnings-modal').remove()" class="bt" style="width:100%;padding:13px;margin-top:8px">+ Log payment</button>
+    </div>`;
+  }catch(e){
+    m.innerHTML=`<div class="modal"><p style="color:#aaa">Could not load earnings</p></div>`;
+  }
+  document.getElementById('app').appendChild(m);
+}
+
+// ─── REAL USER SEARCH ────────────────────────────────────────────
+// Load real users from Firestore + keep demo artists as fallback
 window.sendConnectionRequest=async function(musicianId, musicianName, musicianEmail){
   try{
     // Check if already sent
@@ -1793,7 +1944,165 @@ window.showLangPicker=function(){
   document.getElementById('app').appendChild(m);
 }
 
-window.fpill=function(el){document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+window.toggleParking=function(){
+  const tgl=document.getElementById('parking-tgl');
+  const fields=document.getElementById('parking-fields');
+  if(!tgl||!fields)return;
+  const on=tgl.classList.contains('off');
+  tgl.classList.toggle('off',!on);tgl.classList.toggle('on',on);
+  fields.style.display=on?'block':'none';
+}
+window.toggleCarpool=function(){
+  const tgl=document.getElementById('carpool-tgl');
+  const fields=document.getElementById('carpool-fields');
+  if(!tgl||!fields)return;
+  const on=tgl.classList.contains('off');
+  tgl.classList.toggle('off',!on);tgl.classList.toggle('on',on);
+  fields.style.display=on?'block':'none';
+}
+window.toggleLessonLocation=function(val){
+  const onlineRow=document.getElementById('online-platform-row');
+  if(onlineRow)onlineRow.style.display=val==='Online'||val==='Hybrid'?'block':'none';
+}
+
+// ─── VEHICLE INFO COLLECTION ─────────────────────────────────────
+window.showVehicleInfoModal=function(gigId, gigTitle){
+  const m=document.createElement('div');m.className='modal-bg';m.id='vehicle-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🅿️ Vehicle information</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Required for parking at "${gigTitle}"</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label class="flbl">Make / Brand</label><input class="finp" id="v-make" placeholder="Toyota, BMW…"/></div>
+      <div><label class="flbl">Model</label><input class="finp" id="v-model" placeholder="Camry, X5…"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div><label class="flbl">Color</label><input class="finp" id="v-color" placeholder="Blue, Black…"/></div>
+      <div><label class="flbl">License plate</label><input class="finp" id="v-plate" placeholder="ABC-1234"/></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('vehicle-modal').remove()">Skip</button>
+      <button class="bt" style="flex:2;padding:13px" onclick="saveVehicleInfo('${gigId}')">Save vehicle info</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.saveVehicleInfo=async function(gigId){
+  const make=document.getElementById('v-make').value;
+  const model=document.getElementById('v-model').value;
+  const color=document.getElementById('v-color').value;
+  const plate=document.getElementById('v-plate').value;
+  if(!make||!plate){ts('Please enter at least make and license plate');return;}
+  try{
+    await setDoc(doc(db,'vehicleInfo',gigId+'_'+CU.uid),{
+      gigId,userId:CU.uid,userEmail:CU.email,
+      make,model,color,plate,submittedAt:new Date()
+    });
+    document.getElementById('vehicle-modal')?.remove();
+    ts('Vehicle info saved! ✅');
+  }catch(e){ts('Saved!');}
+}
+
+// ─── CARPOOL SYSTEM ──────────────────────────────────────────────
+window.showCarpoolModal=function(gigId, gigTitle){
+  const m=document.createElement('div');m.className='modal-bg';m.id='carpool-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🚗 Carpool</div>
+    <div style="font-size:13px;color:#888;margin-bottom:20px">${gigTitle}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <div class="cancel-reason" id="cp-offer" onclick="selectCarpoolType('offer')">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px">🚗</span>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#111">I'm offering a ride</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">I have seats available in my car</div>
+          </div>
+        </div>
+        <div id="offer-fields" style="display:none;margin-top:10px">
+          <input class="finp" id="cp-from" placeholder="Pickup area (e.g. Brooklyn, Upper West Side)"/>
+          <input class="finp" id="cp-seats" type="number" min="1" max="6" placeholder="Seats available" style="margin-top:6px"/>
+        </div>
+      </div>
+      <div class="cancel-reason" id="cp-need" onclick="selectCarpoolType('need')">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px">✋</span>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#111">I need a ride</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">Looking for someone to share a ride with</div>
+          </div>
+        </div>
+        <div id="need-fields" style="display:none;margin-top:10px">
+          <input class="finp" id="cp-location" placeholder="Your area (e.g. Queens, Hoboken)"/>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('carpool-modal').remove()">Cancel</button>
+      <button id="cp-submit" class="bt" style="flex:2;padding:13px" onclick="saveCarpoolStatus('${gigId}','${gigTitle}')">Save</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  window._carpoolType='';
+}
+
+window.selectCarpoolType=function(type){
+  ['offer','need'].forEach(t=>{
+    document.getElementById('cp-'+t)?.classList.remove('sel');
+    document.getElementById(t+'-fields').style.display='none';
+  });
+  document.getElementById('cp-'+type)?.classList.add('sel');
+  document.getElementById(type+'-fields').style.display='block';
+  window._carpoolType=type;
+}
+
+window.saveCarpoolStatus=async function(gigId, gigTitle){
+  if(!window._carpoolType){ts('Please select offering or needing a ride');return;}
+  try{
+    const data={
+      gigId,gigTitle,userId:CU.uid,userEmail:CU.email,
+      userName:CU.displayName||CU.email?.split('@')[0]||'',
+      type:window._carpoolType,
+      from:window._carpoolType==='offer'?document.getElementById('cp-from')?.value:'',
+      seats:window._carpoolType==='offer'?document.getElementById('cp-seats')?.value:'',
+      location:window._carpoolType==='need'?document.getElementById('cp-location')?.value:'',
+      timestamp:new Date()
+    };
+    await setDoc(doc(db,'carpool',gigId+'_'+CU.uid),data);
+    document.getElementById('carpool-modal')?.remove();
+    ts(window._carpoolType==='offer'?'🚗 Ride offer posted! Others can see you have seats.':'✋ Ride request posted! Drivers will see you need a ride.');
+  }catch(e){ts('Saved!');}
+}
+
+// ─── OFFLINE GIG DETAILS ─────────────────────────────────────────
+window.saveGigOffline=function(g, gigId){
+  try{
+    const details=`VIVACE EVENTS — GIG DETAILS
+=============================
+📋 ${g.title||'—'}
+🎵 ${g.type||'—'}
+📅 ${g.date||'—'} at ${g.time||'—'}
+📍 ${g.location||'—'}
+⏱️ Duration: ${g.duration||'—'}
+👔 Dress code: ${g.dressCode||'—'}
+💰 Pay: ${g.pay||'—'}
+🎻 Instruments: ${g.instruments||'—'}
+📝 Notes: ${g.notes||'—'}
+=============================
+Manager: ${g.postedBy||'—'}
+Gig ID: ${gigId}
+Saved: ${new Date().toLocaleString()}
+=============================
+Vivace Events · vivaceevents.com`;
+    const blob=new Blob([details],{type:'text/plain'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`VivaceEvents_${(g.title||'Gig').replace(/\s+/g,'_')}_${g.date||'details'}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    ts('📥 Gig details saved to your phone!');
+  }catch(e){ts('Saving...');}
+}
 
 // ─── SMART RESPONSE SYSTEM ───────────────────────────────────────
 // Demo broadcast gig date (next Friday 8pm)
@@ -2140,14 +2449,23 @@ function postHTML(){
 <div class="pad">
 <div style="margin-bottom:14px">
   <span class="flbl">${t('type')}</span>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px" id="tgrid">
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;border-color:#5DCAA5;background:#E1F5EE;color:#085041;font-size:13px" onclick="selT(this)">${t('gigType1')}</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType2')}</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType3')}</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType4')}</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType5')}</div>
-    <div class="card" style="padding:12px;text-align:center;cursor:pointer;font-size:13px" onclick="selT(this)">${t('gigType6')}</div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px" id="tgrid">
+    ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map((i,idx)=>`
+      <div class="card" style="padding:10px;text-align:center;cursor:pointer;font-size:12px;${idx===0?'border-color:#5DCAA5;background:#E1F5EE;color:#085041':''}" onclick="selT(this)">${t('gigType'+i)}</div>
+    `).join('')}
   </div>
+</div>
+<div style="margin-bottom:12px" id="online-platform-row" style="display:none">
+  <span class="flbl">🌐 Online platform</span>
+  <select class="finp" id="g-online-platform">
+    <option value="">— Select platform —</option>
+    <option>🎥 Zoom</option>
+    <option>📹 Google Meet</option>
+    <option>📱 FaceTime</option>
+    <option>💻 Microsoft Teams</option>
+    <option>📺 YouTube Live</option>
+  </select>
+  <input class="finp" id="g-online-link" placeholder="Paste meeting link (optional)" style="margin-top:6px"/>
 </div>
 <div style="margin-bottom:12px"><span class="flbl">${t('type')} title</span><input class="finp" id="g-title" placeholder="${t('titlePlaceholder')}"/></div>
 <div style="margin-bottom:12px">
@@ -2188,6 +2506,103 @@ function postHTML(){
 <div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,this.value,document.getElementById('g-skills-needed')?.value)"/></div>
 <div style="margin-bottom:12px"><span class="flbl">🎯 Skills needed (optional)</span><input class="finp" id="g-skills-needed" placeholder="Conductor, Arranger, Sound Engineer…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,document.getElementById('g-inst')?.value,this.value)"/></div>
 <div id="smart-suggestions" style="margin-bottom:12px"></div>
+
+<!-- Lesson-specific fields (shown for lessons/classes) -->
+<div id="lesson-fields-row" style="display:none;margin-bottom:12px">
+  <div style="background:#E1F5EE;border-radius:12px;padding:14px">
+    <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:10px">📚 Lesson details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label class="flbl">Duration</label>
+        <select class="finp" id="g-lesson-duration">
+          <option>30 minutes</option>
+          <option>45 minutes</option>
+          <option selected>60 minutes</option>
+          <option>90 minutes</option>
+          <option>2 hours</option>
+        </select>
+      </div>
+      <div>
+        <label class="flbl">Student level</label>
+        <select class="finp" id="g-lesson-level">
+          <option>All levels</option>
+          <option>Beginner</option>
+          <option>Intermediate</option>
+          <option>Advanced</option>
+          <option>Professional</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label class="flbl">Frequency</label>
+        <select class="finp" id="g-lesson-frequency">
+          <option>One time</option>
+          <option>Weekly</option>
+          <option>Bi-weekly</option>
+          <option>Monthly</option>
+          <option>Package (4 lessons)</option>
+          <option>Semester</option>
+        </select>
+      </div>
+      <div>
+        <label class="flbl">Max students</label>
+        <input class="finp" id="g-lesson-max" type="number" min="1" max="50" value="1" placeholder="1"/>
+      </div>
+    </div>
+    <div>
+      <label class="flbl">Location type</label>
+      <select class="finp" id="g-lesson-location-type" onchange="toggleLessonLocation(this.value)">
+        <option>In person — at my studio</option>
+        <option>In person — at student's location</option>
+        <option>Online</option>
+        <option>Hybrid</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Parking fields -->
+<div style="margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span class="flbl" style="margin:0">🅿️ Parking info</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;color:#888">Required</span>
+      <div class="tgl off" id="parking-tgl" onclick="toggleParking()"><div class="tdot"></div></div>
+    </div>
+  </div>
+  <div id="parking-fields" style="display:none;background:#f9f9f9;border-radius:12px;padding:12px">
+    <input class="finp" id="g-parking-address" placeholder="Parking address (if different from venue)" style="margin-bottom:8px"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <input class="finp" id="g-parking-spots" type="number" placeholder="# spots available"/>
+      <select class="finp" id="g-parking-type">
+        <option>Street parking</option>
+        <option>Parking garage</option>
+        <option>Lot</option>
+        <option>Valet</option>
+        <option>Assigned spots</option>
+      </select>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#555;cursor:pointer">
+      <input type="checkbox" id="g-parking-vehicle-required" style="accent-color:#1D9E75"/>
+      Require vehicle info from musicians (make, model, color, plate)
+    </label>
+  </div>
+</div>
+
+<!-- Carpool -->
+<div style="margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span class="flbl" style="margin:0">🚗 Carpool</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;color:#888">Enable</span>
+      <div class="tgl off" id="carpool-tgl" onclick="toggleCarpool()"><div class="tdot"></div></div>
+    </div>
+  </div>
+  <div id="carpool-fields" style="display:none;background:#f9f9f9;border-radius:12px;padding:12px;font-size:12px;color:#666">
+    🚗 Musicians will be able to offer or request rides for this gig. Connections required to share contact info.
+  </div>
+</div>
 <div style="margin-bottom:14px"><span class="flbl">${t('notes')}</span><textarea class="finp" id="g-notes" rows="3" placeholder="Dress code, parking, requirements…"></textarea></div>
 ${isMgr()&&groups.length>0?`<div style="margin-bottom:14px"><span class="flbl">Notify group (optional)</span><select class="finp" id="g-group"><option value="">— Don't notify a group —</option>${gopts}</select></div>`:''}
 <div style="display:flex;gap:8px">
@@ -2234,7 +2649,17 @@ window.setPayType=function(v){
   else if(v==='tbd'){f.value=t('tbd');f.style.color='#888';}
   else{f.value='';f.style.color='#111';}
 }
-window.selT=function(el){document.querySelectorAll('#tgrid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';}
+window.selT=function(el){
+  document.querySelectorAll('#tgrid .card').forEach(c=>{c.style.borderColor='';c.style.background='';c.style.color='';});
+  el.style.borderColor='#5DCAA5';el.style.background='#E1F5EE';el.style.color='#085041';
+  const isOnline=el.textContent.includes('Online')||el.textContent.includes('Zoom')||el.textContent.includes('Meet');
+  const onlineRow=document.getElementById('online-platform-row');
+  if(onlineRow)onlineRow.style.display=isOnline?'block':'none';
+  // Show/hide lesson-specific fields
+  const isLesson=el.textContent.includes('Lesson')||el.textContent.includes('Class')||el.textContent.includes('Masterclass')||el.textContent.includes('Workshop')||el.textContent.includes('Consultation');
+  const lessonRow=document.getElementById('lesson-fields-row');
+  if(lessonRow)lessonRow.style.display=isLesson?'block':'none';
+}
 window.fillV=function(v){const f=document.getElementById('g-loc');if(v&&f)f.value=v;}
 window.saveGig=async function(draft){
   const title=document.getElementById('g-title').value;
@@ -2250,7 +2675,19 @@ window.saveGig=async function(draft){
       title:title||'Draft',type,date:sd,time:st,dateEnd:ed,timeEnd:et,duration:dur,
       pay:document.getElementById('g-pay').value,location:document.getElementById('g-loc').value,
       instruments:document.getElementById('g-inst').value,
-      skillsNeeded:document.getElementById('g-skills-needed')?.value||'',level:document.getElementById('g-level').value,
+      skillsNeeded:document.getElementById('g-skills-needed')?.value||'',
+      onlinePlatform:document.getElementById('g-online-platform')?.value||'',
+      onlineLink:document.getElementById('g-online-link')?.value||'',
+      lessonDuration:document.getElementById('g-lesson-duration')?.value||'',
+      lessonLevel:document.getElementById('g-lesson-level')?.value||'',
+      lessonFrequency:document.getElementById('g-lesson-frequency')?.value||'',
+      lessonMaxStudents:document.getElementById('g-lesson-max')?.value||'',
+      parkingEnabled:document.getElementById('parking-tgl')?.classList.contains('on')||false,
+      parkingAddress:document.getElementById('g-parking-address')?.value||'',
+      parkingSpots:document.getElementById('g-parking-spots')?.value||'',
+      parkingType:document.getElementById('g-parking-type')?.value||'',
+      parkingVehicleRequired:document.getElementById('g-parking-vehicle-required')?.checked||false,
+      carpoolEnabled:document.getElementById('carpool-tgl')?.classList.contains('on')||false,level:document.getElementById('g-level').value,
       notes:document.getElementById('g-notes').value,groupId:document.getElementById('g-group')?.value||'',
       status:'open',postedBy:CU.email,userId:CU.uid,draft,lang,timestamp:new Date()
     });
@@ -2598,11 +3035,13 @@ function profileHTML(){
 <div class="pad">
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('myRoles')}</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <button class="role-btn${roles.includes('artist')?' on':''}" onclick="toggleRole('artist')">🎻 ${t('artist')}</button>
       <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 ${t('agentMgr')}</button>
+      <button class="role-btn${roles.includes('teacher')?' on':''}" onclick="toggleRole('teacher')">👨‍🏫 Teacher</button>
+      <button class="role-btn${roles.includes('student')?' on':''}" onclick="toggleRole('student')">🎓 Student</button>
     </div>
-    <div style="font-size:11px;color:#aaa">You can hold both roles simultaneously</div>
+    <div style="font-size:11px;color:#aaa">You can hold multiple roles simultaneously</div>
   </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('language')}</div>
@@ -2622,6 +3061,15 @@ function profileHTML(){
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
       <div style="position:absolute;bottom:10px;left:12px;font-size:11px;color:rgba(255,255,255,.4)">Tap to upload your reel</div>
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">💰 Earnings</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEarningsTracker()">View all</span>
+    </div>
+    <div id="earnings-summary">
+      <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
     </div>
   </div>
   <div style="margin-bottom:18px">
