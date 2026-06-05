@@ -4289,6 +4289,19 @@ window.enableMgr=async function(){
   await saveUP();render();ts('Agent / Manager role enabled! 🎯');
 }
 
+// Auto-grant all roles to founder for testing
+async function checkFounderAccess(){
+  if(!CU||CU.email!=='rafael.javadov@gmail.com')return;
+  const allRoles=['artist','manager','teacher','student'];
+  const current=UP.roles||['artist'];
+  const missing=allRoles.filter(r=>!current.includes(r));
+  if(missing.length>0){
+    UP.roles=[...new Set([...current,...allRoles])];
+    await saveUP();
+    ts('👑 Founder access — all roles enabled!');
+  }
+}
+
 // ─── BILLING SCREEN ─────────────────────────────────────────────
 function billingHTML(){
   const plan=UP.plan||'free';
@@ -5177,7 +5190,7 @@ onAuthStateChanged(auth,async user=>{
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
-    setTimeout(()=>{checkGreetings();checkAutoVerification();},1000);
+    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();},1000);
   } else {
     render();
   }
