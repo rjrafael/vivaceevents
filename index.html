@@ -2820,23 +2820,20 @@ window.installPWA=async function(){
 
 // iOS install tip (iOS doesn't support beforeinstallprompt)
 setTimeout(()=>{
-  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone=window.navigator.standalone;
-  if(isIOS&&!isStandalone&&!document.getElementById('pwa-banner')){
-    const banner=document.createElement('div');
-    banner.id='pwa-banner';
-    banner.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:9998;width:calc(100% - 32px);max-width:440px';
-    banner.innerHTML=`<div style="background:#0d0d0d;border:1px solid #1D9E75;border-radius:16px;padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-        <div style="font-size:28px">🎵</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#fff">Add to home screen</div>
-        <div style="font-size:11px;color:#aaa;margin-top:2px">Install Vivace Events</div></div>
-        <button onclick="document.getElementById('pwa-banner').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button>
-      </div>
-      <div style="font-size:12px;color:#aaa">Tap <strong style="color:#fff">Share ↑</strong> then <strong style="color:#fff">"Add to Home Screen"</strong></div>
-    </div>`;
-    document.body.appendChild(banner);
-  }
+  try{
+    const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone=window.navigator.standalone;
+    if(isIOS&&!isStandalone&&!document.getElementById('pwa-banner')){
+      const banner=document.createElement('div');
+      banner.id='pwa-banner';
+      banner.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:9998;width:calc(100% - 32px);max-width:440px';
+      const d=document.createElement('div');
+      d.style.cssText='background:#0d0d0d;border:1px solid #1D9E75;border-radius:16px;padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+      d.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:24px">🎵</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#fff">Add to home screen</div><div style="font-size:11px;color:#aaa">Install Vivace Events</div></div><button onclick="document.getElementById(\'pwa-banner\').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button></div><div style="font-size:12px;color:#aaa">Tap <b style="color:#fff">Share ↑</b> then <b style="color:#fff">Add to Home Screen</b></div>';
+      banner.appendChild(d);
+      document.body.appendChild(banner);
+    }
+  }catch(e){}
 },45000);
 
 async function checkAutoVerification(){
