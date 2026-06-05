@@ -1774,8 +1774,11 @@ window.showAvailabilityCalendar=async function(){
   // Load existing availability
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
-    if(snap.exists())_availDates=new Set(snap.data().dates||[]);
-  }catch(e){_availDates=new Set();}
+    if(snap.exists()){
+      _availDates=new Set(snap.data().dates||[]);
+      _perfEvents=snap.data().events||{};
+    }
+  }catch(e){_availDates=new Set();_perfEvents={};}
 
   const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
   document.getElementById('app').appendChild(m);
@@ -1791,32 +1794,42 @@ function renderCalendarModal(){
   const today=new Date().toISOString().split('T')[0];
 
   let days='';
-  // Empty cells before first day
   for(let i=0;i<firstDay;i++) days+=`<div></div>`;
-  // Day cells
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isAvail=_availDates.has(dateStr);
+    const perf=_perfEvents[dateStr];
     const isPast=dateStr<today;
     const isToday=dateStr===today;
-    days+=`<div onclick="${isPast?'':'toggleDay(\''+dateStr+'\')'}" 
-      style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
-      background:${isAvail?'#1D9E75':isToday?'#f0f0f0':'transparent'};
-      color:${isAvail?'#fff':isPast?'#ccc':isToday?'#111':'#333'};
-      border:${isToday&&!isAvail?'2px solid #1D9E75':'2px solid transparent'};
-      transition:all .15s">
+    
+    days+=`<div onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}" 
+      style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
+      background:${isAvail?'#1D9E75':perf?'#f5f0ff':'transparent'};
+      color:${isAvail?'#fff':isPast?'#ccc':'#333'};
+      border:${isToday&&!isAvail&&!perf?'2px solid #1D9E75':'2px solid transparent'};
+      position:relative;transition:all .15s">
       ${d}
+      ${perf?`<div style="width:5px;height:5px;border-radius:50%;background:${perf.isPublic?'#7C3AED':'#aaa'};position:absolute;bottom:3px"></div>`:''}
     </div>`;
   }
 
   modal.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:17px;font-weight:700;color:#111">📅 My Availability</div>
+      <div style="font-size:17px;font-weight:700;color:#111">📅 My Calendar</div>
       <button onclick="document.getElementById('avail-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
 
-    <div style="background:#E1F5EE;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#085041;line-height:1.6">
-      Tap dates to mark yourself as <strong>available</strong>. Managers can see your availability when posting gigs. You can change this anytime.
+    <!-- Legend -->
+    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
+        <div style="width:14px;height:14px;border-radius:4px;background:#1D9E75"></div>Available for gigs
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
+        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#7C3AED"></div></div>Public performance
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
+        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#aaa"></div></div>Busy (private)
+      </div>
     </div>
 
     <!-- Month navigation -->
@@ -1836,30 +1849,130 @@ function renderCalendarModal(){
       ${days}
     </div>
 
-    <!-- Legend -->
-    <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:#666">
-      <div style="display:flex;align-items:center;gap:6px">
-        <div style="width:16px;height:16px;border-radius:50%;background:#1D9E75"></div>
-        Available
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <div style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75"></div>
-        Today
-      </div>
-    </div>
-
     <!-- Quick actions -->
     <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button onclick="markWeekdays()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">Mark weekdays</button>
-      <button onclick="markWeekends()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">Mark weekends</button>
-      <button onclick="clearMonth()" style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:12px;cursor:pointer;font-family:inherit">Clear month</button>
+      <button onclick="markWeekdays()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekdays</button>
+      <button onclick="markWeekends()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekends</button>
+      <button onclick="clearMonth()" style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:11px;cursor:pointer;font-family:inherit">Clear</button>
     </div>
 
     <div style="display:flex;gap:8px">
       <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('avail-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveAvailability()">Save availability</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveAvailability()">Save</button>
     </div>
   </div>`;
+}
+
+// Handle calendar day tap — show options
+let _perfEvents={}; // {dateStr: {title, venue, time, ticketLink, isPublic}}
+
+window.handleCalDay=function(dateStr){
+  const perf=_perfEvents[dateStr];
+  const isAvail=_availDates.has(dateStr);
+  
+  // Show action sheet
+  const existing=document.getElementById('cal-action');
+  if(existing)existing.remove();
+  
+  const sheet=document.createElement('div');
+  sheet.id='cal-action';
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  
+  const date=new Date(dateStr+'T00:00:00');
+  const dateLabel=date.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'});
+  
+  sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px">
+    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px">${dateLabel}</div>
+    ${perf?`<div style="background:${perf.isPublic?'#f5f0ff':'#f5f5f5'};border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:600;color:#111">${perf.isPublic?'🎵':'🔒'} ${perf.title}</div>
+      ${perf.isPublic?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${perf.venue} · ⏰ ${perf.time}</div>`:'<div style="font-size:12px;color:#aaa;margin-top:2px">Private — only shows as busy</div>'}
+    </div>`:''}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button onclick="toggleDay('${dateStr}');document.getElementById('cal-action').remove()" 
+        style="padding:13px;border-radius:10px;background:${isAvail?'#FCEBEB':'#E1F5EE'};border:none;color:${isAvail?'#791F1F':'#085041'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        ${isAvail?'❌ Mark as unavailable':'✅ Mark as available'}
+      </button>
+      <button onclick="showAddPerformance('${dateStr}');document.getElementById('cal-action').remove()"
+        style="padding:13px;border-radius:10px;background:#f5f0ff;border:none;color:#5B21B6;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        ${perf?'✏️ Edit performance/event':'🎵 Add performance or event'}
+      </button>
+      ${perf?`<button onclick="deletePerf('${dateStr}');document.getElementById('cal-action').remove()"
+        style="padding:13px;border-radius:10px;background:#FCEBEB;border:none;color:#791F1F;font-size:14px;cursor:pointer;font-family:inherit;text-align:left">
+        🗑️ Remove event
+      </button>`:''}
+    </div>
+    <button onclick="document.getElementById('cal-action').remove()" 
+      style="width:100%;padding:13px;border-radius:10px;background:#f5f5f5;border:none;color:#555;font-size:14px;cursor:pointer;font-family:inherit">
+      Cancel
+    </button>
+  </div>`;
+  document.getElementById('app').appendChild(sheet);
+}
+
+window.deletePerf=function(dateStr){
+  delete _perfEvents[dateStr];
+  renderCalendarModal();
+}
+
+window.showAddPerformance=function(dateStr){
+  const existing=_perfEvents[dateStr]||{};
+  const date=new Date(dateStr+'T00:00:00');
+  const dateLabel=date.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'});
+  
+  const m=document.createElement('div');m.className='modal-bg';m.id='perf-form';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎵 Add event</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${dateLabel}</div>
+    
+    <div style="margin-bottom:10px"><label class="flbl">Event / Concert name *</label>
+      <input class="finp" id="perf-title" placeholder="e.g. Vivaldi Four Seasons" value="${existing.title||''}"/></div>
+    <div style="margin-bottom:10px"><label class="flbl">Venue *</label>
+      <input class="finp" id="perf-venue" placeholder="e.g. Carnegie Hall, NYC" value="${existing.venue||''}"/></div>
+    <div style="margin-bottom:10px"><label class="flbl">Time *</label>
+      <input class="finp" id="perf-time" placeholder="e.g. 7:30 PM" value="${existing.time||''}"/></div>
+    <div style="margin-bottom:16px"><label class="flbl">Ticket link (optional)</label>
+      <input class="finp" id="perf-link" placeholder="https://tickets.com/..." value="${existing.ticketLink||''}"/></div>
+
+    <!-- PUBLIC TOGGLE — the key feature -->
+    <div style="padding:14px;border-radius:12px;border:2px solid ${existing.isPublic!==false?'#7C3AED':'#eee'};background:${existing.isPublic!==false?'#f5f0ff':'#f9f9f9'};margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#111">Make public</div>
+          <div style="font-size:12px;color:#666;margin-top:2px" id="public-desc">
+            ${existing.isPublic!==false?'Anyone can see your concert details + ticket link':'Only shows as busy — no details visible'}
+          </div>
+        </div>
+        <div class="tgl ${existing.isPublic!==false?'on':'off'}" id="public-tgl" onclick="togglePublicPerf()" style="flex-shrink:0"><div class="tdot"></div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('perf-form').remove();showAvailabilityCalendar()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="savePerformance('${dateStr}')">Save event</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.togglePublicPerf=function(){
+  const tgl=document.getElementById('public-tgl');
+  const desc=document.getElementById('public-desc');
+  const isOn=tgl.classList.contains('on');
+  tgl.classList.toggle('on',!isOn);tgl.classList.toggle('off',isOn);
+  if(desc)desc.textContent=!isOn?'Anyone can see your concert details + ticket link':'Only shows as busy — no details visible';
+}
+
+window.savePerformance=function(dateStr){
+  const title=document.getElementById('perf-title').value.trim();
+  const venue=document.getElementById('perf-venue').value.trim();
+  const time=document.getElementById('perf-time').value.trim();
+  const ticketLink=document.getElementById('perf-link').value.trim();
+  const isPublic=document.getElementById('public-tgl')?.classList.contains('on');
+  if(!title||!venue||!time){ts('Please fill in name, venue and time');return;}
+  _perfEvents[dateStr]={title,venue,time,ticketLink,isPublic};
+  document.getElementById('perf-form')?.remove();
+  showAvailabilityCalendar();
+  ts(isPublic?'🎵 Performance added — visible to everyone!':'🔒 Event saved — shows as busy only');
 }
 
 window.calNav=function(dir){
@@ -1916,13 +2029,12 @@ window.saveAvailability=async function(){
     const dates=[..._availDates].sort();
     await setDoc(doc(db,'availability',CU.uid),{
       userId:CU.uid,userEmail:CU.email,
-      dates,updatedAt:new Date()
+      dates,events:_perfEvents,updatedAt:new Date()
     });
-    // Update public profile
     await setDoc(doc(db,'users',CU.uid),{availableDates:dates},{merge:true});
     document.getElementById('avail-modal')?.remove();
     loadAvailabilityPreview();
-    ts(`✅ Availability saved — ${dates.length} days marked!`);
+    ts(`✅ Calendar saved — ${dates.length} available days!`);
   }catch(e){ts('Saved!');}
 }
 
@@ -3629,6 +3741,38 @@ function profileHTML(){
       </div>
     </div>
   </div>
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:12px">🎂 Birthday & Greetings</div>
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+      <div style="margin-bottom:12px">
+        <label class="flbl">Your birthday (optional)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <select class="finp" id="bday-month" onchange="saveBirthday()">
+            <option value="">Month</option>
+            ${['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i)=>`<option value="${i+1}" ${UP.birthdayMonth==i+1?'selected':''}>${m}</option>`).join('')}
+          </select>
+          <select class="finp" id="bday-day" onchange="saveBirthday()">
+            <option value="">Day</option>
+            ${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${UP.birthdayDay==i+1?'selected':''}>${i+1}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">🎂 Birthday wishes</div>
+          <div style="font-size:11px;color:#aaa">Receive a birthday greeting from Vivace Events</div>
+        </div>
+        <div class="tgl ${UP.birthdayWishes!==false?'on':'off'}" id="bday-wishes-tgl" onclick="toggleBdayWishes()"><div class="tdot"></div></div>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111">🎉 Holiday greetings</div>
+          <div style="font-size:11px;color:#aaa">Christmas, New Year, and more</div>
+        </div>
+        <div class="tgl ${UP.holidayWishes!==false?'on':'off'}" id="holiday-wishes-tgl" onclick="toggleHolidayWishes()"><div class="tdot"></div></div>
+      </label>
+    </div>
+  </div>
     <div class="st" style="margin-bottom:10px">Video reel</div>
     <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #222" onclick="ts('Video upload coming soon!')">
       <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center">${ic('play')}</div>
@@ -3962,7 +4106,40 @@ window.uploadProfilePhoto=async function(input){
     img.src=url;
   }catch(e){ts('Upload failed');}
 }
-window.toggleRole=async function(role){
+window.saveBirthday=async function(){
+  const month=document.getElementById('bday-month')?.value;
+  const day=document.getElementById('bday-day')?.value;
+  if(month&&day){
+    UP.birthdayMonth=parseInt(month);
+    UP.birthdayDay=parseInt(day);
+    await saveUP();
+    ts('🎂 Birthday saved!');
+  }
+}
+window.toggleBdayWishes=async function(){
+  const tgl=document.getElementById('bday-wishes-tgl');
+  const isOn=tgl?.classList.contains('on');
+  tgl?.classList.toggle('on',!isOn);
+  tgl?.classList.toggle('off',isOn);
+  UP.birthdayWishes=!isOn;
+  await saveUP();
+  ts(!isOn?'🎂 Birthday wishes enabled!':'Birthday wishes disabled');
+}
+window.toggleHolidayWishes=async function(){
+  const tgl=document.getElementById('holiday-wishes-tgl');
+  const isOn=tgl?.classList.contains('on');
+  tgl?.classList.toggle('on',!isOn);
+  tgl?.classList.toggle('off',isOn);
+  UP.holidayWishes=!isOn;
+  await saveUP();
+  ts(!isOn?'🎉 Holiday greetings enabled!':'Holiday greetings disabled');
+}
+
+// Test greeting (for development)
+window.testGreeting=function(type){
+  const name=UP.name||CU?.displayName||'Rafael';
+  showGreetingPopup(type,name);
+}
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
   else roles.push(role);
@@ -3973,9 +4150,321 @@ window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist
 
 onAuthStateChanged(auth,async user=>{
   CU=user;
-  if(user){await loadUP();await loadGroups();await loadVenues();}
-  render();
+  if(user){
+    await loadUP();await loadGroups();await loadVenues();
+    render();
+    // Check birthday and holidays after render
+    setTimeout(()=>checkGreetings(),1000);
+  } else {
+    render();
+  }
 });
+
+// ─── WORLD-CLASS GREETING SYSTEM ─────────────────────────────────
+function checkGreetings(){
+  if(!CU||!UP)return;
+  const today=new Date();
+  const todayKey=`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  const seenKey=`ve_greeting_${CU.uid}_${todayKey}`;
+  if(localStorage.getItem(seenKey))return; // Already shown today
+
+  const name=UP.name||CU.displayName||CU.email?.split('@')[0]||'Friend';
+  const month=today.getMonth()+1; // 1-12
+  const day=today.getDate();
+
+  // Check birthday first (highest priority)
+  if(UP.birthdayMonth&&UP.birthdayDay&&
+     parseInt(UP.birthdayMonth)===month&&
+     parseInt(UP.birthdayDay)===day&&
+     UP.birthdayWishes!==false){
+    showGreetingPopup('birthday',name);
+    localStorage.setItem(seenKey,'1');
+    return;
+  }
+
+  // Check holidays
+  if(UP.holidayWishes===false)return;
+  const lang=UP.lang||'en';
+  const holiday=getHoliday(month,day,lang);
+  if(holiday){
+    showGreetingPopup(holiday,name);
+    localStorage.setItem(seenKey,'1');
+  }
+}
+
+function getHoliday(month,day,lang){
+  // Universal holidays
+  if(month===1&&day===1)return 'newyear';
+  if(month===2&&day===14)return 'valentines';
+  if(month===10&&day===31)return 'halloween';
+  if(month===12&&day===25)return 'christmas';
+  if(month===12&&day===31)return 'newyearseve';
+
+  // Language-specific
+  if(lang==='en'&&month===7&&day===4)return 'july4';
+  if(lang==='en'&&month===11&&day>=22&&day<=28)return 'thanksgiving';
+  if(lang==='ru'&&month===1&&day===7)return 'orthodox_christmas';
+  if(lang==='ru'&&month===2&&day===23)return 'defender';
+  if(lang==='ru'&&month===3&&day===8)return 'womensday';
+  if(lang==='ru'&&month===5&&day===9)return 'victory';
+  if(lang==='it'&&month===4&&day===25)return 'liberation';
+  if(lang==='it'&&month===8&&day===15)return 'ferragosto';
+  if(lang==='es'&&month===1&&day===6)return 'threekings';
+  if(lang==='fr'&&month===7&&day===14)return 'bastille';
+  if(lang==='de'&&month===10&&day===3)return 'germanunity';
+
+  // Music world holidays
+  if(month===11&&day===22)return 'musicday'; // St. Cecilia — Patron Saint of Music
+  if(month===6&&day===21)return 'worldmusicday'; // Fête de la Musique
+
+  return null;
+}
+
+const GREETINGS={
+  birthday:{
+    emoji:'🎂',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Happy Birthday, ${n}!`,
+    message:'May your music fill every room\nand every heart today.',
+    from:'With love and celebration',
+    btn:'🎉 Thank you!',
+    notes:['🎵','🎶','🎂','🎁','✨','🎊']
+  },
+  newyear:{
+    emoji:'🎆',color:'#4a90d9',glow:'rgba(74,144,217,0.2)',
+    title:(n)=>`Happy New Year, ${n}!`,
+    message:'May the new year bring you\nbeautiful music and new stages.',
+    from:'With hope and harmony',
+    btn:'🥂 Cheers!',
+    notes:['🎆','✨','🎵','🎶','🌟','🥂']
+  },
+  newyearseve:{
+    emoji:'🎇',color:'#4a90d9',glow:'rgba(74,144,217,0.2)',
+    title:(n)=>`Happy New Year's Eve, ${n}!`,
+    message:'Tonight the music plays\nas we say farewell to this year.',
+    from:'With joy and melody',
+    btn:'🎵 Cheers!',
+    notes:['🎇','✨','🎵','🎶','🌟','🎊']
+  },
+  christmas:{
+    emoji:'🎄',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Merry Christmas, ${n}!`,
+    message:'Wishing you peace, music,\nand joy this holiday season.',
+    from:'With warmth and melody',
+    btn:'🎁 Thank you!',
+    notes:['🎄','⭐','🎵','🎶','❄️','🕯️']
+  },
+  valentines:{
+    emoji:'🎻',color:'#e05c8a',glow:'rgba(224,92,138,0.2)',
+    title:(n)=>`Happy Valentine's Day, ${n}!`,
+    message:'Music is the language of love.\nPlay it with all your heart today.',
+    from:'With musical love',
+    btn:'🎻 Thank you!',
+    notes:['💝','🎻','🎵','🎶','💕','🌹']
+  },
+  halloween:{
+    emoji:'🎃',color:'#e07820',glow:'rgba(224,120,32,0.2)',
+    title:(n)=>`Happy Halloween, ${n}!`,
+    message:'Even ghosts need a good\nperformance tonight. 👻',
+    from:'Spookily yours',
+    btn:'🎃 Boo!',
+    notes:['🎃','👻','🎵','🎶','🕷️','🌙']
+  },
+  july4:{
+    emoji:'🇺🇸',color:'#e04040',glow:'rgba(224,64,64,0.2)',
+    title:(n)=>`Happy 4th of July, ${n}!`,
+    message:'Let freedom ring —\nand let the music play!',
+    from:'With patriotic pride',
+    btn:'🎆 Thank you!',
+    notes:['🎆','🇺🇸','🎵','🎶','⭐','🔴']
+  },
+  thanksgiving:{
+    emoji:'🦃',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Happy Thanksgiving, ${n}!`,
+    message:'Grateful for every note,\nevery stage, every connection.',
+    from:'With gratitude',
+    btn:'🦃 Thank you!',
+    notes:['🦃','🍂','🎵','🎶','🌾','⭐']
+  },
+  womensday:{
+    emoji:'🌷',color:'#e05c8a',glow:'rgba(224,92,138,0.2)',
+    title:(n)=>`Happy Women's Day, ${n}!`,
+    message:'To every woman who fills\nthe world with music. 🌷',
+    from:'With admiration',
+    btn:'🌷 Thank you!',
+    notes:['🌷','🌸','🎵','🎶','💐','⭐']
+  },
+  victory:{
+    emoji:'🕊️',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Happy Victory Day, ${n}!`,
+    message:'Music reminds us of peace,\ncourage, and hope.',
+    from:'With respect and memory',
+    btn:'🕊️ Thank you!',
+    notes:['🕊️','⭐','🎵','🎶','🌿','🏅']
+  },
+  musicday:{
+    emoji:'🎼',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Happy St. Cecilia's Day, ${n}!`,
+    message:'Today we celebrate the patron\nsaint of music — and YOU.',
+    from:'With musical reverence',
+    btn:'🎼 Thank you!',
+    notes:['🎼','🎻','🎵','🎶','🎹','🎷']
+  },
+  worldmusicday:{
+    emoji:'🌍',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Happy World Music Day, ${n}!`,
+    message:'Today the whole world plays.\nAnd you are part of it.',
+    from:'With global harmony',
+    btn:'🎵 Play on!',
+    notes:['🌍','🎵','🎶','🎼','🎻','🎷']
+  },
+  orthodox_christmas:{
+    emoji:'⭐',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Merry Christmas, ${n}!`,
+    message:'С Рождеством Христовым!\nMay music bless your home.',
+    from:'With warmth and faith',
+    btn:'⭐ Thank you!',
+    notes:['⭐','🕯️','🎵','🎶','❄️','🙏']
+  },
+  defender:{
+    emoji:'🛡️',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Happy Defender's Day, ${n}!`,
+    message:'С Днём защитника Отечества!\nStrength and music go together.',
+    from:'With respect',
+    btn:'🛡️ Thank you!',
+    notes:['🛡️','⭐','🎵','🎶','🌿','🏅']
+  },
+  bastille:{
+    emoji:'🇫🇷',color:'#4a90d9',glow:'rgba(74,144,217,0.2)',
+    title:(n)=>`Bonne Fête Nationale, ${n}!`,
+    message:'Liberté, Égalité, Musique!\nVive la France! 🇫🇷',
+    from:'Avec toute notre amitié',
+    btn:'🇫🇷 Merci!',
+    notes:['🇫🇷','🎵','🎶','🗼','⭐','🥐']
+  },
+  threekings:{
+    emoji:'👑',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Happy Three Kings Day, ${n}!`,
+    message:'¡Feliz Día de Reyes!\nMay the kings bring you music.',
+    from:'Con cariño',
+    btn:'👑 ¡Gracias!',
+    notes:['👑','⭐','🎵','🎶','🎁','✨']
+  },
+  ferragosto:{
+    emoji:'☀️',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Buon Ferragosto, ${n}!`,
+    message:'Estate, musica e sole!\nBuone vacanze. ☀️',
+    from:'Con affetto',
+    btn:'☀️ Grazie!',
+    notes:['☀️','🌊','🎵','🎶','🍦','⭐']
+  },
+  liberation:{
+    emoji:'🇮🇹',color:'#1D9E75',glow:'rgba(29,158,117,0.2)',
+    title:(n)=>`Buona Festa della Liberazione, ${n}!`,
+    message:'La musica è sempre stata\nvoce di libertà. 🇮🇹',
+    from:'Con rispetto',
+    btn:'🇮🇹 Grazie!',
+    notes:['🇮🇹','🎵','🎶','⭐','🕊️','🌿']
+  },
+  germanunity:{
+    emoji:'🇩🇪',color:'#C9A84C',glow:'rgba(201,168,76,0.2)',
+    title:(n)=>`Happy German Unity Day, ${n}!`,
+    message:'Musik verbindet uns alle.\nTag der Deutschen Einheit! 🇩🇪',
+    from:'Mit herzlichen Grüßen',
+    btn:'🇩🇪 Danke!',
+    notes:['🇩🇪','🎵','🎶','⭐','🏰','✨']
+  }
+};
+
+function showGreetingPopup(type,name){
+  const g=GREETINGS[type];if(!g)return;
+  document.getElementById('greeting-overlay')?.remove();
+
+  const overlay=document.createElement('div');
+  overlay.id='greeting-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  // Generate particles
+  const particles=g.notes.map((_,i)=>{
+    const note=g.notes[i%g.notes.length];
+    return `<div style="position:absolute;font-size:${14+Math.random()*16}px;left:${Math.random()*100}%;top:${Math.random()*100}%;animation:greetFloat ${3+Math.random()*4}s ease-in-out ${Math.random()*3}s infinite;opacity:0">${note}</div>`;
+  }).join('');
+
+  // Confetti dots
+  const colors=['#1D9E75','#C9A84C','#ffffff','rgba(255,255,255,0.3)'];
+  const confetti=Array.from({length:25},(_,i)=>`
+    <div style="position:absolute;width:${4+Math.random()*8}px;height:${4+Math.random()*8}px;border-radius:2px;
+    left:${Math.random()*100}%;background:${colors[i%colors.length]};
+    animation:greetFall ${2+Math.random()*3}s linear ${Math.random()*3}s infinite;opacity:0"></div>
+  `).join('');
+
+  overlay.innerHTML=`
+    <style>
+      @keyframes greetPop{0%{transform:scale(0.3) translateY(40px);opacity:0}70%{transform:scale(1.05) translateY(-5px)}100%{transform:scale(1) translateY(0);opacity:1}}
+      @keyframes greetFloat{0%{transform:translateY(0) rotate(-10deg);opacity:0}20%{opacity:0.8}80%{opacity:0.5}100%{transform:translateY(-100px) rotate(15deg);opacity:0}}
+      @keyframes greetFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+      @keyframes greetBounce{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-10px) rotate(5deg)}}
+      @keyframes greetPulse{0%,100%{box-shadow:0 0 0 0 ${g.glow}}50%{box-shadow:0 0 0 12px transparent}}
+      @keyframes greetTwinkle{0%,100%{opacity:0;transform:scale(0.3)}50%{opacity:1;transform:scale(1)}}
+      @keyframes greetShimmer{0%{opacity:0.3}50%{opacity:0.8}100%{opacity:0.3}}
+    </style>
+
+    <!-- Background particles -->
+    <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+      ${particles}${confetti}
+    </div>
+
+    <!-- Main card -->
+    <div style="background:#0d0d0d;border:1.5px solid ${g.color};border-radius:24px;padding:36px 28px;width:100%;max-width:340px;text-align:center;position:relative;animation:greetPop 0.6s cubic-bezier(0.175,0.885,0.32,1.275) forwards;overflow:hidden">
+
+      <!-- Glow background -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 30%,${g.glow},transparent 70%);pointer-events:none"></div>
+
+      <!-- Twinkling stars inside card -->
+      ${Array.from({length:10},()=>`<div style="position:absolute;color:${g.color};font-size:${8+Math.random()*8}px;left:${5+Math.random()*90}%;top:${5+Math.random()*90}%;animation:greetTwinkle ${1.5+Math.random()*2}s ease-in-out ${Math.random()*2}s infinite">✦</div>`).join('')}
+
+      <!-- Brand -->
+      <div style="font-size:9px;color:${g.color};font-weight:700;letter-spacing:0.15em;margin-bottom:16px;position:relative">VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC</div>
+
+      <!-- Emoji with glow ring -->
+      <div style="width:88px;height:88px;border-radius:50%;background:${g.glow};margin:0 auto 16px;display:flex;align-items:center;justify-content:center;animation:greetPulse 2s ease-in-out infinite;position:relative">
+        <div style="width:72px;height:72px;border-radius:50%;border:2px solid ${g.color};display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)">
+          <span style="font-size:36px;animation:greetBounce 1.5s ease-in-out infinite">${g.emoji}</span>
+        </div>
+      </div>
+
+      <!-- Title -->
+      <div style="font-size:21px;font-weight:700;color:#fff;margin-bottom:10px;position:relative;line-height:1.3">${g.title(name)}</div>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:8px;margin:0 auto 14px;width:80%;position:relative">
+        <div style="flex:1;height:1px;background:${g.color};opacity:0.3"></div>
+        <span style="color:${g.color};font-size:12px;animation:greetShimmer 2s ease-in-out infinite">✦</span>
+        <div style="flex:1;height:1px;background:${g.color};opacity:0.3"></div>
+      </div>
+
+      <!-- Message -->
+      <div style="font-size:14px;color:rgba(255,255,255,0.7);line-height:1.8;margin-bottom:16px;font-style:italic;white-space:pre-line;position:relative">${g.message}</div>
+
+      <!-- From -->
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:22px;line-height:1.6;position:relative">
+        ${g.from}<br>
+        <span style="color:rgba(255,255,255,0.5);font-weight:600">Your Vivace Events Family</span>
+      </div>
+
+      <!-- Button -->
+      <button onclick="document.getElementById('greeting-overlay').remove()"
+        style="background:${g.color};color:#fff;border:none;border-radius:50px;padding:13px 32px;font-size:14px;font-weight:700;cursor:pointer;width:100%;font-family:inherit;position:relative;animation:greetPulse 2s ease-in-out infinite;letter-spacing:0.03em">
+        ${g.btn}
+      </button>
+
+      <!-- Small note -->
+      <div style="margin-top:12px;font-size:10px;color:rgba(255,255,255,0.2);position:relative">Tap to close and continue</div>
+    </div>
+  `;
+
+  document.getElementById('app').appendChild(overlay);
+}
+
 </script>
 </body>
 </html>
