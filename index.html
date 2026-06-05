@@ -4545,6 +4545,13 @@ async function checkFounderAccess(){
 }
 
 // ─── BILLING SCREEN ─────────────────────────────────────────────
+function getTrialDaysLeft(){
+  if(!UP||!UP.trialStarted)return 14;
+  const start=UP.trialStarted?.toDate?UP.trialStarted.toDate():new Date(UP.trialStarted);
+  const days=14-Math.floor((new Date()-start)/(1000*60*60*24));
+  return Math.max(0,days);
+}
+
 function billingHTML(){
   const plan=UP.plan||'free';
 
@@ -4676,12 +4683,6 @@ window.selectPlan=async function(planId){
 }
 
 // ─── TRIAL SYSTEM ────────────────────────────────────────────────
-function getTrialDaysLeft(){
-  if(!UP.trialStarted)return 14;
-  const start=UP.trialStarted?.toDate?UP.trialStarted.toDate():new Date(UP.trialStarted);
-  const days=14-Math.floor((new Date()-start)/(1000*60*60*24));
-  return Math.max(0,days);
-}
 
 async function checkTrialStatus(){
   if(!CU||!UP||UP.plan!=='free')return;
