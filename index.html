@@ -2797,15 +2797,10 @@ function showPWABanner(){
   const banner=document.createElement('div');
   banner.id='pwa-banner';
   banner.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:9998;width:calc(100% - 32px);max-width:440px';
-  banner.innerHTML=`<div style="background:#0d0d0d;border:1px solid #1D9E75;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
-    <div style="font-size:28px">🎵</div>
-    <div style="flex:1">
-      <div style="font-size:13px;font-weight:700;color:#fff">Add to home screen</div>
-      <div style="font-size:11px;color:#aaa;margin-top:2px">Get the full app experience</div>
-    </div>
-    <button onclick="installPWA()" style="padding:8px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Install</button>
-    <button onclick="document.getElementById('pwa-banner').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:0;flex-shrink:0">✕</button>
-  </div>`;
+  const d=document.createElement('div');
+  d.style.cssText='background:#0d0d0d;border:1px solid #1D9E75;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+  d.innerHTML='<span style="font-size:28px">🎵</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#fff">Add to home screen</div><div style="font-size:11px;color:#aaa">Get the full app experience</div></div><button onclick="installPWA()" style="padding:8px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Install</button><button onclick="document.getElementById(\'pwa-banner\').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:0">✕</button>';
+  banner.appendChild(d);
   document.body.appendChild(banner);
 }
 
