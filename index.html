@@ -120,7 +120,7 @@ const gp=new GoogleAuthProvider();
 const fp=new FacebookAuthProvider();
 fp.addScope('public_profile');
 
-let CU=null,UP={roles:['artist']},CS='feed',MT='groups',CP=[],venues=[],groups=[],lang='en';
+let CU=null,UP={roles:['artist']},CS='feed',MT='dashboard',CP=[],venues=[],groups=[],lang='en';
 
 // ─── TRANSLATIONS ───────────────────────────────────────────────
 const T={
@@ -2810,6 +2810,7 @@ function mgrHTML(){
     </div></div>`;}
 
   setTimeout(()=>{
+    if(MT==='dashboard')loadManagerDashboard();
     if(MT==='groups')loadGroups().then(renderGroups);
     if(MT==='venues')loadVenues().then(renderVenues);
     if(MT==='responses')loadResponses();
@@ -2818,10 +2819,11 @@ function mgrHTML(){
   return `
 <div class="hdr"><div><div class="logo" style="font-size:15px">${t('manager')}</div><div style="font-size:11px;color:#555;margin-top:1px">${CU.displayName||CU.email?.split('@')[0]}</div></div></div>
 <div class="pad">
-<div class="tab-bar">
-  <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')">${t('myGroups')}</div>
-  <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')">${t('venues')}</div>
-  <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')">${t('responses')}</div>
+<div class="tab-bar" style="overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;display:flex">
+  <div class="tab${MT==='dashboard'?' on':''}" onclick="mgrTab('dashboard')" style="flex-shrink:0">📊 Dashboard</div>
+  <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')" style="flex-shrink:0">${t('myGroups')}</div>
+  <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')" style="flex-shrink:0">${t('venues')}</div>
+  <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')" style="flex-shrink:0">${t('responses')}</div>
 </div>
 <div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
@@ -2830,19 +2832,125 @@ window.mgrTab=function(tab){
   MT=tab;
   const el=document.getElementById('mtab');if(el)el.innerHTML=mgrTabHTML();
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
-  if(tab==='groups')document.querySelectorAll('.tab')[0].classList.add('on');
-  if(tab==='venues')document.querySelectorAll('.tab')[1].classList.add('on');
-  if(tab==='responses')document.querySelectorAll('.tab')[2].classList.add('on');
+  const tabs=['dashboard','groups','venues','responses'];
+  const idx=tabs.indexOf(tab);
+  document.querySelectorAll('.tab')[idx]?.classList.add('on');
+  if(tab==='dashboard')loadManagerDashboard();
   if(tab==='groups')loadGroups().then(renderGroups);
   if(tab==='venues')loadVenues().then(renderVenues);
   if(tab==='responses')loadResponses();
 }
 
 function mgrTabHTML(){
+  if(MT==='dashboard')return `<div id="dashboard-content"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading dashboard...</p></div>`;
   if(MT==='groups')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">${t('createGroup')}</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   if(MT==='venues')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">${t('addVenue')}</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   if(MT==='responses')return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   return '';
+}
+
+async function loadManagerDashboard(){
+  const el=document.getElementById('dashboard-content');if(!el)return;
+  try{
+    // Load all manager's gigs
+    const gigsSnap=await getDocs(query(collection(db,'gigs'),where('userId','==',CU.uid)));
+    const allGigs=gigsSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const now=new Date();
+
+    // Categorize gigs
+    const upcoming=allGigs.filter(g=>g.date&&new Date(g.date)>=now&&g.status!=='cancelled').sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const past=allGigs.filter(g=>g.date&&new Date(g.date)<now).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const open=allGigs.filter(g=>!g.filled&&g.date&&new Date(g.date)>=now);
+    const filled=allGigs.filter(g=>g.filled);
+
+    // Load pending applications
+    let pendingApps=0;
+    try{
+      const appsSnap=await getDocs(query(collection(db,'applications'),where('managerId','==',CU.uid),where('status','==','pending')));
+      pendingApps=appsSnap.size;
+    }catch(e){}
+
+    // Load unread notifications
+    let unreadNotifs=0;
+    try{
+      const notifSnap=await getDocs(query(collection(db,'notifications'),where('toEmail','==',CU.email)));
+      unreadNotifs=notifSnap.docs.filter(d=>!d.data().read).length;
+    }catch(e){}
+
+    el.innerHTML=`
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px">
+        <div style="background:linear-gradient(135deg,#0C447C,#1D9E75);border-radius:12px;padding:14px;color:#fff">
+          <div style="font-size:28px;font-weight:700">${upcoming.length}</div>
+          <div style="font-size:12px;opacity:0.8;margin-top:2px">Upcoming gigs</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:#111">${open.length}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px">Open positions</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:#111">${filled.length}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px">Filled gigs</div>
+        </div>
+        <div style="background:${pendingApps>0?'#FAEEDA':'#f9f9f9'};border-radius:12px;padding:14px">
+          <div style="font-size:28px;font-weight:700;color:${pendingApps>0?'#633806':'#111'}">${pendingApps}</div>
+          <div style="font-size:12px;color:${pendingApps>0?'#EF9F27':'#aaa'};margin-top:2px">Pending applications</div>
+        </div>
+      </div>
+
+      <!-- Upcoming gigs -->
+      <div style="margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:14px;font-weight:700;color:#111">📅 Upcoming gigs</div>
+          <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="go('feed')">See all</span>
+        </div>
+        ${upcoming.length===0?`<div style="text-align:center;padding:20px 0;color:#aaa;font-size:13px">No upcoming gigs<br><button class="bt" style="margin-top:10px;padding:8px 16px;font-size:12px" onclick="go('post')">+ Post new gig</button></div>`:
+          upcoming.slice(0,3).map(g=>`
+          <div style="border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:12px;align-items:center">
+            <div style="background:${g.filled?'#E1F5EE':'#FAEEDA'};border-radius:10px;padding:8px 10px;text-align:center;min-width:44px">
+              <div style="font-size:16px;font-weight:700;color:${g.filled?'#085041':'#633806'}">${new Date(g.date).getDate()}</div>
+              <div style="font-size:9px;color:${g.filled?'#5DCAA5':'#EF9F27'};text-transform:uppercase">${new Date(g.date).toLocaleString('en',{month:'short'})}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.title||'Untitled'}</div>
+              <div style="font-size:11px;color:#888;margin-top:2px">${g.time||'—'} · ${g.location||'—'}</div>
+            </div>
+            <span style="font-size:10px;padding:4px 8px;border-radius:20px;background:${g.filled?'#E1F5EE':'#FAEEDA'};color:${g.filled?'#085041':'#633806'};font-weight:600;flex-shrink:0">${g.filled?'✅ Filled':'⏳ Open'}</span>
+          </div>`).join('')}
+      </div>
+
+      <!-- Quick actions -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px">⚡ Quick actions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button onclick="go('post')" style="padding:12px;border-radius:12px;background:#0C447C;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📋 Post gig</button>
+          <button onclick="mgrTab('groups')" style="padding:12px;border-radius:12px;background:#1D9E75;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📢 Broadcast</button>
+          <button onclick="mgrTab('venues')" style="padding:12px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📍 Venues</button>
+          <button onclick="go('discover')" style="padding:12px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Find artists</button>
+        </div>
+      </div>
+
+      <!-- Past gigs -->
+      ${past.length>0?`
+      <div style="margin-bottom:18px">
+        <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px">📂 Recent past gigs</div>
+        ${past.slice(0,3).map(g=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#555">${g.title||'Untitled'}</div>
+              <div style="font-size:11px;color:#aaa">${g.date||'—'}</div>
+            </div>
+            <span style="font-size:11px;color:#aaa">${g.filled?'✅':'—'}</span>
+          </div>`).join('')}
+      </div>`:''}
+    `;
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;padding:30px 0">
+      <div style="font-size:36px;margin-bottom:10px">📊</div>
+      <div style="font-size:14px;color:#888">Post your first gig to see your dashboard</div>
+      <button class="bt" style="margin-top:14px;padding:10px 20px" onclick="go('post')">+ Post new gig</button>
+    </div>`;
+  }
 }
 
 function renderGroups(){
