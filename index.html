@@ -692,38 +692,40 @@ async function loadGigs(){
         </div>
         ${g.instruments?`<div style="margin-bottom:8px">${g.instruments.split(',').map(i=>`<span class="tag">${i.trim()}</span>`).join('')}${g.ensembleFormat?`<span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span>`:''}</div>`:
           g.ensembleFormat?`<div style="margin-bottom:8px"><span class="tag" style="background:#FFF8E7;border-color:#C9A84C;color:#7A5800">${g.ensembleFormat}</span></div>`:''}
-        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0;padding-top:10px">
-          <span style="font-size:11px;color:#aaa">by ${g.postedBy||'member'}</span>
-          <div style="display:flex;gap:6px">
-            <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px" title="Report this gig">⚑ Report</button>
-            ${isMine?`
-              <button onclick="showEditGig('${gid}')" style="padding:4px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
-              ${!filled?`<button onclick="showCancelGigModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}')"style="padding:4px 10px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;font-family:inherit">✕ Cancel gig</button>`:''}`:''}
-            ${isMine&&g.status==='cancelled'?`<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FCEBEB;color:#791F1F;font-weight:600">Cancelled</span>`:''}
-            ${isMine&&g.status==='archived'?`<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#f5f5f5;color:#888;font-weight:600">Archived</span>`:''}
-          
-            ${isMine&&!filled?`<button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">Fill position</button>`:''}
-            ${isMine&&filled?`<button onclick="showContractGenerator('${gid}')" style="padding:6px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📄 Contract</button>`:''}
-            ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
-            ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
-                ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️ Vehicle info</button>`:''}
-                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
-                <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
-              </div>
-            `:''}
-            ${isMine&&filled?`
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
-                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
-                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
-              </div>
-            `:''}
-            ${filled&&!g.confirmedApplicants?.includes(CU.uid)&&!isMine?`<span style="font-size:12px;color:#888">Closed</span>`:''}
-          </div>
+        <div style="border-top:1px solid #f0f0f0;padding-top:10px;margin-top:6px">
+          ${isMine?`
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${!filled&&g.status!=='cancelled'?`
+                <button onclick="showFillGig('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" class="bt" style="flex:1;padding:8px;font-size:12px;background:#0C447C">✓ Fill position</button>
+                <button onclick="showEditGig('${gid}')" style="padding:8px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
+                <button onclick="showCancelGigModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:8px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#C0392B;font-size:12px;cursor:pointer;font-family:inherit">✕ Cancel</button>
+              `:''}
+              ${filled?`
+                <button class="bt" style="flex:1;padding:8px;font-size:12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
+                <button onclick="showEditGig('${gid}')" style="padding:8px 12px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">✏️ Edit</button>
+                ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:8px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:12px;cursor:pointer;font-family:inherit">🚗</button>`:''}
+                <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:8px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;cursor:pointer;font-family:inherit">📥</button>
+                <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:8px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;animation:pulse-red 2s infinite">🚨</button>
+              `:''}
+              ${g.status==='cancelled'?`<span style="font-size:12px;padding:6px 12px;border-radius:20px;background:#FCEBEB;color:#C0392B;font-weight:600">✕ Cancelled</span>`:''}
+            </div>
+          `:`
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <button onclick="showReportModal('gig','${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.postedBy||''}')" style="background:#FCEBEB;border:1px solid #F09595;color:#F09595;font-size:12px;cursor:pointer;padding:6px 10px;border-radius:8px">⚑ Report</button>
+              ${!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
+              ${filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
+                <div style="display:flex;gap:6px">
+                  ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗</button>`:''}
+                  ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️</button>`:''}
+                  <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥</button>
+                  <button onclick="showCancelModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #ddd;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Cancel</button>
+                  <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;animation:pulse-red 2s infinite">🚨</button>
+                </div>
+              `:''}
+              ${filled&&!(g.confirmedApplicants||[]).includes(CU?.uid||'')?`<span style="font-size:12px;color:#888">Position filled</span>`:''}
+            </div>
+          `}
+          <div style="margin-top:6px;font-size:11px;color:#bbb">by ${g.postedBy||'member'}</div>
         </div>
       </div>`;
     }).join('');
