@@ -680,8 +680,9 @@ async function loadGigs(){
       const free=g.pay&&(g.pay.toLowerCase().includes('free')||g.pay.toLowerCase().includes('volunteer')||g.pay.toLowerCase().includes('gratis')||g.pay.toLowerCase().includes('bесплатно'));
       const multiday=g.dateEnd&&g.dateEnd!==g.date&&g.dateEnd!=='';
       const isMine=g.userId===CU.uid;
-      const filled=g.status==='filled';
-      return `<div class="card" style="${filled?'opacity:0.7':''}">
+      const filled=g.filled||g.status==='filled';
+      const cancelled=g.status==='cancelled';
+      return `<div class="card" style="${filled?'opacity:0.7':''}${cancelled?'opacity:0.5;border-left:3px solid #F09595':''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <span class="tag tg">${g.type||'Gig'}</span>
           <span style="font-size:14px;font-weight:600;color:${free?'#1D9E75':'#BA7517'}">${g.pay||'TBD'}</span>
