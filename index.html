@@ -2121,7 +2121,8 @@ async function loadArtistCards(){
         const rating=u.publicRating?.average?u.publicRating.average.toFixed(1):'New';
         return {ini,bg,tc,name,role:role||'Musician',avail:true,rat:rating,tags:tags||'Musician',
           id:u.id,email:u.email,priority:priorities[u.id]||'',trusted:trusted[u.id]||false,
-          instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[]};
+          instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[],
+          genres:u.genres||[],verified:u.verified||false,featured:u.featured||false,plan:u.plan||'free'};
       });
       const count=document.getElementById('search-count');
       if(count)count.textContent=`${_allArtists.length} musician${_allArtists.length>1?'s':''}`;
@@ -2802,7 +2803,20 @@ function discoverHTML(){
   </div>
 </div>
 
-<!-- Results count -->
+<!-- Filter pills - genres (scrollable) -->
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+  <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="genre-pills">
+    <button onclick="selectPill(this,'genre')" data-filter=""
+      style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid #7C3AED;background:#7C3AED;color:#fff;transition:all .15s">
+      All genres
+    </button>
+    ${GENRE_LIST.map(g=>`
+      <button onclick="selectPill(this,'genre')" data-filter="${g.name.toLowerCase()}"
+        style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${g.text}44;background:${g.color};color:${g.text};transition:all .15s">
+        ${g.name}
+      </button>`).join('')}
+  </div>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
   <div id="search-count" style="font-size:12px;color:#aaa"></div>
   ${isMgr()||isTeacher()?`<div style="font-size:12px;color:#666">Tap ○ to select · <span style="color:#1D9E75;cursor:pointer" onclick="clearCP()">Clear</span></div>`:''}
@@ -2817,20 +2831,21 @@ let _allArtists=[];
 let _instFilter='';
 let _skillFilter='';
 let _roleFilter='';
+let _genreFilter='';
 
 window.selectPill=function(el, type){
-  const container=document.getElementById(type==='inst'?'inst-pills':type==='skill'?'skill-pills':'role-pills');
-  const color=type==='inst'?'#1D9E75':type==='skill'?'#0C447C':'#555';
+  const container=document.getElementById(type==='inst'?'inst-pills':type==='skill'?'skill-pills':type==='genre'?'genre-pills':'role-pills');
+  const color=type==='inst'?'#1D9E75':type==='skill'?'#0C447C':type==='genre'?'#7C3AED':'#555';
   container.querySelectorAll('button').forEach(btn=>{
-    btn.style.background='#fff';
-    btn.style.borderColor='#e0e0e0';
-    btn.style.color='#555';
+    const gd=GENRE_LIST.find(g=>g.name===btn.textContent.trim());
+    if(type==='genre'&&gd){btn.style.background=gd.color;btn.style.borderColor=gd.text+'44';btn.style.color=gd.text;}
+    else{btn.style.background='#fff';btn.style.borderColor='#e0e0e0';btn.style.color='#555';}
   });
-  el.style.background=color;
-  el.style.borderColor=color;
-  el.style.color='#fff';
+  el.style.background=type==='genre'&&el.dataset.filter?GENRE_LIST.find(g=>g.name.toLowerCase()===el.dataset.filter)?.color||color:color;
+  el.style.borderColor=color;el.style.color='#fff';
   if(type==='inst')_instFilter=el.dataset.filter||'';
   else if(type==='skill')_skillFilter=el.dataset.filter||'';
+  else if(type==='genre')_genreFilter=el.dataset.filter||'';
   else _roleFilter=el.dataset.filter||'';
   filterArtists();
 }
@@ -2871,6 +2886,12 @@ window.filterArtists=function(){
     // Skill filter
     if(_skillFilter){
       if(!skills.includes(_skillFilter))return false;
+    }
+
+    // Genre filter
+    if(_genreFilter){
+      const userGenres=(a.genres||[]).join(' ').toLowerCase();
+      if(!userGenres.includes(_genreFilter))return false;
     }
 
     // Role filter
@@ -2940,7 +2961,9 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
         <span class="tag ${avail?'tg':'tr'}">${avail?'Available':'Unavailable'}</span>
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:6px">${role}</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">${tags.split(',').map(x=>`<span class="tag">${x.trim()}</span>`).join('')}${priorityBadge?` ${priorityBadge}`:''}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">${tags.split(',').map(x=>`<span class="tag">${x.trim()}</span>`).join('')}${priorityBadge?` ${priorityBadge}`:''}
+        ${(u.genres||[]).slice(0,2).map(g=>{const gd=GENRE_LIST.find(gl=>gl.name===g)||{color:'#1a0a2e',text:'#C4B5FD'};return `<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${gd.color};border:1px solid ${gd.text}33;color:${gd.text}">${g}</span>`;}).join('')}
+      </div>
       ${contactInfo}
     </div>
   </div>
@@ -3870,6 +3893,20 @@ function profileHTML(){
   </div>
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎵 Music genres</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showGenreEditor()">Edit</span>
+    </div>
+    <div id="profile-genres">
+      ${(UP.genres||[]).length===0?
+        `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showGenreEditor()">+ Add your genres</div>`:
+        `<div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${(UP.genres||[]).map(g=>`<span class="tag" style="font-size:12px;padding:5px 10px;background:#1a0a2e;border-color:#7C3AED;color:#C4B5FD">${g}</span>`).join('')}
+        </div>`
+      }
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">🎼 Ensemble formats</div>
       <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEnsembleEditor()">Edit</span>
     </div>
@@ -3914,6 +3951,90 @@ function profileHTML(){
     </div>
   </div>
 </div>`;}
+
+// ─── GENRE EDITOR ────────────────────────────────────────────────
+const GENRE_LIST=[
+  {name:'🎼 Classical',color:'#1a1a3e',text:'#93C5FD'},
+  {name:'🎷 Jazz',color:'#1a0a00',text:'#FCD34D'},
+  {name:'🎸 Rock / Pop',color:'#1a0a0a',text:'#FCA5A5'},
+  {name:'🎻 Folk / Celtic',color:'#0a1a0a',text:'#86EFAC'},
+  {name:'🌍 World / Ethnic',color:'#1a1000',text:'#FDE68A'},
+  {name:'🎤 R&B / Soul',color:'#1a001a',text:'#D8B4FE'},
+  {name:'🎹 Electronic / EDM',color:'#001a1a',text:'#67E8F9'},
+  {name:'🎺 Blues',color:'#000d1a',text:'#93C5FD'},
+  {name:'🤠 Country / Bluegrass',color:'#1a0d00',text:'#FCD34D'},
+  {name:'🎵 Hip-Hop / Rap',color:'#0d0d0d',text:'#E5E7EB'},
+  {name:'💃 Latin / Flamenco',color:'#1a0505',text:'#FCA5A5'},
+  {name:'🎭 Musical Theatre',color:'#0d001a',text:'#C4B5FD'},
+  {name:'🎤 Opera',color:'#1a0a1a',text:'#F9A8D4'},
+  {name:'🎶 Contemporary / Indie',color:'#001a10',text:'#6EE7B7'},
+  {name:'✝️ Gospel / Spiritual',color:'#1a1000',text:'#FDE68A'},
+  {name:'🎬 Film / TV / Soundtrack',color:'#0d0d1a',text:'#93C5FD'},
+  {name:'📚 Educational / Academic',color:'#001010',text:'#67E8F9'},
+  {name:'🧘 Meditation / Ambient',color:'#0a0a1a',text:'#C4B5FD'},
+  {name:'🎪 Experimental',color:'#1a001a',text:'#F0ABFC'},
+  {name:'🕺 Dance / Club',color:'#1a0010',text:'#F9A8D4'},
+];
+
+window.showGenreEditor=function(){
+  const current=UP.genres||[];
+  const m=document.createElement('div');m.className='modal-bg';m.id='genre-modal';
+  m.innerHTML=`<div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🎵 Music genres</div>
+      <button onclick="document.getElementById('genre-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Select all genres you perform in</div>
+    
+    ${current.length>0?`
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Your genres</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${current.map(g=>{
+          const gd=GENRE_LIST.find(gl=>gl.name===g)||{color:'#1a0a2e',text:'#C4B5FD'};
+          return `<div style="display:flex;align-items:center;gap:4px;background:${gd.color};border:1px solid ${gd.text}44;border-radius:20px;padding:5px 10px">
+            <span style="font-size:12px;color:${gd.text}">${g}</span>
+            <button onclick="removeGenre('${g.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:0 2px">×</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`:''}
+    
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add genre</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${GENRE_LIST.filter(g=>!current.includes(g.name)).map(g=>`
+        <button onclick="addGenre('${g.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" 
+          style="padding:7px 14px;border-radius:20px;border:1px solid ${g.text}44;background:${g.color};color:${g.text};font-size:12px;cursor:pointer;font-family:inherit">
+          ${g.name}
+        </button>
+      `).join('')}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="saveGenres()">Save genres</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.addGenre=function(name){
+  if(!UP.genres)UP.genres=[];
+  if(!UP.genres.includes(name)){
+    UP.genres.push(name);
+    document.getElementById('genre-modal')?.remove();
+    showGenreEditor();
+  }
+}
+
+window.removeGenre=function(name){
+  UP.genres=(UP.genres||[]).filter(g=>g!==name);
+  document.getElementById('genre-modal')?.remove();
+  showGenreEditor();
+}
+
+window.saveGenres=async function(){
+  await saveUP();
+  document.getElementById('genre-modal')?.remove();
+  render();
+  ts('Genres saved! 🎵');
+}
 
 // ─── ENSEMBLE SIZE EDITOR ────────────────────────────────────────
 const ENSEMBLE_LIST=[
