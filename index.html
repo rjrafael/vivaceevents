@@ -826,6 +826,8 @@ window.saveEditGig=async function(gigId){
     loadFeed();
   }catch(e){ts('Saved!');}
 }
+
+window.showFillGig=async function(gigId,gigTitle){
   try{
     const s=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
     const apps=s.docs.map(d=>({id:d.id,...d.data()}));
