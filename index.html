@@ -3619,7 +3619,7 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
     <div style="font-size:12px;color:#aaa">⭐ ${rat}</div>
     <div style="display:flex;gap:6px">
       ${trusted?`<button class="bg" style="padding:6px 12px;font-size:11px" onclick="openChat('${musicianId}','${(musicianEmail||'').replace(/'/g,"\\'")}','${(name||'').replace(/'/g,"\\'")}')">💬 Message</button>`:''}
-      ${(u.roles||[]).includes('teacher')&&(isStudent()||CU?.email==='rafael.javadov@gmail.com')?`
+      ${(role.toLowerCase().includes('teacher')||(u.roles||[]).includes('teacher'))&&(isStudent()||CU?.email==='rafael.javadov@gmail.com')?`
         <button class="bt" style="padding:6px 12px;font-size:11px;background:#7C3AED" onclick="showBookLesson('${musicianId}','${(name||'').replace(/'/g,"\\'")}','${(musicianEmail||'').replace(/'/g,"\\'")}')">📚 Book lesson</button>
       `:''}
       ${isMgr()?`
