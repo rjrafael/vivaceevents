@@ -4165,30 +4165,27 @@ function checkGreetings(){
   if(!CU||!UP)return;
   const today=new Date();
   const todayKey=`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-  const seenKey=`ve_greeting_${CU.uid}_${todayKey}`;
-  if(localStorage.getItem(seenKey))return; // Already shown today
+  if(window._greetingShown===todayKey)return; // Already shown today
 
   const name=UP.name||CU.displayName||CU.email?.split('@')[0]||'Friend';
-  const month=today.getMonth()+1; // 1-12
+  const month=today.getMonth()+1;
   const day=today.getDate();
 
-  // Check birthday first (highest priority)
   if(UP.birthdayMonth&&UP.birthdayDay&&
      parseInt(UP.birthdayMonth)===month&&
      parseInt(UP.birthdayDay)===day&&
      UP.birthdayWishes!==false){
+    window._greetingShown=todayKey;
     showGreetingPopup('birthday',name);
-    localStorage.setItem(seenKey,'1');
     return;
   }
 
-  // Check holidays
   if(UP.holidayWishes===false)return;
   const lang=UP.lang||'en';
   const holiday=getHoliday(month,day,lang);
   if(holiday){
+    window._greetingShown=todayKey;
     showGreetingPopup(holiday,name);
-    localStorage.setItem(seenKey,'1');
   }
 }
 
