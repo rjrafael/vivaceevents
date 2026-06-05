@@ -2268,19 +2268,122 @@ window.respond=async function(type){
 }
 
 function discoverHTML(){
-  setTimeout(loadArtistCards,100);
+  setTimeout(()=>{loadArtistCards();},100);
   return `
 <div class="hdr"><div class="logo" style="font-size:15px">${t('find')}</div></div>
 <div class="pad">
-<div style="position:relative;margin-bottom:14px">
+
+<!-- Search bar -->
+<div style="position:relative;margin-bottom:10px">
   <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-  <input class="finp" style="padding-left:38px" placeholder="Search by name, instrument, discipline…"/>
+  <input class="finp" id="search-input" style="padding-left:38px;padding-right:36px" placeholder="Search by name, instrument, skill…" oninput="filterArtists()"/>
+  <span id="search-clear" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#aaa;cursor:pointer" onclick="clearSearch()">✕</span>
 </div>
-<div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Violin</span><span class="pl" onclick="fpill(this)">Cello</span><span class="pl" onclick="fpill(this)">Voice</span><span class="pl" onclick="fpill(this)">Dance</span><span class="pl" onclick="fpill(this)">Acting</span><span class="pl" onclick="fpill(this)">Photo</span></div>
-${isMgr()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="flex:1;font-size:13px;color:#666">Cherry-pick: tap ○ to select artists</div><span class="tag tp">${CP.length} selected</span></div>`:''}
+
+<!-- Filter pills - instruments -->
+<div class="pr" style="margin-bottom:8px" id="inst-pills">
+  <span class="pl on" onclick="selectPill(this,'inst')" data-filter="">All</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="violin">Violin</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="viola">Viola</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="cello">Cello</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="bass">Bass</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="piano">Piano</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="voice">Voice</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="guitar">Guitar</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="saxophone">Saxophone</span>
+  <span class="pl" onclick="selectPill(this,'inst')" data-filter="drums">Drums</span>
+</div>
+
+<!-- Filter pills - roles -->
+<div class="pr" style="margin-bottom:12px" id="role-pills">
+  <span class="pl on" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="">Everyone</span>
+  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="artist">🎻 Artists</span>
+  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="teacher">👨‍🏫 Teachers</span>
+  <span class="pl" style="background:#f0f0f0;border-color:#ddd" onclick="selectPill(this,'role')" data-filter="available">✅ Available</span>
+</div>
+
+<!-- Results count -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div id="search-count" style="font-size:12px;color:#aaa"></div>
+  ${isMgr()||isTeacher()?`<div style="font-size:12px;color:#666">Tap ○ to select · <span style="color:#1D9E75;cursor:pointer" onclick="clearCP()">Clear</span></div>`:''}
+</div>
+
+${isMgr()||isTeacher()?`<div class="card" style="background:#f9f9f9;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="flex:1;font-size:13px;color:#666">Cherry-pick: tap ○ to select artists</div><span class="tag tp">${CP.length} selected</span></div>`:''}
 <div id="artist-cards"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading artists...</p></div>
 </div>`;}
 
+// ─── SEARCH & FILTER STATE ───────────────────────────────────────
+let _allArtists=[];
+let _instFilter='';
+let _roleFilter='';
+
+window.selectPill=function(el, type){
+  const container=document.getElementById(type==='inst'?'inst-pills':'role-pills');
+  container.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  if(type==='inst')_instFilter=el.dataset.filter||'';
+  else _roleFilter=el.dataset.filter||'';
+  filterArtists();
+}
+
+window.clearSearch=function(){
+  const inp=document.getElementById('search-input');
+  if(inp)inp.value='';
+  document.getElementById('search-clear').style.display='none';
+  filterArtists();
+}
+
+window.filterArtists=function(){
+  const query=(document.getElementById('search-input')?.value||'').toLowerCase().trim();
+  const clear=document.getElementById('search-clear');
+  if(clear)clear.style.display=query?'block':'none';
+
+  const filtered=_allArtists.filter(a=>{
+    const name=(a.name||'').toLowerCase();
+    const role=(a.role||'').toLowerCase();
+    const tags=(a.tags||'').toLowerCase();
+    const instruments=(a.instruments||[]).map(i=>i.name?.toLowerCase()||'').join(' ');
+    const skills=(a.skills||[]).join(' ').toLowerCase();
+    const roles=(a.roles||[]).join(' ').toLowerCase();
+
+    // Search filter
+    if(query){
+      const matches=name.includes(query)||role.includes(query)||tags.includes(query)||
+        instruments.includes(query)||skills.includes(query);
+      if(!matches)return false;
+    }
+
+    // Instrument filter
+    if(_instFilter){
+      const hasInst=instruments.includes(_instFilter)||tags.includes(_instFilter)||role.includes(_instFilter);
+      if(!hasInst)return false;
+    }
+
+    // Role filter
+    if(_roleFilter==='available'){
+      if(!a.avail)return false;
+    } else if(_roleFilter){
+      if(!roles.includes(_roleFilter))return false;
+    }
+
+    return true;
+  });
+
+  const el=document.getElementById('artist-cards');
+  const count=document.getElementById('search-count');
+  if(count)count.textContent=filtered.length>0?`${filtered.length} musician${filtered.length>1?'s':''} found`:'';
+
+  if(!el)return;
+  if(filtered.length===0){
+    el.innerHTML=`<div style="text-align:center;padding:30px 0">
+      <div style="font-size:32px;margin-bottom:10px">🔍</div>
+      <div style="font-size:14px;color:#888">No musicians found</div>
+      <div style="font-size:12px;color:#aaa;margin-top:4px">Try a different search or filter</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML=filtered.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,a.priority,a.trusted)).join('');
+}
 function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,priority,trusted){
   const sel=CP.includes(name);
   const priorityBadge=priority?{
@@ -2331,38 +2434,6 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
 </div>`;}
 
 // Load artist cards with ratings AND trust status
-async function loadArtistCards(){
-  const el=document.getElementById('artist-cards');if(!el)return;
-  const artists=[
-    {ini:'SC',bg:'#B5D4F4',tc:'#0C447C',name:'Sofia Chen',role:'Violinist · Classical',avail:true,rat:'4.9',tags:'Violin,Bow technique,Classical',id:'sofia_chen',email:'sofia@example.com'},
-    {ini:'MW',bg:'#9FE1CB',tc:'#085041',name:'Marcus Webb',role:'Cellist · Professional',avail:true,rat:'4.8',tags:'Cello,Chamber,Studio',id:'marcus_webb',email:'marcus@example.com'},
-    {ini:'LP',bg:'#F5C4B3',tc:'#712B13',name:'Lena Park',role:'Violist · Chamber',avail:false,rat:'5.0',tags:'Viola,Quartet,Educator',id:'lena_park',email:'lena@example.com'},
-    {ini:'JO',bg:'#FAC775',tc:'#633806',name:'James Okafor',role:'Violinist · Educator',avail:true,rat:'4.7',tags:'Violin,Beginner,Masterclass',id:'james_okafor',email:'james@example.com'},
-    {ini:'NR',bg:'#CECBF6',tc:'#3C3489',name:'Nina Reyes',role:'Bassist · Jazz + Classical',avail:true,rat:'4.6',tags:'Bass,Jazz,Sessions',id:'nina_reyes',email:'nina@example.com'},
-    {ini:'MK',bg:'#9FE1CB',tc:'#085041',name:'Maria Kovács',role:'Soprano · Opera',avail:true,rat:'4.9',tags:'Voice,Opera,Concerts',id:'maria_kovacs',email:'maria@example.com'},
-    {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Contemporary Dancer',avail:true,rat:'4.8',tags:'Dance,Contemporary,Teaching',id:'diego_lima',email:'diego@example.com'},
-  ];
-  
-  const priorities={};
-  const trusted={};
-  if(isMgr()){
-    try{
-      const rs=await getDocs(query(collection(db,'ratings'),where('managerId','==',CU.uid)));
-      rs.docs.forEach(d=>{priorities[d.data().musicianId]=d.data().priority;});
-      // Load trusted connections
-      const cs=await getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid),where('status','==','accepted')));
-      cs.docs.forEach(d=>{trusted[d.data().musicianId]=true;});
-      // Also auto-trust confirmed musicians
-      const apps=await getDocs(query(collection(db,'applications'),where('status','==','confirmed')));
-      // Check gigs owned by this manager
-      const myGigs=await getDocs(query(collection(db,'gigs'),where('userId','==',CU.uid)));
-      const myGigIds=new Set(myGigs.docs.map(d=>d.id));
-      apps.docs.forEach(d=>{if(myGigIds.has(d.data().gigId))trusted[d.data().userId]=true;});
-    }catch(e){}
-  }
-  
-  el.innerHTML=artists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,priorities[a.id]||'',trusted[a.id]||false)).join('');
-}
 window.inviteOne=function(n){if(groups.length===0){ts('Create a group first!');return;}showGPicker([n]);}
 window.toggleCP=function(n){
   const i=CP.indexOf(n);
