@@ -102,8 +102,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cancel-reason:hover{border-color:#1D9E75}
 .cancel-reason.sel{border-color:#1D9E75;background:#E1F5EE}
 .cancel-reason.sel-red{border-color:#FF3B30;background:#FCEBEB}
-.warning-badge{display:inline-flex;align-items:center;gap:6px;background:#FAEEDA;border:1px solid #EF9F27;border-radius:20px;padding:4px 10px;font-size:11px;color:#633806;font-weight:600}
-.danger-badge{display:inline-flex;align-items:center;gap:6px;background:#FCEBEB;border:1px solid #F09595;border-radius:20px;padding:4px 10px;font-size:11px;color:#791F1F;font-weight:600}
+.verified-badge{display:inline-flex;align-items:center;gap:3px;background:#0C447C;color:#fff;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
+.featured-badge{display:inline-flex;align-items:center;gap:3px;background:#C9A84C;color:#7A5800;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
+.pro-badge{display:inline-flex;align-items:center;gap:3px;background:#1D9E75;color:#fff;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
 @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.5)}60%{box-shadow:0 0 0 8px rgba(255,59,48,0)}}
 </style>
 </head>
@@ -2064,6 +2065,34 @@ async function loadAvailabilityPreview(){
     `;
   }catch(e){}
 }
+
+// ─── BADGE SYSTEM ────────────────────────────────────────────────
+async function checkAutoVerification(){
+  if(!CU||!UP||UP.verified)return;
+  try{
+    const ratingsSnap=await getDocs(query(collection(db,'ratings'),where('musicianId','==',CU.uid)));
+    const ratings=ratingsSnap.docs.map(d=>d.data());
+    const count=ratings.length;
+    const avg=count>0?ratings.reduce((s,r)=>s+(r.average||0),0)/count:0;
+    if(UP.plan&&UP.plan!=='free'&&count>=5&&avg>=4.5){
+      await setDoc(doc(db,'users',CU.uid),{verified:true,verifiedAt:new Date(),verifiedReason:'auto'},{merge:true});
+      UP.verified=true;
+      ts('✓ You just earned Verified status! 🎉');
+    }
+  }catch(e){}
+}
+
+window.adminGrantBadge=async function(userEmail,badge){
+  if(CU.email!=='rafael.javadov@gmail.com'){ts('Admin only');return;}
+  try{
+    const snap=await getDocs(query(collection(db,'users'),where('email','==',userEmail)));
+    if(snap.empty){ts('User not found');return;}
+    const update={};update[badge]=true;update[badge+'At']=new Date();
+    await setDoc(doc(db,'users',snap.docs[0].id),update,{merge:true});
+    ts(`✅ ${badge} badge granted to ${userEmail}!`);
+  }catch(e){ts('Error: '+e.message);}
+}
+
 async function loadArtistCards(){
   const el=document.getElementById('artist-cards');if(!el)return;
   const priorities={};const trusted={};
@@ -2871,6 +2900,11 @@ window.filterArtists=function(){
 }
 function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,priority,trusted){
   const sel=CP.includes(name);
+  const u=_allArtists.find(a=>a.id===musicianId)||{};
+  const isVerified=u.verified||false;
+  const isFeatured=u.featured||false;
+  const isPro=(u.plan&&u.plan!=='free')||false;
+
   const priorityBadge=priority?{
     top:`<span class="tag tg" style="font-size:10px">🟢 Top priority</span>`,
     medium:`<span class="tag ta" style="font-size:10px">🟡 Medium</span>`,
@@ -2897,7 +2931,12 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
     <div class="av" style="width:52px;height:52px;font-size:16px;background:${bg};color:${tc}">${ini}</div>
     <div style="flex:1;min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
-        <div style="font-size:14px;font-weight:600;color:#111">${name}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600;color:#111">${name}</div>
+          ${isVerified?`<span class="verified-badge">✓ Verified</span>`:''}
+          ${isFeatured?`<span class="featured-badge">⭐ Featured</span>`:''}
+          ${isPro?`<span class="pro-badge">Pro</span>`:''}
+        </div>
         <span class="tag ${avail?'tg':'tr'}">${avail?'Available':'Unavailable'}</span>
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:6px">${role}</div>
@@ -3698,6 +3737,11 @@ function profileHTML(){
     </div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+        ${UP.verified?`<span class="verified-badge">✓ Verified</span>`:''}
+        ${UP.featured?`<span class="featured-badge">⭐ Featured</span>`:''}
+        ${plan!=='free'?`<span class="pro-badge">${planLabels[plan]}</span>`:''}
+      </div>
       <div style="font-size:12px;color:#555;margin-bottom:6px;user-select:none" oncontextmenu="return false">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('artist')?'<span class="tag tg">Artist</span>':''}
@@ -4269,7 +4313,7 @@ onAuthStateChanged(auth,async user=>{
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
-    setTimeout(()=>checkGreetings(),1000);
+    setTimeout(()=>{checkGreetings();checkAutoVerification();},1000);
   } else {
     render();
   }
