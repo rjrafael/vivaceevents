@@ -2504,13 +2504,13 @@ async function loadArtistCards(){
   }catch(e){}
   // Demo fallback
   _allArtists=[
-    {ini:'SC',bg:'#B5D4F4',tc:'#0C447C',name:'Sofia Chen',role:'Violinist · Classical',avail:true,rat:'4.9',tags:'Violin,Classical',id:'sofia_chen',email:'sofia@example.com',instruments:[{name:'Violin',primary:true}],skills:[],roles:['artist']},
-    {ini:'MW',bg:'#9FE1CB',tc:'#085041',name:'Marcus Webb',role:'Cellist · Professional',avail:true,rat:'4.8',tags:'Cello,Chamber',id:'marcus_webb',email:'marcus@example.com',instruments:[{name:'Cello',primary:true}],skills:[],roles:['artist']},
-    {ini:'LP',bg:'#F5C4B3',tc:'#712B13',name:'Lena Park',role:'Violist · Chamber',avail:false,rat:'5.0',tags:'Viola,Educator',id:'lena_park',email:'lena@example.com',instruments:[{name:'Viola',primary:true}],skills:['Music Educator'],roles:['artist','teacher']},
-    {ini:'JO',bg:'#FAC775',tc:'#633806',name:'James Okafor',role:'Violinist · Educator',avail:true,rat:'4.7',tags:'Violin,Masterclass',id:'james_okafor',email:'james@example.com',instruments:[{name:'Violin',primary:true}],skills:['Private Teacher'],roles:['artist','teacher']},
-    {ini:'NR',bg:'#CECBF6',tc:'#3C3489',name:'Nina Reyes',role:'Bassist · Jazz',avail:true,rat:'4.6',tags:'Bass,Jazz',id:'nina_reyes',email:'nina@example.com',instruments:[{name:'Double Bass',primary:true}],skills:[],roles:['artist']},
-    {ini:'MK',bg:'#9FE1CB',tc:'#085041',name:'Maria Kovács',role:'Soprano · Opera',avail:true,rat:'4.9',tags:'Voice,Opera',id:'maria_kovacs',email:'maria@example.com',instruments:[{name:'Voice — Soprano',primary:true}],skills:[],roles:['artist']},
-    {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Choreographer',avail:true,rat:'4.8',tags:'Dance,Contemporary',id:'diego_lima',email:'diego@example.com',instruments:[],skills:['Choreographer'],roles:['artist','teacher']},
+    {ini:'SC',bg:'#B5D4F4',tc:'#0C447C',name:'Sofia Chen',role:'Violinist · Classical',avail:true,rat:'4.9',tags:'Violin,Classical',id:'sofia_chen',email:'sofia@example.com',instruments:[{name:'Violin',primary:true}],skills:[],roles:['artist'],genres:['🎼 Classical'],verified:true,featured:false,plan:'pro'},
+    {ini:'MW',bg:'#9FE1CB',tc:'#085041',name:'Marcus Webb',role:'Cellist · Professional',avail:true,rat:'4.8',tags:'Cello,Chamber',id:'marcus_webb',email:'marcus@example.com',instruments:[{name:'Cello',primary:true}],skills:[],roles:['artist'],genres:['🎼 Classical','🎷 Jazz'],verified:false,featured:false,plan:'free'},
+    {ini:'LP',bg:'#F5C4B3',tc:'#712B13',name:'Lena Park',role:'Violist · Teacher',avail:false,rat:'5.0',tags:'Viola,Educator',id:'lena_park',email:'lena@example.com',instruments:[{name:'Viola',primary:true}],skills:['Music Educator'],roles:['artist','teacher'],genres:['🎼 Classical'],verified:true,featured:true,plan:'pro'},
+    {ini:'JO',bg:'#FAC775',tc:'#633806',name:'James Okafor',role:'Violinist · Teacher',avail:true,rat:'4.7',tags:'Violin,Masterclass',id:'james_okafor',email:'james@example.com',instruments:[{name:'Violin',primary:true}],skills:['Private Teacher'],roles:['artist','teacher'],genres:['🎼 Classical','🎬 Film / TV / Soundtrack'],verified:false,featured:false,plan:'free'},
+    {ini:'NR',bg:'#CECBF6',tc:'#3C3489',name:'Nina Reyes',role:'Bassist · Jazz',avail:true,rat:'4.6',tags:'Bass,Jazz',id:'nina_reyes',email:'nina@example.com',instruments:[{name:'Double Bass',primary:true}],skills:[],roles:['artist'],genres:['🎷 Jazz'],verified:false,featured:false,plan:'free'},
+    {ini:'MK',bg:'#9FE1CB',tc:'#085041',name:'Maria Kovács',role:'Soprano · Opera',avail:true,rat:'4.9',tags:'Voice,Opera',id:'maria_kovacs',email:'maria@example.com',instruments:[{name:'Voice — Soprano',primary:true}],skills:[],roles:['artist'],genres:['🎤 Opera','🎼 Classical'],verified:true,featured:true,plan:'studio'},
+    {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Choreographer · Teacher',avail:true,rat:'4.8',tags:'Dance,Contemporary',id:'diego_lima',email:'diego@example.com',instruments:[],skills:['Choreographer'],roles:['artist','teacher'],genres:['💃 Latin / Flamenco'],verified:false,featured:false,plan:'free'},
   ].map(a=>({...a,priority:priorities[a.id]||'',trusted:trusted[a.id]||false}));
   const count=document.getElementById('search-count');
   if(count)count.textContent=`${_allArtists.length} musicians`;
@@ -3233,6 +3233,9 @@ window.filterArtists=function(){
   const query=(document.getElementById('search-input')?.value||'').toLowerCase().trim();
   const clear=document.getElementById('search-clear');
   if(clear)clear.style.display=query?'block':'none';
+
+  // If no artists loaded yet, wait
+  if(_allArtists.length===0){loadArtistCards();return;}
 
   const filtered=_allArtists.filter(a=>{
     const name=(a.name||'').toLowerCase();
