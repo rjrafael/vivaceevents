@@ -3016,13 +3016,22 @@ function profileHTML(){
   return `
 <div style="background:#0d0d0d;padding:20px 16px 22px">
   <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:18px">
-    <div class="av" style="width:58px;height:58px;font-size:18px;background:#B5D4F4;color:#0C447C">${ini}</div>
+    <div style="position:relative;cursor:pointer" onclick="document.getElementById('photo-upload').click()">
+      ${UP.photoURL?
+        `<img src="${UP.photoURL}" style="width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid #1D9E75"/>`:
+        `<div class="av" style="width:58px;height:58px;font-size:18px;background:#B5D4F4;color:#0C447C">${ini}</div>`
+      }
+      <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;font-size:11px">📷</div>
+      <input type="file" id="photo-upload" accept="image/*" style="display:none" onchange="uploadProfilePhoto(this)"/>
+    </div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:3px">${name}</div>
       <div style="font-size:12px;color:#555;margin-bottom:6px;user-select:none" oncontextmenu="return false">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('artist')?'<span class="tag tg">Artist</span>':''}
         ${roles.includes('manager')?'<span class="tag tp">Agent / Manager</span>':''}
+        ${roles.includes('teacher')?'<span class="tag tb">Teacher</span>':''}
+        ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
       </div>
     </div>
     <button style="padding:7px 14px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Sign out</button>
@@ -3348,6 +3357,39 @@ window.inviteToGig=async function(userId, userName, userEmail){
     });
     ts(`Invite sent to ${userName}! 📨`);
   }catch(e){ts('Invite sent!');}
+}
+window.uploadProfilePhoto=async function(input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>5*1024*1024){ts('Image too large — max 5MB');return;}
+  ts('Uploading photo...');
+  try{
+    // Resize image before upload
+    const canvas=document.createElement('canvas');
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=async function(){
+      const size=200;
+      canvas.width=size;canvas.height=size;
+      const ctx=canvas.getContext('2d');
+      // Crop to square
+      const min=Math.min(img.width,img.height);
+      const sx=(img.width-min)/2;const sy=(img.height-min)/2;
+      ctx.drawImage(img,sx,sy,min,min,0,0,size,size);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(async(blob)=>{
+        try{
+          const storageRef=ref(storage,`profiles/${CU.uid}/avatar.jpg`);
+          const snapshot=await uploadBytes(storageRef,blob,{contentType:'image/jpeg'});
+          const photoURL=await getDownloadURL(snapshot.ref);
+          UP.photoURL=photoURL;
+          await saveUP();
+          render();
+          ts('Profile photo updated! 📷✅');
+        }catch(e){ts('Upload failed — check storage rules');}
+      },'image/jpeg',0.85);
+    };
+    img.src=url;
+  }catch(e){ts('Upload failed');}
 }
 window.toggleRole=async function(role){
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
