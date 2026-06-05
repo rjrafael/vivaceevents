@@ -1761,7 +1761,57 @@ window.showEarningsTracker=async function(){
   document.getElementById('app').appendChild(m);
 }
 
-// ─── REAL USER SEARCH ────────────────────────────────────────────
+// ─── LOAD ARTIST CARDS ───────────────────────────────────────────
+async function loadArtistCards(){
+  const el=document.getElementById('artist-cards');if(!el)return;
+  const priorities={};const trusted={};
+  if(isMgr()||isTeacher()){
+    try{
+      const rs=await getDocs(query(collection(db,'ratings'),where('managerId','==',CU.uid)));
+      rs.docs.forEach(d=>{priorities[d.data().musicianId]=d.data().priority;});
+      const cs=await getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid),where('status','==','accepted')));
+      cs.docs.forEach(d=>{trusted[d.data().musicianId]=true;});
+    }catch(e){}
+  }
+  try{
+    const usersSnap=await getDocs(collection(db,'users'));
+    const realUsers=usersSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(u=>u.id!==CU.uid&&(u.roles?.includes('artist')||u.roles?.includes('teacher')));
+    if(realUsers.length>0){
+      _allArtists=realUsers.map(u=>{
+        const name=u.name||u.email?.split('@')[0]||'Artist';
+        const ini=name.substring(0,2).toUpperCase();
+        const colors=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#712B13'],['#FAC775','#633806'],['#CECBF6','#3C3489']];
+        const [bg,tc]=colors[Math.abs(name.charCodeAt(0))%colors.length];
+        const primaryInst=(u.instruments||[]).find(i=>i.primary)?.name||(u.instruments||[])[0]?.name||'';
+        const skills=(u.skills||[]).slice(0,2).join(', ');
+        const role=primaryInst+(skills?` · ${skills}`:'');
+        const tags=[...(u.instruments||[]).slice(0,2).map(i=>i.name),...(u.skills||[]).slice(0,1)].filter(Boolean).join(',');
+        const rating=u.publicRating?.average?u.publicRating.average.toFixed(1):'New';
+        return {ini,bg,tc,name,role:role||'Musician',avail:true,rat:rating,tags:tags||'Musician',
+          id:u.id,email:u.email,priority:priorities[u.id]||'',trusted:trusted[u.id]||false,
+          instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[]};
+      });
+      const count=document.getElementById('search-count');
+      if(count)count.textContent=`${_allArtists.length} musician${_allArtists.length>1?'s':''}`;
+      el.innerHTML=_allArtists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,a.priority,a.trusted)).join('');
+      return;
+    }
+  }catch(e){}
+  // Demo fallback
+  _allArtists=[
+    {ini:'SC',bg:'#B5D4F4',tc:'#0C447C',name:'Sofia Chen',role:'Violinist · Classical',avail:true,rat:'4.9',tags:'Violin,Classical',id:'sofia_chen',email:'sofia@example.com',instruments:[{name:'Violin',primary:true}],skills:[],roles:['artist']},
+    {ini:'MW',bg:'#9FE1CB',tc:'#085041',name:'Marcus Webb',role:'Cellist · Professional',avail:true,rat:'4.8',tags:'Cello,Chamber',id:'marcus_webb',email:'marcus@example.com',instruments:[{name:'Cello',primary:true}],skills:[],roles:['artist']},
+    {ini:'LP',bg:'#F5C4B3',tc:'#712B13',name:'Lena Park',role:'Violist · Chamber',avail:false,rat:'5.0',tags:'Viola,Educator',id:'lena_park',email:'lena@example.com',instruments:[{name:'Viola',primary:true}],skills:['Music Educator'],roles:['artist','teacher']},
+    {ini:'JO',bg:'#FAC775',tc:'#633806',name:'James Okafor',role:'Violinist · Educator',avail:true,rat:'4.7',tags:'Violin,Masterclass',id:'james_okafor',email:'james@example.com',instruments:[{name:'Violin',primary:true}],skills:['Private Teacher'],roles:['artist','teacher']},
+    {ini:'NR',bg:'#CECBF6',tc:'#3C3489',name:'Nina Reyes',role:'Bassist · Jazz',avail:true,rat:'4.6',tags:'Bass,Jazz',id:'nina_reyes',email:'nina@example.com',instruments:[{name:'Double Bass',primary:true}],skills:[],roles:['artist']},
+    {ini:'MK',bg:'#9FE1CB',tc:'#085041',name:'Maria Kovács',role:'Soprano · Opera',avail:true,rat:'4.9',tags:'Voice,Opera',id:'maria_kovacs',email:'maria@example.com',instruments:[{name:'Voice — Soprano',primary:true}],skills:[],roles:['artist']},
+    {ini:'DL',bg:'#FAC775',tc:'#633806',name:'Diego Lima',role:'Choreographer',avail:true,rat:'4.8',tags:'Dance,Contemporary',id:'diego_lima',email:'diego@example.com',instruments:[],skills:['Choreographer'],roles:['artist','teacher']},
+  ].map(a=>({...a,priority:priorities[a.id]||'',trusted:trusted[a.id]||false}));
+  const count=document.getElementById('search-count');
+  if(count)count.textContent=`${_allArtists.length} musicians`;
+  el.innerHTML=_allArtists.map(a=>acard(a.ini,a.bg,a.tc,a.name,a.role,a.avail,a.rat,a.tags,a.id,a.email,a.priority,a.trusted)).join('');
+}
 // Load real users from Firestore + keep demo artists as fallback
 window.sendConnectionRequest=async function(musicianId, musicianName, musicianEmail){
   try{
