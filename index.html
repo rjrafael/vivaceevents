@@ -720,6 +720,7 @@ async function loadGigs(){
             ${isMine&&filled?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
+                <button style="padding:6px 12px;border-radius:8px;background:#C9A84C;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600" onclick="showPayMusician('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${(g.confirmedApplicants||[])[0]||''}','${g.postedBy||''}','${g.userEmail||''}','${g.pay||''}')">💰 Pay</button>
                 <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
                 <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
@@ -5370,6 +5371,26 @@ function profileHTML(){
       <div id="reel-progress-text" style="font-size:11px;color:#888;margin-top:4px;text-align:center">Uploading...</div>
     </div>
   </div>
+  <!-- Payments section -->
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">💳 Payments</div>
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px">
+      ${UP.stripeAccountVerified?`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:20px">✅</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#085041">Bank account connected</div>
+          <div style="font-size:11px;color:#aaa">You can receive payments through the app</div>
+        </div>
+      </div>
+      `:`
+      <div style="font-size:12px;color:#888;margin-bottom:10px">Connect your bank account to get paid directly through Vivace Events.</div>
+      `}
+      <button onclick="showConnectBankAccount()" style="width:100%;padding:10px;border-radius:10px;background:${UP.stripeAccountVerified?'#f5f5f5':'#1D9E75'};border:none;color:${UP.stripeAccountVerified?'#555':'#fff'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        ${UP.stripeAccountVerified?'⚙️ Manage payment account':'🏦 Connect bank account'}
+      </button>
+    </div>
+  </div>
   ${isTeacher()?`
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">👨‍🏫 Teacher tools</div>
@@ -6547,6 +6568,195 @@ window.saveTicketLink=async function(dateStr){
 window.showTicketOptions=function(){
   const ticketRow=document.getElementById('ticket-row');
   if(ticketRow)ticketRow.style.display=ticketRow.style.display==='none'?'block':'none';
+}
+
+// ─── STRIPE CONNECT ──────────────────────────────────────────────
+const CF_BASE='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net';
+
+// Musician: Connect bank account
+window.showConnectBankAccount=async function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='connect-modal';
+  const hasAccount=UP.stripeAccountId&&UP.stripeAccountVerified;
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">💳 Get Paid via Vivace Events</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Connect your bank account to receive payments directly when managers book you.</div>
+    ${hasAccount?`
+    <div style="background:#E1F5EE;border-radius:12px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:24px">✅</span>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#085041">Bank account connected!</div>
+        <div style="font-size:12px;color:#1D9E75;margin-top:2px">You can receive payments through the app</div>
+      </div>
+    </div>`:`
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">How it works:</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>1️⃣</span><span>Securely connect your bank via Stripe</span></div>
+        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>2️⃣</span><span>Manager pays through the app</span></div>
+        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>3️⃣</span><span>You receive 95% directly to your bank</span></div>
+        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>💰</span><span>5% platform fee supports Vivace Events</span></div>
+      </div>
+    </div>`}
+    <button id="connect-btn" class="bt" style="width:100%;padding:13px;margin-bottom:8px" onclick="startStripeOnboarding()">
+      ${hasAccount?'🔄 Update bank account':'🏦 Connect bank account'}
+    </button>
+    <button class="bg" style="width:100%;padding:11px" onclick="document.getElementById('connect-modal').remove()">Close</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+window.startStripeOnboarding=async function(){
+  const btn=document.getElementById('connect-btn');
+  if(btn){btn.textContent='Connecting...';btn.disabled=true;}
+  try{
+    const resp=await fetch(`${CF_BASE}/createConnectAccount`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        userId:CU.uid,
+        email:CU.email,
+        name:UP.name||CU.email?.split('@')[0]||'',
+        stripeAccountId:UP.stripeAccountId||null
+      })
+    });
+    const data=await resp.json();
+    if(data.url){
+      // Save account ID
+      if(data.accountId&&!UP.stripeAccountId){
+        UP.stripeAccountId=data.accountId;
+        await saveUP();
+      }
+      document.getElementById('connect-modal')?.remove();
+      window.open(data.url,'_blank');
+      ts('🏦 Opening Stripe onboarding...');
+    } else {
+      ts('Error: '+data.error);
+      if(btn){btn.textContent='🏦 Connect bank account';btn.disabled=false;}
+    }
+  }catch(e){
+    ts('Connection failed — try again');
+    if(btn){btn.textContent='🏦 Connect bank account';btn.disabled=false;}
+  }
+}
+
+// Handle return from Stripe onboarding
+window.addEventListener('load',()=>{
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('connect')==='success'){
+    setTimeout(async()=>{
+      if(CU&&UP.stripeAccountId){
+        UP.stripeAccountVerified=true;
+        await saveUP();
+        ts('✅ Bank account connected! You can now receive payments.');
+      }
+    },1000);
+  }
+});
+
+// Manager: Pay musician for a gig
+window.showPayMusician=async function(gigId, gigTitle, musicianId, musicianName, musicianEmail, amount){
+  const m=document.createElement('div');m.className='modal-bg';m.id='pay-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">💰 Pay Musician</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:#555">Musician</span>
+        <span style="font-size:13px;font-weight:600;color:#111">${musicianName}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:#555">Amount</span>
+        <input id="pay-amount" type="number" value="${amount||''}" placeholder="0.00" style="width:100px;padding:6px 10px;border:1px solid #eee;border-radius:8px;font-size:13px;text-align:right;font-family:inherit"/>
+      </div>
+      <div id="pay-breakdown" style="border-top:1px solid #eee;padding-top:10px;margin-top:6px;display:none">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px">
+          <span>Platform fee (5%)</span><span id="fee-amt">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#111">
+          <span>Musician receives</span><span id="musician-amt">—</span>
+        </div>
+      </div>
+    </div>
+    <div id="pay-status" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('pay-modal').remove()">Cancel</button>
+      <button class="bt" id="pay-btn" style="flex:2;padding:13px" onclick="processGigPayment('${gigId}','${gigTitle}','${musicianId}','${musicianName}')">Send Payment</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+
+  // Live fee calculation
+  document.getElementById('pay-amount')?.addEventListener('input',function(){
+    const amt=parseFloat(this.value);
+    if(amt>0){
+      const fee=(amt*0.05).toFixed(2);
+      const receives=(amt*0.95).toFixed(2);
+      document.getElementById('fee-amt').textContent='$'+fee;
+      document.getElementById('musician-amt').textContent='$'+receives;
+      document.getElementById('pay-breakdown').style.display='block';
+    } else {
+      document.getElementById('pay-breakdown').style.display='none';
+    }
+  });
+
+  // Check if musician has connected account
+  try{
+    const snap=await getDoc(doc(db,'users',musicianId));
+    const musician=snap.data();
+    if(!musician?.stripeAccountId||!musician?.stripeAccountVerified){
+      document.getElementById('pay-status').innerHTML=`
+        <div style="background:#FAEEDA;border-radius:10px;padding:10px 12px;font-size:12px;color:#633806">
+          ⚠️ ${musicianName} hasn't connected their bank account yet. They need to set up payments in their profile first.
+        </div>`;
+      document.getElementById('pay-btn').disabled=true;
+      document.getElementById('pay-btn').style.opacity='0.5';
+    }
+  }catch(e){}
+}
+
+window.processGigPayment=async function(gigId, gigTitle, musicianId, musicianName){
+  const amount=parseFloat(document.getElementById('pay-amount')?.value);
+  if(!amount||amount<=0){ts('Please enter an amount');return;}
+
+  const btn=document.getElementById('pay-btn');
+  if(btn){btn.textContent='Processing...';btn.disabled=true;}
+
+  try{
+    const snap=await getDoc(doc(db,'users',musicianId));
+    const musician=snap.data();
+    if(!musician?.stripeAccountId){ts('Musician has not connected bank account');return;}
+
+    const resp=await fetch(`${CF_BASE}/createGigPayment`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        amount,currency:'usd',
+        musicianAccountId:musician.stripeAccountId,
+        gigId,gigTitle,
+        managerId:CU.uid,musicianId
+      })
+    });
+    const data=await resp.json();
+    if(data.clientSecret){
+      // For now show success — full card UI needs Stripe.js
+      document.getElementById('pay-modal')?.remove();
+      // Save payment record
+      await addDoc(collection(db,'payments'),{
+        gigId,gigTitle,managerId:CU.uid,musicianId,
+        amount,platformFee:data.platformFee/100,
+        musicianReceives:data.musicianReceives/100,
+        paymentIntentId:data.paymentIntentId,
+        status:'pending',timestamp:new Date()
+      });
+      ts(`💰 Payment of $${amount} initiated to ${musicianName}!`);
+    } else {
+      ts('Payment failed: '+data.error);
+      if(btn){btn.textContent='Send Payment';btn.disabled=false;}
+    }
+  }catch(e){
+    ts('Payment failed — try again');
+    if(btn){btn.textContent='Send Payment';btn.disabled=false;}
+  }
 }
 
 window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
