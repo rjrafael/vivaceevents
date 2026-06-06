@@ -7367,9 +7367,9 @@ window.switchRadioGenre=async function(genre){
 window.radioPlayPause=async function(){
   const track=_radioQueue[_radioIndex];
   if(!track){ts('No tracks available');return;}
+  if(!track.url){ts('Track URL missing — try refreshing');console.log('Track missing URL:',track);return;}
   if(!_radioAudio){
     _radioAudio=new Audio(track.url);
-    _radioAudio.crossOrigin='anonymous';
     _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
     _radioAudio.ontimeupdate=()=>{
       const fill=document.getElementById('radio-progress-fill');
