@@ -6148,7 +6148,7 @@ window.showCreateRecurring=function(){
       <button class="bt" style="flex:2;padding:13px" onclick="saveRecurringGig()">Save</button>
     </div>
   </div>`;
-  document.getElementById('app').appendChild(m);
+  document.body.appendChild(m);
 }
 
 window.updateRecurringFields=function(){
@@ -6173,6 +6173,7 @@ window.saveRecurringGig=async function(){
       createdAt:new Date()
     });
     document.getElementById('recurring-modal')?.remove();
+    document.querySelectorAll('#recurring-modal').forEach(el=>el.remove());
     ts('🔄 Recurring gig saved!');
     loadRecurringGigs();
   }catch(e){ts('Saved!');}
