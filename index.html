@@ -3062,7 +3062,11 @@ async function loadArtistCards(){
   try{
     const usersSnap=await getDocs(collection(db,'users'));
     const realUsers=usersSnap.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(u=>(u.id!==CU.uid||CU.email==='rafael.javadov@gmail.com')&&(u.roles?.includes('artist')||u.roles?.includes('teacher')||u.roles?.includes('student')));
+      .filter(u=>{
+        if(u.visibility==='hidden')return false; // Hidden users never show
+        return (u.id!==CU.uid||CU.email==='rafael.javadov@gmail.com')&&
+               (u.roles?.includes('artist')||u.roles?.includes('teacher')||u.roles?.includes('student'));
+      });
     if(realUsers.length>0){
       _allArtists=realUsers.map(u=>{
         const name=u.name||u.email?.split('@')[0]||'Artist';
@@ -3077,7 +3081,8 @@ async function loadArtistCards(){
         return {ini,bg,tc,name,role:role||'Musician',avail:true,rat:rating,tags:tags||'Musician',
           id:u.id,email:u.email,priority:priorities[u.id]||'',trusted:trusted[u.id]||false,
           instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[],
-          genres:u.genres||[],verified:u.verified||false,featured:u.featured||false,plan:u.plan||'free'};
+          genres:u.genres||[],verified:u.verified||false,featured:u.featured||false,
+          plan:u.plan||'free',visibility:u.visibility||'public'};
       });
       const count=document.getElementById('search-count');
       if(count)count.textContent=`${_allArtists.length} musician${_allArtists.length>1?'s':''}`;
@@ -3941,10 +3946,11 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
     <div style="flex:1;min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <div style="font-size:14px;font-weight:600;color:#111">${name}</div>
+          <div style="font-size:14px;font-weight:600;color:#111">${u.visibility==='private'?'🔒 '+name:name}</div>
           ${isVerified?`<span class="verified-badge">✓ Verified</span>`:''}
           ${isFeatured?`<span class="featured-badge">⭐ Featured</span>`:''}
           ${isPro?`<span class="pro-badge">Pro</span>`:''}
+          ${u.visibility==='private'?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806;border:1px solid #EF9F2744">Private profile</span>`:''}
         </div>
         <span class="tag ${avail?'tg':'tr'}">${avail?'Available':'Unavailable'}</span>
       </div>
@@ -4998,6 +5004,27 @@ function profileHTML(){
     </div>
     <div style="font-size:11px;color:#aaa">${t('multipleRoles')||'You can hold multiple roles simultaneously'}</div>
   </div>
+
+  <!-- Profile Visibility -->
+  <div style="margin-bottom:18px">
+    <div class="st" style="margin-bottom:10px">👁️ Profile visibility</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${[
+        {id:'public',icon:'🌍',label:'Public',desc:'Anyone can find you in search',color:'#1D9E75',bg:'#E1F5EE'},
+        {id:'private',icon:'🔒',label:'Private',desc:'Name visible — full profile needs approval',color:'#BA7517',bg:'#FAEEDA'},
+        {id:'hidden',icon:'👻',label:'Hidden',desc:'Invisible — only active in your groups',color:'#888',bg:'#f5f5f5'}
+      ].map(v=>`
+        <button onclick="setVisibility('${v.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:${(UP.visibility||'public')===v.id?`2px solid ${v.color}`:'1px solid #eee'};background:${(UP.visibility||'public')===v.id?v.bg:'#fff'};cursor:pointer;text-align:left;font-family:inherit;width:100%">
+          <span style="font-size:20px">${v.icon}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#111">${v.label}</div>
+            <div style="font-size:11px;color:#888;margin-top:1px">${v.desc}</div>
+          </div>
+          ${(UP.visibility||'public')===v.id?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${v.color};color:#fff;font-weight:600">Active</span>`:''}
+        </button>`).join('')}
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.5">🛡️ Contact info is always protected by the Trust Network regardless of visibility.</div>
+  </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('language')}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -5716,6 +5743,14 @@ window.toggleRole=async function(role){
   else roles.push(role);
   UP.roles=[...new Set(roles)];await saveUP();render();
   ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
+}
+
+window.setVisibility=async function(visibility){
+  UP.visibility=visibility;
+  await saveUP();
+  render();
+  const labels={public:'🌍 Profile set to Public',private:'🔒 Profile set to Private',hidden:'👻 Profile set to Hidden'};
+  ts(labels[visibility]||'Visibility updated');
 }
 window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
 
