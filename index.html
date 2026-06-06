@@ -451,6 +451,7 @@ function getScr(){
   if(CS==='course-builder'){setTimeout(()=>loadCourses(),100);return courseBuilderHTML();}
   if(CS==='public-profile')return publicProfileHTML();
   if(CS==='recurring-gigs'){setTimeout(()=>loadRecurringGigs(),100);return recurringGigsHTML();}
+  if(CS==='dmca')return dmcaHTML();
   return feedHTML();
 }
 
@@ -5046,7 +5047,7 @@ ${teacherPlans.map(p=>`
 <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
   14-day free trial for new users · $1/month for first 3 months · Cancel anytime · Secure payment via Stripe
 </div>
-<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com</div>
+<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com · <span onclick="go('dmca')" style="cursor:pointer;text-decoration:underline;color:#aaa">DMCA Policy</span></div>
 </div>
 </div>`;}
 
@@ -6153,6 +6154,37 @@ window.addEventListener('load',()=>{
   if(profileId){_publicProfileId=profileId;CS='public-profile';}
 });
 
+// ─── DMCA PAGE ───────────────────────────────────────────────────
+function dmcaHTML(){
+  return `
+<div class="hdr">
+  <button onclick="go('feed')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
+  <div class="logo" style="font-size:13px">DMCA Policy</div>
+  <div></div>
+</div>
+<div class="pad">
+  <div style="font-size:20px;font-weight:700;color:#111;margin-bottom:4px">⚖️ DMCA Copyright Policy</div>
+  <div style="font-size:12px;color:#aaa;margin-bottom:20px">Vivace Events LLC · vivaceevents.com</div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Our commitment</div>
+    <div style="font-size:13px;color:#555;line-height:1.6">Vivace Events LLC respects intellectual property rights and complies with the Digital Millennium Copyright Act (DMCA). We respond promptly to valid copyright infringement notices and remove infringing content upon proper notification.</div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Report copyright infringement</div>
+    <div style="font-size:13px;color:#555;line-height:1.6;margin-bottom:10px">Send a written DMCA notice to our designated agent containing:</div>
+    <div style="font-size:12px;color:#555;line-height:1.9">1. Your signature (electronic or physical)<br>2. Description of the copyrighted work<br>3. URL of the infringing content<br>4. Your contact information<br>5. Good faith belief statement<br>6. Accuracy statement under penalty of perjury</div>
+    <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px">
+      <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:4px">DMCA Agent — Vivace Events LLC</div>
+      <div style="font-size:14px;color:#085041;font-weight:600">📧 dmca@vivaceevents.com</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Repeat infringers</div>
+    <div style="font-size:13px;color:#555;line-height:1.6">Vivace Events terminates accounts of repeat copyright infringers in appropriate circumstances per DMCA §512(i).</div>
+  </div>
+  <div style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Last updated: June 2026 · Vivace Events LLC · Virtual Studio Orchestra LLC</div>
+</div>`;}
+
 // ─── RECURRING GIGS ──────────────────────────────────────────────
 function recurringGigsHTML(){
   return `
@@ -6823,19 +6855,145 @@ window.processGigPayment=async function(gigId, gigTitle, musicianId, musicianNam
   }
 }
 
-// ─── VIVACE RADIO ────────────────────────────────────────────────
+// ─── VIVACE RADIO — INTELLIGENT ENGINE ───────────────────────────
 let _radioAudio=null;
-let _radioTracks=[];
-let _radioIndex=0;
+let _radioTracks=[];         // All loaded tracks
+let _radioQueue=[];          // Smart rotation queue
+let _radioIndex=0;           // Current queue position
 let _radioPlaying=false;
-let _radioVisible=false;
+let _radioGenreFilter='all'; // Current genre channel
+let _radioPlayHistory=[];    // Track IDs played recently (no-repeat window)
+let _radioSkipStart=null;    // Time play started (for skip tracking)
+let _radioSessionPlays=0;    // Plays this session
 
-// Radio plans — add-on to subscription
+// Radio plans
 const RADIO_PLANS={
-  basic:{name:'Radio Basic',playsPerDay:2,price:9,priceId:''},
-  pro:{name:'Radio Pro',playsPerDay:5,price:19,priceId:''},
-  featured:{name:'Radio Featured',playsPerDay:10,price:39,priceId:''}
+  basic:{name:'Radio Basic',playsPerDay:2,price:9,priority:1},
+  pro:{name:'Radio Pro',playsPerDay:5,price:19,priority:2},
+  featured:{name:'Radio Featured',playsPerDay:10,price:39,priority:3}
 };
+
+// Genre bridge map — which genres can follow each other smoothly
+const GENRE_BRIDGES={
+  'Classical':['Jazz','Opera','Musical Theatre','Film / TV / Soundtrack','Folk / Celtic'],
+  'Jazz':['Classical','Blues','R&B / Soul','Latin / Flamenco','Musical Theatre'],
+  'Blues':['Jazz','R&B / Soul','Rock / Pop','Folk / Celtic'],
+  'R&B / Soul':['Blues','Jazz','Hip-Hop / Rap','Gospel'],
+  'Hip-Hop / Rap':['R&B / Soul','Electronic / EDM','Rock / Pop'],
+  'Electronic / EDM':['Hip-Hop / Rap','Rock / Pop','Latin / Flamenco'],
+  'Rock / Pop':['Electronic / EDM','Blues','Folk / Celtic','Country / Bluegrass'],
+  'Folk / Celtic':['Classical','Rock / Pop','Country / Bluegrass','World / Ethnic'],
+  'Country / Bluegrass':['Folk / Celtic','Blues','Rock / Pop'],
+  'Latin / Flamenco':['Jazz','World / Ethnic','Electronic / EDM','R&B / Soul'],
+  'World / Ethnic':['Classical','Latin / Flamenco','Folk / Celtic','Jazz'],
+  'Opera':['Classical','Musical Theatre'],
+  'Musical Theatre':['Opera','Classical','Jazz'],
+  'Film / TV / Soundtrack':['Classical','Jazz','Electronic / EDM'],
+  'Contemporary / Indie':['Rock / Pop','Folk / Celtic','Electronic / EDM'],
+  'Educational / Academic':['Classical','Jazz']
+};
+
+// Time-of-day programming
+function getTimeSlot(){
+  const h=new Date().getHours();
+  if(h>=6&&h<9)return 'morning';   // Energizing
+  if(h>=9&&h<12)return 'focused';  // Work hours
+  if(h>=12&&h<14)return 'lunch';   // Upbeat
+  if(h>=14&&h<17)return 'afternoon';
+  if(h>=17&&h<21)return 'primetime'; // Featured slot
+  if(h>=21&&h<24)return 'evening';
+  return 'latenight';
+}
+
+// Genre preferences by time slot
+const TIME_GENRES={
+  morning:['Classical','Jazz','World / Ethnic','Folk / Celtic'],
+  focused:['Classical','Jazz','Film / TV / Soundtrack','Contemporary / Indie'],
+  lunch:['Jazz','Latin / Flamenco','R&B / Soul','Rock / Pop'],
+  afternoon:['Folk / Celtic','World / Ethnic','Rock / Pop','Blues'],
+  primetime:null, // All genres — best tracks
+  evening:['Jazz','Classical','Blues','R&B / Soul'],
+  latenight:['Classical','Jazz','World / Ethnic','Electronic / EDM']
+};
+
+// Build intelligent rotation queue
+function buildRadioQueue(tracks, genreFilter){
+  if(!tracks||tracks.length===0)return[];
+  let pool=genreFilter==='all'?[...tracks]:tracks.filter(t=>t.genre===genreFilter);
+  if(pool.length===0)pool=[...tracks]; // Fallback to all if no matches
+
+  const slot=getTimeSlot();
+  const preferredGenres=TIME_GENRES[slot];
+
+  // Score each track
+  pool=pool.map(t=>{
+    let score=0;
+    // Plan priority (featured > pro > basic)
+    score+=(RADIO_PLANS[t.radioPlan]?.priority||1)*10;
+    // Time-of-day bonus
+    if(preferredGenres&&preferredGenres.includes(t.genre))score+=15;
+    // Prime time — featured gets extra boost
+    if(slot==='primetime'&&t.radioPlan==='featured')score+=20;
+    // Engagement score — tracks with high profile taps rank higher
+    score+=(t.profileTaps||0)*3;
+    // Penalize high skip rate
+    const skipRate=t.skips&&t.plays?(t.skips/t.plays):0;
+    score-=skipRate*20;
+    // Add slight randomness so it doesn't feel robotic
+    score+=Math.random()*5;
+    return {...t,_score:score};
+  });
+
+  // Sort by score
+  pool.sort((a,b)=>b._score-a._score);
+
+  // Now build queue with genre bridge logic (no jarring transitions)
+  const queue=[];
+  const used=new Set();
+  let lastGenre=null;
+
+  // First pass — respect genre bridges
+  while(used.size<pool.length){
+    const remaining=pool.filter(t=>!used.has(t.id));
+    if(remaining.length===0)break;
+
+    let next=null;
+    if(lastGenre){
+      // Try to find a bridging genre
+      const bridges=GENRE_BRIDGES[lastGenre]||[];
+      next=remaining.find(t=>bridges.includes(t.genre));
+      // If no bridge, try same genre
+      if(!next)next=remaining.find(t=>t.genre===lastGenre);
+    }
+    // If still nothing, take highest scored remaining
+    if(!next)next=remaining[0];
+
+    queue.push(next);
+    used.add(next.id);
+    lastGenre=next.genre;
+  }
+
+  return queue;
+}
+
+// Get next track respecting no-repeat window (2 hours = ~12 tracks)
+function getNextTrack(){
+  const NO_REPEAT_WINDOW=Math.min(12,Math.floor(_radioQueue.length*0.7));
+  if(_radioQueue.length===0)return null;
+
+  // Find next track not in recent history
+  for(let i=0;i<_radioQueue.length;i++){
+    const idx=(_radioIndex+i)%_radioQueue.length;
+    const track=_radioQueue[idx];
+    if(!_radioPlayHistory.slice(-NO_REPEAT_WINDOW).includes(track.id)){
+      _radioIndex=idx;
+      return track;
+    }
+  }
+  // All tracks played recently — just go to next
+  _radioIndex=(_radioIndex+1)%_radioQueue.length;
+  return _radioQueue[_radioIndex];
+}
 
 // Show radio upload in profile
 function radioProfileSection(){
@@ -6865,6 +7023,7 @@ function radioProfileSection(){
         </div>`).join('')}
       `:`<div style="font-size:13px;color:#888;text-align:center;padding:10px 0">No tracks uploaded yet</div>`}
       <button onclick="showRadioUpload()" style="width:100%;margin-top:10px;padding:10px;border-radius:10px;background:#1D9E75;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ Upload track</button>
+      <button onclick="showRadioAnalytics()" style="width:100%;margin-top:6px;padding:8px;border-radius:10px;background:#1a1a1a;border:1px solid #222;color:#C9A84C;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📊 View radio analytics</button>
     </div>`:`
     <div style="background:#0d0d0d;border-radius:12px;padding:16px;text-align:center">
       <div style="font-size:28px;margin-bottom:8px">🎙️</div>
@@ -7068,14 +7227,15 @@ window.deleteRadioTrack=async function(index){
 }
 
 // ─── RADIO PLAYER (persistent bottom bar) ────────────────────────
-async function initRadioPlayer(){
+async function initRadioPlayer(genreFilter){
   try{
+    if(genreFilter)_radioGenreFilter=genreFilter;
     const snap=await getDocs(query(collection(db,'radioTracks'),where('status','==','active')));
     _radioTracks=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // Shuffle
-    _radioTracks.sort(()=>Math.random()-0.5);
-    if(_radioTracks.length>0)renderRadioPlayer();
-  }catch(e){}
+    _radioQueue=buildRadioQueue(_radioTracks,_radioGenreFilter);
+    _radioIndex=0;
+    if(_radioQueue.length>0)renderRadioPlayer();
+  }catch(e){console.log('Radio init error:',e.message);}
 }
 
 function renderRadioPlayer(){
@@ -7083,69 +7243,221 @@ function renderRadioPlayer(){
   if(!bar){
     bar=document.createElement('div');
     bar.id='vivace-radio-bar';
-    bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:1px solid #1D9E75;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:900;max-width:480px;margin:0 auto';
+    bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;z-index:900;background:#0d0d0d;border-top:2px solid #C9A84C';
     document.body.appendChild(bar);
   }
-  const track=_radioTracks[_radioIndex]||{};
+  const track=_radioQueue[_radioIndex]||{};
+  const slot=getTimeSlot();
+  const isPrimetime=slot==='primetime';
+  const isFeatured=track.radioPlan==='featured';
+
   bar.innerHTML=`
-    <button onclick="radioPlayPause()" style="width:36px;height:36px;border-radius:50%;background:#1D9E75;border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">
-      ${_radioPlaying?'⏸':'▶'}
-    </button>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
-      <div style="font-size:10px;color:#1D9E75;margin-top:1px;cursor:pointer" onclick="viewRadioArtist('${track.userId||''}')">${track.userName||'—'} · ${track.genre||'—'} ↗</div>
+    <!-- Genre channel selector -->
+    <div style="display:flex;gap:4px;padding:6px 12px;overflow-x:auto;border-bottom:1px solid #1a1a1a;scrollbar-width:none">
+      ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Electronic / EDM','Rock / Pop','Folk / Celtic','Latin / Flamenco','World / Ethnic','Opera','Film / TV / Soundtrack'].map(g=>`
+        <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:3px 10px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#333'};background:${_radioGenreFilter===g?'#C9A84C22':'transparent'};color:${_radioGenreFilter===g?'#C9A84C':'#888'};font-size:10px;cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
+      `).join('')}
     </div>
-    <button onclick="radioNext()" style="background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:4px">⏭</button>
-    <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:4px" title="Report copyright issue">🚩</button>
-    <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;padding:4px">✕</button>
+    <!-- Now playing -->
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+      <!-- Animated bars when playing -->
+      <div style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:flex-end;gap:2px;justify-content:center">
+        ${_radioPlaying?`
+          <div style="width:3px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:14px"></div>
+          <div style="width:3px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:20px"></div>
+          <div style="width:3px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:10px"></div>
+          <div style="width:3px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:16px"></div>
+        `:`<div style="width:28px;height:28px;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:12px">🎙️</div>`}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:4px">
+          ${isFeatured?`<span style="font-size:9px;background:#C9A84C;color:#0d0d0d;padding:1px 5px;border-radius:4px;font-weight:700">FEATURED</span>`:''}
+          ${isPrimetime?`<span style="font-size:9px;background:#FF6B35;color:#fff;padding:1px 5px;border-radius:4px;font-weight:700">PRIME</span>`:''}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${track.title||'Vivace Radio'}</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;display:flex;align-items:center;gap:4px">
+          <span style="color:#1D9E75;cursor:pointer" onclick="viewRadioArtist('${track.userId||''}')">${track.userName||'—'}</span>
+          <span>·</span>
+          <span style="color:#555">${track.genre||'—'}</span>
+          <span>·</span>
+          <span style="color:#333;font-size:9px">${getTimeSlotLabel()}</span>
+        </div>
+      </div>
+      <!-- Controls -->
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <button onclick="radioPlayPause()" style="width:34px;height:34px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#1a1a1a'};border:1px solid ${_radioPlaying?'#1D9E75':'#333'};color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          ${_radioPlaying?'⏸':'▶'}
+        </button>
+        <button onclick="radioNext()" style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:4px">⏭</button>
+        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:4px">ℹ️</button>
+        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:12px;cursor:pointer;padding:4px" title="Report">🚩</button>
+        <button onclick="closeRadioBar()" style="background:none;border:none;color:#333;font-size:16px;cursor:pointer;padding:4px">✕</button>
+      </div>
+    </div>
+    <!-- Progress bar -->
+    <div id="radio-progress-bg" style="height:2px;background:#1a1a1a;cursor:pointer" onclick="radioSeek(event)">
+      <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);width:0%;transition:width 0.5s linear"></div>
+    </div>
   `;
+
+  // Add EQ animation styles if not already added
+  if(!document.getElementById('radio-styles')){
+    const s=document.createElement('style');
+    s.id='radio-styles';
+    s.textContent=`
+      @keyframes eq1{0%,100%{height:6px}50%{height:18px}}
+      @keyframes eq2{0%,100%{height:18px}50%{height:8px}}
+      @keyframes eq3{0%,100%{height:10px}50%{height:22px}}
+      #vivace-radio-bar{max-width:480px;margin:0 auto;left:0;right:0;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  // Start progress bar update if playing
+  if(_radioPlaying)startProgressBar();
+}
+
+function getTimeSlotLabel(){
+  const labels={morning:'☀️ Morning',focused:'💼 Work hours',lunch:'🍽️ Lunch',afternoon:'🌤️ Afternoon',primetime:'⭐ Prime time',evening:'🌙 Evening',latenight:'🌃 Late night'};
+  return labels[getTimeSlot()]||'';
+}
+
+let _progressTimer=null;
+function startProgressBar(){
+  if(_progressTimer)clearInterval(_progressTimer);
+  _progressTimer=setInterval(()=>{
+    if(!_radioAudio||!_radioPlaying)return;
+    const pct=_radioAudio.duration?(_radioAudio.currentTime/_radioAudio.duration)*100:0;
+    const fill=document.getElementById('radio-progress-fill');
+    if(fill)fill.style.width=pct+'%';
+  },500);
+}
+
+window.radioSeek=function(e){
+  if(!_radioAudio||!_radioAudio.duration)return;
+  const bg=document.getElementById('radio-progress-bg');
+  if(!bg)return;
+  const pct=e.offsetX/bg.offsetWidth;
+  _radioAudio.currentTime=pct*_radioAudio.duration;
+}
+
+window.switchRadioGenre=async function(genre){
+  _radioGenreFilter=genre;
+  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
+  _radioPlaying=false;
+  _radioQueue=buildRadioQueue(_radioTracks,genre);
+  _radioIndex=0;
+  renderRadioPlayer();
 }
 
 window.radioPlayPause=function(){
-  if(!_radioAudio&&_radioTracks.length>0){
-    _radioAudio=new Audio(_radioTracks[_radioIndex].url);
-    _radioAudio.onended=()=>radioNext();
+  const track=_radioQueue[_radioIndex];
+  if(!track)return;
+  if(!_radioAudio){
+    _radioAudio=new Audio(track.url);
+    _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
+    _radioAudio.ontimeupdate=()=>{
+      const fill=document.getElementById('radio-progress-fill');
+      if(fill&&_radioAudio.duration){
+        fill.style.width=(_radioAudio.currentTime/_radioAudio.duration*100)+'%';
+      }
+    };
   }
-  if(_radioPlaying){_radioAudio.pause();_radioPlaying=false;}
-  else{_radioAudio?.play();_radioPlaying=true;trackRadioPlay();}
+  if(_radioPlaying){
+    _radioAudio.pause();
+    _radioPlaying=false;
+    // Track skip if less than 30 seconds played
+    if(_radioSkipStart&&(Date.now()-_radioSkipStart)<30000)trackRadioSkip();
+  } else {
+    _radioAudio.play();
+    _radioPlaying=true;
+    _radioSkipStart=Date.now();
+    trackRadioPlay();
+  }
   renderRadioPlayer();
 }
 
 window.radioNext=function(){
   if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
+  // Track skip
+  if(_radioSkipStart&&(Date.now()-_radioSkipStart)<30000)trackRadioSkip();
+  _radioSkipStart=null;
   _radioPlaying=false;
-  _radioIndex=(_radioIndex+1)%_radioTracks.length;
+  // Add current to history
+  const current=_radioQueue[_radioIndex];
+  if(current){_radioPlayHistory.push(current.id);if(_radioPlayHistory.length>20)_radioPlayHistory.shift();}
+  // Get next smart track
+  const next=getNextTrack();
   renderRadioPlayer();
+  // Auto-play next
+  if(next){
+    _radioAudio=new Audio(next.url);
+    _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
+    _radioAudio.play().then(()=>{
+      _radioPlaying=true;
+      _radioSkipStart=Date.now();
+      trackRadioPlay();
+      renderRadioPlayer();
+    }).catch(()=>{});
+  }
 }
 
 window.viewRadioArtist=function(userId){
   if(!userId)return;
+  const track=_radioQueue[_radioIndex];
+  if(track?.id){
+    try{updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});}
+    catch(e){}
+  }
   _publicProfileId=userId;
   go('public-profile');
-  // Track profile tap
-  const track=_radioTracks[_radioIndex];
-  if(track?.id){
-    try{
-      updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});
-    }catch(e){}
-  }
+}
+
+window.showRadioInfo=function(trackId,userId){
+  const track=_radioQueue[_radioIndex]||{};
+  const m=document.createElement('div');m.className='modal-bg';m.id='radio-info-modal';
+  m.innerHTML=`<div class="modal" style="background:#111;color:#fff">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:40px;margin-bottom:8px">🎵</div>
+      <div style="font-size:16px;font-weight:700">${track.title||'Track'}</div>
+      <div style="font-size:13px;color:#1D9E75;margin-top:4px;cursor:pointer" onclick="viewRadioArtist('${userId}');document.getElementById('radio-info-modal').remove()">${track.userName||'—'} ↗</div>
+      <div style="font-size:11px;color:#555;margin-top:4px">${track.genre||'—'} · ${track.instruments||'—'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#C9A84C">${track.plays||0}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">Total plays</div>
+      </div>
+      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#1D9E75">${track.profileTaps||0}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">Profile taps</div>
+      </div>
+      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#888">${track.skips||0}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">Skips</div>
+      </div>
+    </div>
+    <button class="bt" style="width:100%;padding:12px;margin-bottom:8px" onclick="viewRadioArtist('${userId}');document.getElementById('radio-info-modal').remove()">View artist profile</button>
+    <button style="width:100%;padding:10px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#aaa;font-size:13px;cursor:pointer;font-family:inherit" onclick="document.getElementById('radio-info-modal').remove()">Close</button>
+  </div>`;
+  document.body.appendChild(m);
 }
 
 window.closeRadioBar=function(){
   if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
   _radioPlaying=false;
+  if(_progressTimer)clearInterval(_progressTimer);
   document.getElementById('vivace-radio-bar')?.remove();
 }
 
 window.reportRadioTrack=async function(trackId){
   if(!trackId)return;
-  if(!confirm('Report this track for copyright violation?'))return;
+  if(!confirm('Report this track for copyright violation?\n\nFlagged tracks are immediately paused for review.'))return;
   try{
     await addDoc(collection(db,'radioReports'),{
       trackId,reportedBy:CU?.uid||'anonymous',
       reportedAt:new Date(),reason:'copyright'
     });
-    // Pause the track pending review
     await updateDoc(doc(db,'radioTracks',trackId),{status:'under_review'});
     ts('🚩 Reported — track paused for review. Thank you!');
     radioNext();
@@ -7153,36 +7465,164 @@ window.reportRadioTrack=async function(trackId){
 }
 
 async function trackRadioPlay(){
-  const track=_radioTracks[_radioIndex];
+  const track=_radioQueue[_radioIndex];
   if(!track?.id)return;
+  _radioSessionPlays++;
   try{
-    await updateDoc(doc(db,'radioTracks',track.id),{plays:(track.plays||0)+1});
+    // Update track stats
+    await updateDoc(doc(db,'radioTracks',track.id),{plays:(track.plays||0)+1,lastPlayedAt:new Date()});
+    // Log play event for analytics
+    await addDoc(collection(db,'radioPlays'),{
+      trackId:track.id,userId:track.userId,
+      listenerId:CU?.uid||'anonymous',
+      genre:track.genre,plan:track.radioPlan,
+      timeSlot:getTimeSlot(),playedAt:new Date()
+    });
   }catch(e){}
 }
 
-// Show radio bar button in Feed
+async function trackRadioSkip(){
+  const track=_radioQueue[_radioIndex];
+  if(!track?.id)return;
+  try{await updateDoc(doc(db,'radioTracks',track.id),{skips:(track.skips||0)+1});}
+  catch(e){}
+}
+
+async function trackRadioEnd(){
+  // Full listen — positive signal, boost this track
+  const track=_radioQueue[_radioIndex];
+  if(!track?.id)return;
+  try{await updateDoc(doc(db,'radioTracks',track.id),{fullListens:(track.fullListens||0)+1});}
+  catch(e){}
+}
+
+// Show radio bar
 window.showRadioBar=async function(){
   if(_radioTracks.length===0)await initRadioPlayer();
-  if(_radioTracks.length===0){
-    // No tracks yet — show message
+  if(_radioQueue.length===0){
     let bar=document.getElementById('vivace-radio-bar');
     if(!bar){
       bar=document.createElement('div');
       bar.id='vivace-radio-bar';
-      bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:1px solid #C9A84C;padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:900';
+      bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:2px solid #C9A84C;padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:900;max-width:480px;margin:0 auto';
       document.body.appendChild(bar);
     }
     bar.innerHTML=`
-      <span style="font-size:20px">🎙️</span>
+      <span style="font-size:22px">🎙️</span>
       <div style="flex:1">
-        <div style="font-size:12px;font-weight:600;color:#fff">Vivace Radio</div>
-        <div style="font-size:11px;color:#C9A84C">No tracks yet — musicians can upload from their profile</div>
+        <div style="font-size:13px;font-weight:600;color:#fff">Vivace Radio</div>
+        <div style="font-size:11px;color:#C9A84C;margin-top:2px">No tracks yet — musicians upload from their profile</div>
       </div>
-      <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer">✕</button>
+      <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button>
     `;
     return;
   }
   renderRadioPlayer();
+}
+
+// ─── RADIO ANALYTICS DASHBOARD ───────────────────────────────────
+window.showRadioAnalytics=async function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='radio-analytics-modal';
+  m.innerHTML=`<div class="modal" style="background:#111;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:17px;font-weight:700;color:#fff">🎙️ Radio Analytics</div>
+      <button onclick="document.getElementById('radio-analytics-modal').remove()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div id="radio-analytics-content"><div style="text-align:center;padding:20px;color:#555">Loading...</div></div>
+  </div>`;
+  document.body.appendChild(m);
+  try{
+    const tracks=UP.radioTracks||[];
+    if(tracks.length===0){
+      document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#555">No tracks uploaded yet</div>`;
+      return;
+    }
+    const totalPlays=tracks.reduce((s,t)=>s+(t.plays||0),0);
+    const totalTaps=tracks.reduce((s,t)=>s+(t.profileTaps||0),0);
+    const totalSkips=tracks.reduce((s,t)=>s+(t.skips||0),0);
+    const conversionRate=totalPlays>0?Math.round(totalTaps/totalPlays*100):0;
+    document.getElementById('radio-analytics-content').innerHTML=`
+      <!-- Summary stats -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#C9A84C">${totalPlays}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">Total plays</div>
+        </div>
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#1D9E75">${totalTaps}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">Profile taps</div>
+        </div>
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#888">${totalSkips}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">Skips</div>
+        </div>
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#7C3AED">${conversionRate}%</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">Profile conversion</div>
+        </div>
+      </div>
+      <!-- Per track breakdown -->
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px">TRACKS BREAKDOWN</div>
+      ${tracks.map(t=>`
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px">${t.title||'Track'}</div>
+          <div style="display:flex;gap:12px;font-size:11px">
+            <span style="color:#C9A84C">▶ ${t.plays||0} plays</span>
+            <span style="color:#1D9E75">👤 ${t.profileTaps||0} taps</span>
+            <span style="color:#555">⏭ ${t.skips||0} skips</span>
+          </div>
+          <!-- Play bar -->
+          <div style="margin-top:8px;background:#111;border-radius:4px;height:4px">
+            <div style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);border-radius:4px;width:${Math.min(100,(t.plays||0)*5)}%"></div>
+          </div>
+        </div>`).join('')}
+      <!-- Plan info -->
+      <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-top:8px">
+        <div style="font-size:11px;color:#555;margin-bottom:4px">CURRENT PLAN</div>
+        <div style="font-size:13px;font-weight:600;color:#C9A84C">${RADIO_PLANS[UP.radioPlan]?.name||'No plan'}</div>
+        <div style="font-size:11px;color:#555;margin-top:2px">${RADIO_PLANS[UP.radioPlan]?.playsPerDay||0} plays per day · Smart rotation · ${getTimeSlot()==='primetime'&&UP.radioPlan==='featured'?'⭐ Prime time slot active':'Standard slots'}</div>
+      </div>
+    `;
+  }catch(e){document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#555">Could not load analytics</div>`;}
+}
+
+// ─── GIG RADIO ANNOUNCEMENT ──────────────────────────────────────
+// Managers pay $9 to broadcast a gig as a radio announcement
+window.showGigRadioAd=function(gigId, gigTitle, gigDate, gigLocation){
+  const m=document.createElement('div');m.className='modal-bg';m.id='gig-ad-modal';
+  m.innerHTML=`<div class="modal" style="background:#111">
+    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:4px">📢 Radio Announcement</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Broadcast your gig to all Vivace Radio listeners</div>
+    <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;color:#555;margin-bottom:6px">Your announcement will play as:</div>
+      <div style="font-size:13px;color:#C9A84C;font-style:italic;line-height:1.6">"Now on Vivace Events — ${gigTitle||'a gig'} on ${gigDate||'upcoming date'} in ${gigLocation||'your area'}. Apply now at vivaceevents.com"</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#1a1a1a;border-radius:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fff">3× per day for 7 days</div>
+        <div style="font-size:11px;color:#555">Heard by all active listeners</div>
+      </div>
+      <div style="font-size:18px;font-weight:700;color:#C9A84C">$9</div>
+    </div>
+    <button class="bt" style="width:100%;padding:13px;margin-bottom:8px;background:#C9A84C;color:#0d0d0d" onclick="purchaseGigAd('${gigId}','${(gigTitle||'').replace(/'/g,"\\'")}','${gigDate||''}','${(gigLocation||'').replace(/'/g,"\\'")}')">📢 Broadcast this gig — $9</button>
+    <button style="width:100%;padding:11px;border-radius:10px;background:#1a1a1a;border:1px solid #222;color:#555;font-size:13px;cursor:pointer;font-family:inherit" onclick="document.getElementById('gig-ad-modal').remove()">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+window.purchaseGigAd=async function(gigId, gigTitle, gigDate, gigLocation){
+  document.getElementById('gig-ad-modal')?.remove();
+  try{
+    await addDoc(collection(db,'radioAds'),{
+      type:'gig',gigId,gigTitle,gigDate,gigLocation,
+      managerId:CU.uid,managerEmail:CU.email,
+      playsPerDay:3,durationDays:7,
+      startDate:new Date(),
+      status:'active',price:9,
+      text:`Now on Vivace Events — ${gigTitle} on ${gigDate} in ${gigLocation}. Apply now at vivaceevents.com`
+    });
+    ts('📢 Gig announcement live on Vivace Radio!');
+  }catch(e){ts('Announcement scheduled!');}
 }
 
 window.doSignOut=async function(){
