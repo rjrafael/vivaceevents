@@ -5219,32 +5219,21 @@ window.uploadReel=async function(input){
   if(progress)progress.style.display='block';
 
   try{
-    const {ref:sRef,uploadBytesResumable,getDownloadURL}=await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js');
-    const storageRef=sRef(storage,`reels/${CU.uid}/${Date.now()}_${file.name}`);
-    const uploadTask=uploadBytesResumable(storageRef,file);
-
-    uploadTask.on('state_changed',
-      (snapshot)=>{
-        const pct=Math.round((snapshot.bytesTransferred/snapshot.totalBytes)*100);
-        if(bar)bar.style.width=pct+'%';
-        if(text)text.textContent=`Uploading ${pct}%...`;
-      },
-      (err)=>{
-        if(progress)progress.style.display='none';
-        ts('Upload failed — try again');
-      },
-      async()=>{
-        const url=await getDownloadURL(uploadTask.snapshot.ref);
-        UP.reelURL=url;
-        await saveUP();
-        if(progress)progress.style.display='none';
-        ts('🎥 Video reel uploaded!');
-        render();
-      }
-    );
-  }catch(e){
+    const storageRef=ref(storage,`reels/${CU.uid}/${Date.now()}_${file.name}`);
+    // Use uploadBytes for simplicity
+    if(text)text.textContent='Uploading...';
+    if(bar)bar.style.width='50%';
+    const snapshot=await uploadBytes(storageRef,file);
+    const url=await getDownloadURL(snapshot.ref);
+    UP.reelURL=url;
+    await saveUP();
     if(progress)progress.style.display='none';
-    ts('Upload failed');
+    ts('🎥 Video reel uploaded!');
+    render();
+  }catch(e){
+    console.error('Reel upload error:',e);
+    if(progress)progress.style.display='none';
+    ts('Upload failed — '+e.message);
   }
 }
 
