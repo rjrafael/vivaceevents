@@ -7258,76 +7258,124 @@ function renderRadioPlayer(){
     bar=document.createElement('div');
     bar.id='vivace-radio-bar';
     document.body.appendChild(bar);
+    // Floating player — no page padding needed
+    document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='70px');
   }
-  const nav=document.querySelector('.bnav');
-  const navH=nav?nav.offsetHeight:60;
-  bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:999;background:#0d0d0d;border-top:2px solid #C9A84C;box-sizing:border-box`;
-  // Push page content up so radio bar doesn't cover it
-  document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='130px');
   const track=_radioQueue[_radioIndex]||{};
-  const slot=getTimeSlot();
-  const isPrimetime=slot==='primetime';
   const isFeatured=track.radioPlan==='featured';
 
+  // Position bottom-right by default, only first time
+  if(!bar._positioned){
+    const nav=document.querySelector('.bnav');
+    const navH=nav?nav.offsetHeight:60;
+    bar.style.cssText=`position:fixed;bottom:${navH+12}px;right:12px;z-index:9999;width:210px;border-radius:18px;background:rgba(13,13,13,0.96);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7),0 0 0 1px #C9A84C11;cursor:grab;user-select:none`;
+    bar._positioned=true;
+    makeDraggable(bar);
+  }
+
   bar.innerHTML=`
-    <!-- Now playing - compact single row -->
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px">
-      <div style="width:22px;height:22px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
-        ${_radioPlaying?`
-          <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:10px"></div>
-          <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:16px"></div>
-          <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:8px"></div>
-          <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:12px"></div>
-        `:`<span style="font-size:14px">🎙️</span>`}
-      </div>
-      <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioGenres()">
-        <div style="font-size:12px;font-weight:700;color:#ffffff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
-        <div style="font-size:9px;display:flex;align-items:center;gap:3px;margin-top:1px">
-          <span style="color:#1D9E75;font-weight:600">${track.userName||'—'}</span>
-          <span style="color:#666">·</span>
-          <span style="color:#bbb">${track.genre||'—'}</span>
-          <span style="color:#666">·</span>
-          <span style="color:#C9A84C">${getTimeSlotLabel()}</span>
+    <div id="radio-collapsed" style="padding:9px 11px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <div style="width:18px;height:18px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
+          ${_radioPlaying?`
+            <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:9px"></div>
+            <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:15px"></div>
+            <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:7px"></div>
+            <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:12px"></div>
+          `:`<span style="font-size:13px;line-height:1">🎙️</span>`}
         </div>
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioExpand()">
+          <div style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${track.title||'Vivace Radio'}</div>
+          <div style="font-size:9px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'}</div>
+        </div>
+        <button onclick="radioPlayPause()" style="width:26px;height:26px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:10px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
+        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:13px;cursor:pointer;padding:0 0 0 2px;font-weight:700;line-height:1;flex-shrink:0">✕</button>
       </div>
-      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
-        <button onclick="radioPlayPause()" style="width:30px;height:30px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
-        <button onclick="radioNext()" style="background:none;border:none;color:#aaa;font-size:15px;cursor:pointer;padding:2px">⏭</button>
-        <button onclick="toggleRadioGenres()" style="background:none;border:none;color:#C9A84C;font-size:11px;cursor:pointer;padding:2px">🎚️</button>
-        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:16px;cursor:pointer;padding:2px;font-weight:700;line-height:1">✕</button>
+      <div id="radio-progress-bg" style="height:2px;background:#333;border-radius:2px;margin-top:6px;cursor:pointer" onclick="radioSeek(event)">
+        <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);border-radius:2px;width:0%;transition:width 0.5s linear"></div>
       </div>
     </div>
-    <!-- Genre selector - hidden by default -->
-    <div id="radio-genre-row" style="display:none;gap:4px;padding:4px 10px 6px;overflow-x:auto;border-top:1px solid #222;scrollbar-width:none">
-      ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Electronic / EDM','Rock / Pop','Folk / Celtic','Latin / Flamenco','World / Ethnic','Opera','Film / TV / Soundtrack'].map(g=>`
-        <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:2px 8px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#555'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ddd'};font-size:9px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
-      `).join('')}
-    </div>
-    <div id="radio-progress-bg" style="height:2px;background:#222;cursor:pointer" onclick="radioSeek(event)">
-      <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);width:0%;transition:width 0.5s linear"></div>
+    <div id="radio-expanded" style="display:none;border-top:1px solid #222;padding:8px 11px 10px">
+      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:8px">
+        <button onclick="radioPlayPause()" style="width:34px;height:34px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:13px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
+        <button onclick="radioNext()" style="background:none;border:none;color:#ccc;font-size:16px;cursor:pointer">⏭</button>
+        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#ccc;font-size:12px;cursor:pointer">ℹ️</button>
+        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:12px;cursor:pointer">🚩</button>
+      </div>
+      <div style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px">
+        ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Rock / Pop','World / Ethnic','Electronic / EDM','Opera'].map(g=>`
+          <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:2px 7px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#444'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ccc'};font-size:8px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️':g}</button>
+        `).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px">
+        <span style="font-size:9px;color:#C9A84C">${getTimeSlotLabel()}${isFeatured?' ⭐':''}</span>
+        <span style="font-size:9px;color:#1D9E75;cursor:pointer;font-weight:600" onclick="viewRadioArtist('${track.userId||''}')">Profile ↗</span>
+      </div>
     </div>
   `;
 
-  // Add EQ animation styles if not already added
   if(!document.getElementById('radio-styles')){
     const s=document.createElement('style');
     s.id='radio-styles';
     s.textContent=`
-      @keyframes eq1{0%,100%{height:6px}50%{height:18px}}
-      @keyframes eq2{0%,100%{height:18px}50%{height:8px}}
-      @keyframes eq3{0%,100%{height:10px}50%{height:22px}}
-      #vivace-radio-bar{max-width:480px;margin:0 auto;left:0;right:0;}
+      @keyframes eq1{0%,100%{height:5px}50%{height:16px}}
+      @keyframes eq2{0%,100%{height:14px}50%{height:6px}}
+      @keyframes eq3{0%,100%{height:8px}50%{height:18px}}
     `;
     document.head.appendChild(s);
   }
-
-  // Start progress bar update if playing
   if(_radioPlaying)startProgressBar();
 }
 
 function getTimeSlotLabel(){
-  const labels={morning:'☀️ Morning',focused:'💼 Work hours',lunch:'🍽️ Lunch',afternoon:'🌤️ Afternoon',primetime:'⭐ Prime time',evening:'🌙 Evening',latenight:'🌃 Late night'};
+  const labels={morning:'☀️ Morning',focused:'💼 Work',lunch:'🍽️ Lunch',afternoon:'🌤️ Afternoon',primetime:'⭐ Prime time',evening:'🌙 Evening',latenight:'🌃 Late night'};
   return labels[getTimeSlot()]||'';
+}
+
+window.toggleRadioExpand=function(){
+  const exp=document.getElementById('radio-expanded');
+  if(!exp)return;
+  const bar=document.getElementById('vivace-radio-bar');
+  if(exp.style.display==='none'){
+    exp.style.display='block';
+    if(bar){bar.style.borderRadius='18px 18px 14px 14px';}
+  } else {
+    exp.style.display='none';
+    if(bar){bar.style.borderRadius='18px';}
+  }
+}
+
+function makeDraggable(el){
+  let startX,startY,startRight,startBottom,dragging=false,moved=false;
+  function dragStart(e){
+    if(e.target.tagName==='BUTTON')return;
+    dragging=true;moved=false;
+    const touch=e.touches?e.touches[0]:e;
+    startX=touch.clientX;startY=touch.clientY;
+    const rect=el.getBoundingClientRect();
+    startRight=window.innerWidth-rect.right;
+    startBottom=window.innerHeight-rect.bottom;
+    el.style.cursor='grabbing';
+  }
+  function dragMove(e){
+    if(!dragging)return;
+    const touch=e.touches?e.touches[0]:e;
+    const dx=touch.clientX-startX;
+    const dy=touch.clientY-startY;
+    if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;
+    const newRight=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,startRight-dx));
+    const newBottom=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,startBottom-dy));
+    el.style.right=newRight+'px';
+    el.style.bottom=newBottom+'px';
+    el.style.left='auto';
+    e.preventDefault&&e.preventDefault();
+  }
+  el.addEventListener('mousedown',dragStart);
+  el.addEventListener('touchstart',dragStart,{passive:true});
+  document.addEventListener('mousemove',dragMove);
+  document.addEventListener('touchmove',dragMove,{passive:false});
+  document.addEventListener('mouseup',()=>{dragging=false;el.style.cursor='grab';});
+  document.addEventListener('touchend',()=>{dragging=false;el.style.cursor='grab';});
 }
 
 let _progressTimer=null;
