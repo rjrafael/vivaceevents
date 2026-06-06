@@ -6163,7 +6163,7 @@ window.addEventListener('load',()=>{
 function dmcaHTML(){
   return `
 <div class="hdr">
-  <button onclick="go('feed')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
+  <button onclick="history.back?history.back():go('profile')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
   <div class="logo" style="font-size:13px">DMCA Policy</div>
   <div></div>
 </div>
