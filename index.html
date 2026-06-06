@@ -2947,6 +2947,81 @@ setTimeout(()=>{
   }catch(e){}
 },45000);
 
+// ─── MUSICIAN CALENDAR MODAL ─────────────────────────────────────
+window.showMusicianCalendar=async function(musicianId, musicianName){
+  const m=document.createElement('div');m.className='modal-bg';m.id='musician-cal-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:#111">📅 ${musicianName}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px">Availability & performances</div>
+      </div>
+      <button onclick="document.getElementById('musician-cal-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div id="musician-cal-content"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  try{
+    const snap=await getDoc(doc(db,'availability',musicianId));
+    const data=snap.exists()?snap.data():{};
+    const available=data.available||[];
+    const unavailable=data.unavailable||[];
+    const performances=data.performances||[];
+    const el=document.getElementById('musician-cal-content');if(!el)return;
+    const now=new Date();
+    const months=[];
+    for(let i=0;i<2;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);months.push(d);}
+    let html='';
+    const upcomingPerf=performances.filter(p=>new Date(p.date)>=now).sort((a,b)=>new Date(a.date)-new Date(b.date));
+    if(upcomingPerf.length>0){
+      html+=`<div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">🎵 Upcoming performances</div>
+        ${upcomingPerf.slice(0,3).map(p=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f5">
+            <div><div style="font-size:13px;font-weight:600;color:#111">${p.title||'Performance'}</div>
+            <div style="font-size:11px;color:#aaa">${p.venue||'—'}</div></div>
+            <div style="font-size:12px;color:#888">${p.date||'—'}</div>
+          </div>`).join('')}
+      </div>`;
+    }
+    months.forEach(monthDate=>{
+      const year=monthDate.getFullYear();const month=monthDate.getMonth();
+      const monthName=monthDate.toLocaleString('default',{month:'long',year:'numeric'});
+      const daysInMonth=new Date(year,month+1,0).getDate();
+      const firstDay=new Date(year,month,1).getDay();
+      html+=`<div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">${monthName}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center">
+          ${['S','M','T','W','T','F','S'].map(d=>`<div style="font-size:10px;color:#aaa;padding:4px 0">${d}</div>`).join('')}
+          ${Array(firstDay).fill('<div></div>').join('')}
+          ${Array.from({length:daysInMonth},(_,i)=>{
+            const day=i+1;
+            const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const isAvail=available.includes(dateStr);
+            const isUnavail=unavailable.includes(dateStr);
+            const isPerf=performances.some(p=>p.date===dateStr);
+            const isToday=dateStr===new Date().toISOString().split('T')[0];
+            let bg='transparent',color='#111',border='none';
+            if(isPerf){bg='#1D9E75';color='#fff';}
+            else if(isAvail){bg='#E1F5EE';color='#085041';}
+            else if(isUnavail){bg='#FCEBEB';color='#791F1F';}
+            if(isToday)border='2px solid #1D9E75';
+            return `<div style="padding:4px 2px;border-radius:6px;background:${bg};color:${color};font-size:11px;border:${border}">${day}</div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    });
+    html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:12px;height:12px;border-radius:3px;background:#E1F5EE"></div><span style="font-size:11px;color:#888">Available</span></div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:12px;height:12px;border-radius:3px;background:#FCEBEB"></div><span style="font-size:11px;color:#888">Unavailable</span></div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:12px;height:12px;border-radius:3px;background:#1D9E75"></div><span style="font-size:11px;color:#888">Performance</span></div>
+    </div>`;
+    el.innerHTML=html;
+  }catch(e){
+    document.getElementById('musician-cal-content').innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">No availability data</div>`;
+  }
+}
+
 async function checkAutoVerification(){
   if(!CU||!UP||UP.verified)return;
   try{
@@ -3368,11 +3443,12 @@ window.saveVehicleInfo=async function(gigId){
 }
 
 // ─── CARPOOL SYSTEM ──────────────────────────────────────────────
-window.showCarpoolModal=function(gigId, gigTitle){
+window.showCarpoolModal=async function(gigId, gigTitle){
   const m=document.createElement('div');m.className='modal-bg';m.id='carpool-modal';
-  m.innerHTML=`<div class="modal">
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🚗 Carpool</div>
-    <div style="font-size:13px;color:#888;margin-bottom:20px">${gigTitle}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">${gigTitle}</div>
+    <div id="carpool-list" style="margin-bottom:14px"><div style="text-align:center;padding:10px 0;color:#aaa;font-size:12px">Loading...</div></div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
       <div class="cancel-reason" id="cp-offer" onclick="selectCarpoolType('offer')">
         <div style="display:flex;align-items:center;gap:12px">
@@ -3407,6 +3483,31 @@ window.showCarpoolModal=function(gigId, gigTitle){
   </div>`;
   document.getElementById('app').appendChild(m);
   window._carpoolType='';
+  // Load existing carpool entries
+  try{
+    const snap=await getDocs(query(collection(db,'carpool'),where('gigId','==',gigId)));
+    const entries=snap.docs.map(d=>d.data());
+    const el=document.getElementById('carpool-list');if(!el)return;
+    if(entries.length===0){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:6px 0">No carpool entries yet — be the first!</div>';return;}
+    const offers=entries.filter(e=>e.type==='offer');
+    const needs=entries.filter(e=>e.type==='need');
+    let html='';
+    if(offers.length>0){
+      html+=`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:#085041;margin-bottom:6px">🚗 Offering rides (${offers.length})</div>
+        ${offers.map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#E1F5EE;border-radius:8px;margin-bottom:4px">
+          <div><div style="font-size:12px;font-weight:600;color:#111">${e.userName||'Driver'}</div>
+          <div style="font-size:11px;color:#666">${e.from?'📍 '+e.from:''} ${e.seats?'· '+e.seats+' seats':''}</div></div>
+        </div>`).join('')}</div>`;
+    }
+    if(needs.length>0){
+      html+=`<div><div style="font-size:11px;font-weight:600;color:#633806;margin-bottom:6px">✋ Need rides (${needs.length})</div>
+        ${needs.map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#FAEEDA;border-radius:8px;margin-bottom:4px">
+          <div><div style="font-size:12px;font-weight:600;color:#111">${e.userName||'Rider'}</div>
+          <div style="font-size:11px;color:#666">${e.location?'📍 '+e.location:''}</div></div>
+        </div>`).join('')}</div>`;
+    }
+    el.innerHTML=html;
+  }catch(e){document.getElementById('carpool-list').innerHTML='';}
 }
 
 window.selectCarpoolType=function(type){
@@ -3767,7 +3868,7 @@ window.filterArtists=function(){
       if(!skills.includes(_skillFilter))return false;
     }
     if(_genreFilter){
-      if(!genres.includes(_genreFilter))return false;
+      if(!genres.includes(_genreFilter)&&!genres.includes(_genreFilter.toLowerCase()))return false;
     }
     if(_roleFilter==='available'){
       if(!a.avail)return false;
@@ -3855,6 +3956,7 @@ function acard(ini,bg,tc,name,role,avail,rat,tags,musicianId,musicianEmail,prior
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
     <div style="font-size:12px;color:#aaa">⭐ ${rat}</div>
     <div style="display:flex;gap:6px">
+      ${isMgr()?`<button class="bg" style="padding:6px 10px;font-size:11px" onclick="showMusicianCalendar('${musicianId}','${(name||'').replace(/'/g,"\\'")}')">📅</button>`:''}
       ${trusted?`<button class="bg" style="padding:6px 12px;font-size:11px" onclick="openChat('${musicianId}','${(musicianEmail||'').replace(/'/g,"\\'")}','${(name||'').replace(/'/g,"\\'")}')">💬 Message</button>`:''}
       ${(role.toLowerCase().includes('teacher')||(u.roles||[]).includes('teacher'))&&(isStudent()||CU?.email==='rafael.javadov@gmail.com')?`
         <button class="bt" style="padding:6px 12px;font-size:11px;background:#7C3AED" onclick="showBookLesson('${musicianId}','${(name||'').replace(/'/g,"\\'")}','${(musicianEmail||'').replace(/'/g,"\\'")}')">📚 Book lesson</button>
