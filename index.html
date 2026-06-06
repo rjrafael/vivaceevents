@@ -7364,11 +7364,12 @@ window.switchRadioGenre=async function(genre){
   renderRadioPlayer();
 }
 
-window.radioPlayPause=function(){
+window.radioPlayPause=async function(){
   const track=_radioQueue[_radioIndex];
-  if(!track)return;
+  if(!track){ts('No tracks available');return;}
   if(!_radioAudio){
     _radioAudio=new Audio(track.url);
+    _radioAudio.crossOrigin='anonymous';
     _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
     _radioAudio.ontimeupdate=()=>{
       const fill=document.getElementById('radio-progress-fill');
@@ -7380,13 +7381,18 @@ window.radioPlayPause=function(){
   if(_radioPlaying){
     _radioAudio.pause();
     _radioPlaying=false;
-    // Track skip if less than 30 seconds played
     if(_radioSkipStart&&(Date.now()-_radioSkipStart)<30000)trackRadioSkip();
   } else {
-    _radioAudio.play();
-    _radioPlaying=true;
-    _radioSkipStart=Date.now();
-    trackRadioPlay();
+    try{
+      await _radioAudio.play();
+      _radioPlaying=true;
+      _radioSkipStart=Date.now();
+      trackRadioPlay();
+    }catch(e){
+      console.log('Play error:',e.message);
+      ts('Tap play again to start radio 🎙️');
+      _radioAudio=null;
+    }
   }
   renderRadioPlayer();
 }
