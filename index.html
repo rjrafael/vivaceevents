@@ -3869,6 +3869,7 @@ window.filterArtists=function(){
     }
     if(_genreFilter){
       const genreArr=(a.genres||[]).map(g=>g.toLowerCase());
+      if(genreArr.length===0)return false;
       if(!genreArr.some(g=>g.includes(_genreFilter)||_genreFilter.includes(g)))return false;
     }
     if(_roleFilter==='available'){
