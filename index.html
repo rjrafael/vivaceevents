@@ -1972,9 +1972,13 @@ function renderCalendarModal(){
     if(isToday&&bg==='transparent')border='2px solid #1D9E75';
     if(isPast){color='#ccc';}
 
-    days+=`<div onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}" 
+    days+=`<div 
+      onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}"
+      onmousedown="${isPast?'':'startCalDrag(\''+dateStr+'\')'}"
+      onmouseover="${isPast?'':'updateCalDrag(\''+dateStr+'\')'}"
+      onmouseup="${isPast?'':'endCalDrag()'}"
       style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
-      background:${bg};color:${color};border:${border};position:relative;transition:all .15s">
+      background:${bg};color:${color};border:${border};position:relative;transition:all .1s;user-select:none">
       ${d}
       ${perf?`<div style="width:5px;height:5px;border-radius:50%;background:${perf.isPublic?'#7C3AED':'#aaa'};position:absolute;bottom:3px"></div>`:''}
     </div>`;
@@ -2075,6 +2079,26 @@ window.handleCalDay=function(dateStr){
   const perf=_perfEvents[dateStr];
   const isAvail=_availDates.has(dateStr);
   const isUnavail=_unavailDates&&_unavailDates.has(dateStr);
+
+// Mouse drag for desktop range selection
+let _isDragging=false;
+window.startCalDrag=function(dateStr){
+  _isDragging=true;
+  _rangeStart=dateStr;
+  _rangeEnd=null;
+  renderCalendarModal();
+}
+window.updateCalDrag=function(dateStr){
+  if(!_isDragging||!_rangeStart)return;
+  if(dateStr===_rangeStart){_rangeEnd=null;}
+  else if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
+  else{_rangeEnd=dateStr;}
+  renderCalendarModal();
+}
+window.endCalDrag=function(){
+  _isDragging=false;
+}
+document.addEventListener('mouseup',()=>{_isDragging=false;});
 
 window.applyRange=function(status){
   if(!_rangeStart||!_rangeEnd)return;
@@ -2239,30 +2263,47 @@ window.toggleDay=function(dateStr){
   renderCalendarModal();
 }
 
-window.markWeekdays=function(){
-  const year=_calYear,month=_calMonth;
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  for(let d=1;d<=daysInMonth;d++){
-    const date=new Date(year,month,d);
-    if(date.getDay()>0&&date.getDay()<6){
-      const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      _availDates.add(dateStr);
-    }
-  }
-  renderCalendarModal();
+window.markWeekdays=function(){showBulkPicker('weekdays');}
+window.markWeekends=function(){showBulkPicker('weekends');}
+
+window.showBulkPicker=function(type){
+  const m=document.createElement('div');
+  m.id='bulk-picker';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  const label=type==='weekdays'?'weekdays':'weekends';
+  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px">
+    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px">Mark all ${label} as…</div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:16px">Applies to current month only</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <button onclick="applyBulk('${type}','available')" style="padding:13px;border-radius:10px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">✅ Available for gigs</button>
+      <button onclick="applyBulk('${type}','unavailable')" style="padding:13px;border-radius:10px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">❌ Unavailable / Busy</button>
+      <button onclick="applyBulk('${type}','clear')" style="padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:14px;cursor:pointer;font-family:inherit;text-align:left">⚪ Clear all markings</button>
+    </div>
+    <button onclick="document.getElementById('bulk-picker').remove()" style="width:100%;padding:12px;border-radius:10px;background:#f5f5f5;border:none;color:#555;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
 }
 
-window.markWeekends=function(){
+window.applyBulk=function(type, status){
   const year=_calYear,month=_calMonth;
   const daysInMonth=new Date(year,month+1,0).getDate();
+  let count=0;
   for(let d=1;d<=daysInMonth;d++){
     const date=new Date(year,month,d);
-    if(date.getDay()===0||date.getDay()===6){
+    const dow=date.getDay();
+    const isWeekday=dow>0&&dow<6;
+    const isWeekend=dow===0||dow===6;
+    if((type==='weekdays'&&isWeekday)||(type==='weekends'&&isWeekend)){
       const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      _availDates.add(dateStr);
+      if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
+      else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
+      else{_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
+      count++;
     }
   }
+  document.getElementById('bulk-picker')?.remove();
   renderCalendarModal();
+  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} ${type} updated!`);
 }
 
 window.clearMonth=function(){
@@ -2271,8 +2312,10 @@ window.clearMonth=function(){
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     _availDates.delete(dateStr);
+    _unavailDates.delete(dateStr);
   }
   renderCalendarModal();
+  ts('⚪ Month cleared!');
 }
 
 window.saveAvailability=async function(){
