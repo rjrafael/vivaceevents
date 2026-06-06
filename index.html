@@ -7268,60 +7268,55 @@ function renderRadioPlayer(){
   if(!bar._positioned){
     const nav=document.querySelector('.bnav');
     const navH=nav?nav.offsetHeight:60;
-    bar.style.cssText=`position:fixed;bottom:${navH+12}px;right:12px;z-index:9999;width:210px;border-radius:18px;background:rgba(13,13,13,0.96);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7),0 0 0 1px #C9A84C11;cursor:grab;user-select:none`;
+    bar.style.cssText=`position:fixed;bottom:${navH+10}px;left:50%;transform:translateX(-50%);z-index:9999;width:320px;border-radius:18px;background:rgba(13,13,13,0.97);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7),0 0 0 1px #C9A84C11;cursor:grab;user-select:none`;
     bar._positioned=true;
     makeDraggable(bar);
   }
 
   bar.innerHTML=`
-    <div id="radio-collapsed" style="padding:9px 11px">
-      <div style="display:flex;align-items:center;gap:7px">
-        <div style="width:18px;height:18px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
+    <div id="radio-collapsed" style="padding:11px 14px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="width:22px;height:22px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
           ${_radioPlaying?`
             <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:9px"></div>
             <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:15px"></div>
             <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:7px"></div>
             <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:12px"></div>
-          `:`<span style="font-size:13px;line-height:1">🎙️</span>`}
+          `:`<span style="font-size:14px;line-height:1">🎙️</span>`}
         </div>
         <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioExpand()">
-          <div style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${track.title||'Vivace Radio'}</div>
-          <div style="font-size:9px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'}</div>
+          <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${track.title||'Vivace Radio'}</div>
+          <div style="font-size:10px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'} · <span style="color:#666">tap to expand</span></div>
         </div>
-        <button onclick="radioPlayPause()" style="width:26px;height:26px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:10px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
-        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:13px;cursor:pointer;padding:0 0 0 2px;font-weight:700;line-height:1;flex-shrink:0">✕</button>
+        <button onclick="radioPlayPause()" style="width:30px;height:30px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
+        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:14px;cursor:pointer;padding:0 0 0 2px;font-weight:700;line-height:1;flex-shrink:0">✕</button>
       </div>
-      <div id="radio-progress-bg" style="height:2px;background:#333;border-radius:2px;margin-top:6px;cursor:pointer" onclick="radioSeek(event)">
+      <div id="radio-progress-bg" style="height:2px;background:#333;border-radius:2px;margin-top:8px;cursor:pointer" onclick="radioSeek(event)">
         <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);border-radius:2px;width:0%;transition:width 0.5s linear"></div>
       </div>
     </div>
-    <div id="radio-expanded" style="display:none;border-top:1px solid #222;padding:8px 11px 10px">
-      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:8px">
-        <button onclick="radioPlayPause()" style="width:34px;height:34px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:13px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
-        <button onclick="radioNext()" style="background:none;border:none;color:#ccc;font-size:16px;cursor:pointer">⏭</button>
-        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#ccc;font-size:12px;cursor:pointer">ℹ️</button>
-        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:12px;cursor:pointer">🚩</button>
+    <div id="radio-expanded" style="display:block;border-top:1px solid #222;padding:10px 14px 12px">
+      <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-bottom:10px">
+        <button onclick="radioPlayPause()" style="width:38px;height:38px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:15px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(201,168,76,0.3)">${_radioPlaying?'⏸':'▶'}</button>
+        <button onclick="radioNext()" style="background:none;border:none;color:#ccc;font-size:18px;cursor:pointer">⏭</button>
+        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#ccc;font-size:14px;cursor:pointer">ℹ️</button>
+        <button onclick="viewRadioArtist('${track.userId||''}')" style="background:none;border:none;color:#1D9E75;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit">Profile ↗</button>
+        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:13px;cursor:pointer">🚩</button>
       </div>
-      <div style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px">
+      <div style="font-size:9px;color:#555;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">🎚️ Genre channel</div>
+      <div style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px">
         ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Rock / Pop','World / Ethnic','Electronic / EDM','Opera'].map(g=>`
-          <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:2px 7px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#444'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ccc'};font-size:8px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️':g}</button>
+          <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:3px 9px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#444'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ccc'};font-size:9px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
         `).join('')}
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:7px">
-        <span style="font-size:9px;color:#C9A84C">${getTimeSlotLabel()}${isFeatured?' ⭐':''}</span>
-        <span style="font-size:9px;color:#1D9E75;cursor:pointer;font-weight:600" onclick="viewRadioArtist('${track.userId||''}')">Profile ↗</span>
-      </div>
+      <div style="margin-top:8px;font-size:9px;color:#C9A84C">${getTimeSlotLabel()}${isFeatured?' · Featured':''}</div>
     </div>
   `;
 
   if(!document.getElementById('radio-styles')){
     const s=document.createElement('style');
     s.id='radio-styles';
-    s.textContent=`
-      @keyframes eq1{0%,100%{height:5px}50%{height:16px}}
-      @keyframes eq2{0%,100%{height:14px}50%{height:6px}}
-      @keyframes eq3{0%,100%{height:8px}50%{height:18px}}
-    `;
+    s.textContent='@keyframes eq1{0%,100%{height:5px}50%{height:16px}}@keyframes eq2{0%,100%{height:14px}50%{height:6px}}@keyframes eq3{0%,100%{height:8px}50%{height:18px}}';
     document.head.appendChild(s);
   }
   if(_radioPlaying)startProgressBar();
