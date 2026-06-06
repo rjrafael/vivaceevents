@@ -668,6 +668,7 @@ function gigStatusBadge(status){
 }
 
 async function loadGigs(){
+  loadFeaturedGigs(); // Load featured section
   try{
     const s=await getDocs(query(collection(db,'gigs'),orderBy('timestamp','desc')));
     const el=document.getElementById('gig-list');if(!el)return;
@@ -1919,18 +1920,22 @@ window.showEarningsTracker=async function(){
 
 // ─── AVAILABILITY CALENDAR ───────────────────────────────────────
 let _availDates=new Set(); // Set of 'YYYY-MM-DD' strings
+let _unavailDates=new Set(); // Set of unavailable dates
 let _calYear=new Date().getFullYear();
 let _calMonth=new Date().getMonth();
+let _rangeStart=null;
+let _rangeEnd=null;
 
 window.showAvailabilityCalendar=async function(){
-  // Load existing availability
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
     if(snap.exists()){
-      _availDates=new Set(snap.data().dates||[]);
-      _perfEvents=snap.data().events||{};
+      const d=snap.data();
+      _availDates=new Set(d.available||d.dates||[]);
+      _unavailDates=new Set(d.unavailable||[]);
+      _perfEvents=d.events||{};
     }
-  }catch(e){_availDates=new Set();_perfEvents={};}
+  }catch(e){_availDates=new Set();_unavailDates=new Set();_perfEvents={};}
 
   const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
   document.getElementById('app').appendChild(m);
@@ -1950,16 +1955,26 @@ function renderCalendarModal(){
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isAvail=_availDates.has(dateStr);
+    const isUnavail=_unavailDates.has(dateStr);
+    const isRangeStart=_rangeStart===dateStr;
+    const isRangeEnd=_rangeEnd===dateStr;
+    const isInRange=_rangeStart&&_rangeEnd&&dateStr>_rangeStart&&dateStr<_rangeEnd;
     const perf=_perfEvents[dateStr];
     const isPast=dateStr<today;
     const isToday=dateStr===today;
-    
+
+    let bg='transparent',color='#333',border='2px solid transparent';
+    if(isRangeStart||isRangeEnd){bg='#0C447C';color='#fff';}
+    else if(isInRange){bg='#E6F1FB';color='#0C447C';}
+    else if(isAvail){bg='#1D9E75';color='#fff';}
+    else if(isUnavail){bg='#FF3B30';color='#fff';}
+    else if(perf){bg='#f5f0ff';}
+    if(isToday&&bg==='transparent')border='2px solid #1D9E75';
+    if(isPast){color='#ccc';}
+
     days+=`<div onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}" 
       style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
-      background:${isAvail?'#1D9E75':perf?'#f5f0ff':'transparent'};
-      color:${isAvail?'#fff':isPast?'#ccc':'#333'};
-      border:${isToday&&!isAvail&&!perf?'2px solid #1D9E75':'2px solid transparent'};
-      position:relative;transition:all .15s">
+      background:${bg};color:${color};border:${border};position:relative;transition:all .15s">
       ${d}
       ${perf?`<div style="width:5px;height:5px;border-radius:50%;background:${perf.isPublic?'#7C3AED':'#aaa'};position:absolute;bottom:3px"></div>`:''}
     </div>`;
@@ -1972,17 +1987,18 @@ function renderCalendarModal(){
     </div>
 
     <!-- Legend -->
-    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#1D9E75"></div>Available for gigs
+        <div style="width:14px;height:14px;border-radius:4px;background:#1D9E75"></div>Available
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#7C3AED"></div></div>Public performance
+        <div style="width:14px;height:14px;border-radius:4px;background:#FF3B30"></div>Unavailable
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#aaa"></div></div>Busy (private)
+        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#7C3AED"></div></div>Performance
       </div>
     </div>
+    <div style="font-size:11px;color:#1D9E75;margin-bottom:12px;font-weight:600">💡 Tap a date to set it · Tap two dates to select a range</div>
 
     <!-- Month navigation -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -2002,10 +2018,26 @@ function renderCalendarModal(){
     </div>
 
     <!-- Quick actions -->
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <button onclick="markWeekdays()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekdays</button>
       <button onclick="markWeekends()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekends</button>
       <button onclick="clearMonth()" style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:11px;cursor:pointer;font-family:inherit">Clear</button>
+    </div>
+
+    <!-- Range selection -->
+    <div id="range-bar" style="background:#f5f5f5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:12px;color:#555">
+        ${_rangeStart?`<span style="color:#1D9E75;font-weight:600">From: ${_rangeStart}</span> ${_rangeEnd?`→ <span style="color:#1D9E75;font-weight:600">${_rangeEnd}</span>`:'→ tap end date'}`:
+        '<span style="color:#888">Tap two dates to select a range</span>'}
+      </div>
+      ${_rangeStart?`<div style="display:flex;gap:6px">
+        ${_rangeEnd?`
+          <button onclick="applyRange('available')" style="padding:4px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">✅ Available</button>
+          <button onclick="applyRange('unavailable')" style="padding:4px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">❌ Busy</button>
+          <button onclick="applyRange('clear')" style="padding:4px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">⚪</button>
+        `:''}
+        <button onclick="clearRange()" style="padding:4px 8px;border-radius:8px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer">✕</button>
+      </div>`:''}
     </div>
 
     <div style="display:flex;gap:8px">
@@ -2019,8 +2051,53 @@ function renderCalendarModal(){
 let _perfEvents={}; // {dateStr: {title, venue, time, ticketLink, isPublic}}
 
 window.handleCalDay=function(dateStr){
+  // If range start is set and we tap a different date — set end of range
+  if(_rangeStart&&!_rangeEnd&&dateStr!==_rangeStart){
+    if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
+    else _rangeEnd=dateStr;
+    renderCalendarModal();
+    return;
+  }
+  // If same date tapped twice while range start — clear range start
+  if(_rangeStart===dateStr&&!_rangeEnd){
+    _rangeStart=null;
+    renderCalendarModal();
+    return;
+  }
+  // If range is complete, reset and start new
+  if(_rangeStart&&_rangeEnd){
+    _rangeStart=dateStr;_rangeEnd=null;
+    renderCalendarModal();
+    return;
+  }
+
+  // No range started — show single day options
   const perf=_perfEvents[dateStr];
   const isAvail=_availDates.has(dateStr);
+  const isUnavail=_unavailDates&&_unavailDates.has(dateStr);
+
+window.applyRange=function(status){
+  if(!_rangeStart||!_rangeEnd)return;
+  const start=new Date(_rangeStart+'T00:00:00');
+  const end=new Date(_rangeEnd+'T00:00:00');
+  const d=new Date(start);
+  while(d<=end){
+    const dateStr=d.toISOString().split('T')[0];
+    if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
+    else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
+    else if(status==='clear'){_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
+    d.setDate(d.getDate()+1);
+  }
+  const count=Math.round((end-start)/(1000*60*60*24))+1;
+  _rangeStart=null;_rangeEnd=null;
+  renderCalendarModal();
+  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} days updated!`);
+}
+
+window.clearRange=function(){
+  _rangeStart=null;_rangeEnd=null;
+  renderCalendarModal();
+}
   
   // Show action sheet
   const existing=document.getElementById('cal-action');
@@ -2040,10 +2117,18 @@ window.handleCalDay=function(dateStr){
       ${perf.isPublic?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${perf.venue} · ⏰ ${perf.time}</div>`:'<div style="font-size:12px;color:#aaa;margin-top:2px">Private — only shows as busy</div>'}
     </div>`:''}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-      <button onclick="toggleDay('${dateStr}');document.getElementById('cal-action').remove()" 
-        style="padding:13px;border-radius:10px;background:${isAvail?'#FCEBEB':'#E1F5EE'};border:none;color:${isAvail?'#791F1F':'#085041'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
-        ${isAvail?'❌ Mark as unavailable':'✅ Mark as available'}
+      <button onclick="setDayStatus('${dateStr}','available');document.getElementById('cal-action').remove()" 
+        style="padding:13px;border-radius:10px;background:${isAvail?'#1D9E75':'#E1F5EE'};border:${isAvail?'none':'1px solid #5DCAA5'};color:${isAvail?'#fff':'#085041'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        ✅ ${isAvail?'Available (current)':'Mark as available'}
       </button>
+      <button onclick="setDayStatus('${dateStr}','unavailable');document.getElementById('cal-action').remove()"
+        style="padding:13px;border-radius:10px;background:${isUnavail?'#FF3B30':'#FCEBEB'};border:${isUnavail?'none':'1px solid #F09595'};color:${isUnavail?'#fff':'#791F1F'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        ❌ ${isUnavail?'Unavailable (current)':'Mark as unavailable'}
+      </button>
+      ${isAvail||isUnavail?`<button onclick="setDayStatus('${dateStr}','clear');document.getElementById('cal-action').remove()"
+        style="padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:14px;cursor:pointer;font-family:inherit;text-align:left">
+        ⚪ Clear — remove marking
+      </button>`:''}
       <button onclick="showAddPerformance('${dateStr}');document.getElementById('cal-action').remove()"
         style="padding:13px;border-radius:10px;background:#f5f0ff;border:none;color:#5B21B6;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
         ${perf?'✏️ Edit performance/event':'🎵 Add performance or event'}
@@ -2134,6 +2219,20 @@ window.calNav=function(dir){
   renderCalendarModal();
 }
 
+window.setDayStatus=function(dateStr, status){
+  if(status==='available'){
+    _availDates.add(dateStr);
+    _unavailDates.delete(dateStr);
+  } else if(status==='unavailable'){
+    _unavailDates.add(dateStr);
+    _availDates.delete(dateStr);
+  } else if(status==='clear'){
+    _availDates.delete(dateStr);
+    _unavailDates.delete(dateStr);
+  }
+  renderCalendarModal();
+}
+
 window.toggleDay=function(dateStr){
   if(_availDates.has(dateStr))_availDates.delete(dateStr);
   else _availDates.add(dateStr);
@@ -2179,14 +2278,16 @@ window.clearMonth=function(){
 window.saveAvailability=async function(){
   try{
     const dates=[..._availDates].sort();
+    const unavailDates=[..._unavailDates].sort();
     await setDoc(doc(db,'availability',CU.uid),{
       userId:CU.uid,userEmail:CU.email,
+      available:dates,unavailable:unavailDates,
       dates,events:_perfEvents,updatedAt:new Date()
     });
     await setDoc(doc(db,'users',CU.uid),{availableDates:dates},{merge:true});
     document.getElementById('avail-modal')?.remove();
     loadAvailabilityPreview();
-    ts(`✅ Calendar saved — ${dates.length} available days!`);
+    ts(`✅ Calendar saved — ${dates.length} available, ${unavailDates.length} unavailable!`);
   }catch(e){ts('Saved!');}
 }
 
@@ -3082,7 +3183,7 @@ async function loadArtistCards(){
           id:u.id,email:u.email,priority:priorities[u.id]||'',trusted:trusted[u.id]||false,
           instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[],
           genres:u.genres||[],verified:u.verified||false,featured:u.featured||false,
-          plan:u.plan||'free',visibility:u.visibility||'public'};
+          plan:u.plan||'free',visibility:u.visibility||'public',ensembles:u.ensembles||[]};
       });
       const count=document.getElementById('search-count');
       if(count)count.textContent=`${_allArtists.length} musician${_allArtists.length>1?'s':''}`;
@@ -3351,7 +3452,7 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(()=>{loadGigs();checkNotifications();},100);
+  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
@@ -3361,20 +3462,102 @@ function feedHTML(){
   </div>
 </div>
 <div class="pad">
+
+<!-- Feed Search -->
+<div style="position:relative;margin-bottom:12px">
+  <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:#aaa">🔍</span>
+  <input class="finp" id="feed-search" style="padding-left:36px" placeholder="Search gigs by title, type, location…" oninput="filterFeed()"/>
+</div>
+
 <div class="pr"><span class="pl on" onclick="fpill(this)">All</span><span class="pl" onclick="fpill(this)">Gigs</span><span class="pl" onclick="fpill(this)">Masterclasses</span><span class="pl" onclick="fpill(this)">Sessions</span><span class="pl" onclick="fpill(this)">Free</span></div>
-<div class="dc">
-  <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
-  <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap" id="demo-bc-btns">
-    <button id="demo-avail" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #1D9E75;background:#1D9E75;color:#fff;opacity:0.5;transition:all .15s" onclick="demoRespond('available')">${t('available')}</button>
-    <button id="demo-maybe" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FFD700;background:#FFD700;color:#7A5800;opacity:0.5;transition:all .15s" onclick="demoRespond('maybe')">${t('maybe')}</button>
-    <button id="demo-no" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FF3B30;background:#FF3B30;color:#fff;opacity:0.5;transition:all .15s" onclick="demoRespond('no')">${t('cantMakeIt')}</button>
+
+<!-- Broadcast area — real or demo -->
+<div id="feed-broadcast">
+  <div class="dc">
+    <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — Alex Rivera, Manager</div>
+    <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">Who can play a string quartet Friday 8pm? Corporate gala downtown. $400/musician.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="demo-bc-btns">
+      <button id="demo-avail" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #1D9E75;background:#1D9E75;color:#fff;opacity:0.5;transition:all .15s" onclick="demoRespond('available')">${t('available')}</button>
+      <button id="demo-maybe" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FFD700;background:#FFD700;color:#7A5800;opacity:0.5;transition:all .15s" onclick="demoRespond('maybe')">${t('maybe')}</button>
+      <button id="demo-no" style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FF3B30;background:#FF3B30;color:#fff;opacity:0.5;transition:all .15s" onclick="demoRespond('no')">${t('cantMakeIt')}</button>
+    </div>
   </div>
 </div>
+
+<!-- Featured section -->
+<div id="featured-section" style="display:none;margin-bottom:16px">
+  <div class="sh"><span class="st">⭐ Featured opportunities</span></div>
+  <div id="featured-list"></div>
+</div>
+
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
 <div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
 
+// Load real broadcast for feed
+async function loadFeedBroadcast(){
+  try{
+    const snap=await getDocs(query(collection(db,'broadcasts'),orderBy('timestamp','desc')));
+    const broadcasts=snap.docs.map(d=>({id:d.id,...d.data()})).filter(b=>!b.groupId);
+    if(broadcasts.length===0)return; // Keep demo broadcast
+    const latest=broadcasts[0];
+    const el=document.getElementById('feed-broadcast');
+    if(!el)return;
+    el.innerHTML=`<div class="dc">
+      <div style="font-size:10px;font-weight:600;color:#1D9E75;letter-spacing:.07em;margin-bottom:5px">BROADCAST — ${latest.managerName||'Manager'}</div>
+      <div style="font-size:14px;color:#eee;line-height:1.5;margin-bottom:12px">${latest.message||''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #1D9E75;background:#1D9E75;color:#fff" onclick="respondBroadcast('${latest.id}','available')">${t('available')}</button>
+        <button style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FFD700;background:#FFD700;color:#7A5800" onclick="respondBroadcast('${latest.id}','maybe')">${t('maybe')}</button>
+        <button style="flex:1;padding:9px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:2px solid #FF3B30;background:#FF3B30;color:#fff" onclick="respondBroadcast('${latest.id}','no')">${t('cantMakeIt')}</button>
+      </div>
+    </div>`;
+  }catch(e){}
+}
+
+window.respondBroadcast=async function(broadcastId, response){
+  try{
+    await setDoc(doc(db,'responses',broadcastId+'_'+CU.uid),{
+      broadcastId,userId:CU.uid,userEmail:CU.email,
+      userName:UP.name||CU.email?.split('@')[0]||'',
+      response,timestamp:new Date()
+    });
+    ts(response==='available'?'✅ Response sent!':response==='maybe'?'⚡ Maybe sent!':'❌ Declined');
+  }catch(e){ts('Response saved!');}
+}
+
+// Feed keyword search
+window.filterFeed=function(){
+  const query=(document.getElementById('feed-search')?.value||'').toLowerCase().trim();
+  const cards=document.querySelectorAll('#gig-list .card');
+  cards.forEach(card=>{
+    const text=card.textContent.toLowerCase();
+    card.style.display=!query||text.includes(query)?'':'none';
+  });
+}
+
+// Load featured gigs
+async function loadFeaturedGigs(){
+  try{
+    const snap=await getDocs(query(collection(db,'gigs'),where('featured','==',true),where('status','==','open')));
+    const featured=snap.docs.map(d=>({id:d.id,...d.data()})).slice(0,3);
+    const section=document.getElementById('featured-section');
+    const list=document.getElementById('featured-list');
+    if(!section||!list||featured.length===0)return;
+    section.style.display='block';
+    list.innerHTML=featured.map(g=>`
+      <div class="card" style="border-left:3px solid #C9A84C;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FDF6E3;color:#C9A84C;font-weight:600;border:1px solid #C9A84C44">⭐ Featured</span>
+            <div style="font-size:15px;font-weight:700;color:#111;margin-top:4px">${g.title||'Gig'}</div>
+            <div style="font-size:12px;color:#888">${g.type||'Gig'} · ${g.date||'TBD'} · ${g.location||'Remote'}</div>
+          </div>
+          <div style="font-size:14px;font-weight:700;color:#1D9E75">${g.pay||''}</div>
+        </div>
+      </div>`).join('');
+  }catch(e){}
+}
 window.showLangPicker=function(){
   const m=document.createElement('div');m.className='modal-bg';m.id='lang-modal';
   m.innerHTML=`<div class="modal">
@@ -3790,7 +3973,7 @@ function discoverHTML(){
 </div>
 
 <!-- Filter pills - genres (scrollable) -->
-<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px;margin-left:-16px;margin-right:-16px;padding:0 16px">
   <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="genre-pills">
     <button onclick="selectPill(this,'genre')" data-filter=""
       style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid #7C3AED;background:#7C3AED;color:#fff;transition:all .15s">
@@ -3800,6 +3983,21 @@ function discoverHTML(){
       <button onclick="selectPill(this,'genre')" data-filter="${g.name.toLowerCase()}"
         style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${g.text}44;background:${g.color};color:${g.text};transition:all .15s">
         ${g.name}
+      </button>`).join('')}
+  </div>
+</div>
+
+<!-- Filter pills - ensemble (scrollable) -->
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;margin-left:-16px;margin-right:-16px;padding:0 16px">
+  <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="ensemble-pills">
+    <button onclick="selectEnsemblePill(this,'')" data-filter=""
+      style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid #555;background:#555;color:#fff">
+      All formats
+    </button>
+    ${ENSEMBLE_LIST.slice(0,10).map(e=>`
+      <button onclick="selectEnsemblePill(this,'${e.toLowerCase().replace(/'/g,"\\'")}')" data-filter="${e.toLowerCase()}"
+        style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid #eee;background:#f5f5f5;color:#555">
+        ${e}
       </button>`).join('')}
   </div>
 </div>
@@ -3818,6 +4016,16 @@ let _instFilter='';
 let _skillFilter='';
 let _roleFilter='';
 let _genreFilter='';
+let _ensembleFilter='';
+
+window.selectEnsemblePill=function(el,filter){
+  document.getElementById('ensemble-pills')?.querySelectorAll('button').forEach(b=>{
+    b.style.background='#f5f5f5';b.style.borderColor='#eee';b.style.color='#555';
+  });
+  el.style.background='#555';el.style.borderColor='#555';el.style.color='#fff';
+  _ensembleFilter=filter||'';
+  filterArtists();
+}
 
 window.selectPill=function(el, type){
   const container=document.getElementById(type==='inst'?'inst-pills':type==='skill'?'skill-pills':type==='genre'?'genre-pills':'role-pills');
@@ -3876,6 +4084,10 @@ window.filterArtists=function(){
       const genreArr=(a.genres||[]).map(g=>g.toLowerCase());
       if(genreArr.length===0)return false;
       if(!genreArr.some(g=>g.includes(_genreFilter)||_genreFilter.includes(g)))return false;
+    }
+    if(_ensembleFilter){
+      const ensembles=(a.ensembles||[]).join(' ').toLowerCase();
+      if(!ensembles.includes(_ensembleFilter))return false;
     }
     if(_roleFilter==='available'){
       if(!a.avail)return false;
