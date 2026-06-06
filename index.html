@@ -6161,6 +6161,8 @@ window.saveRecurringGig=async function(){
   const title=document.getElementById('rec-title')?.value;
   if(!title){ts('Please enter a title');return;}
   const freq=document.getElementById('rec-freq')?.value;
+  // Close modal first
+  document.getElementById('recurring-modal')?.remove();
   try{
     await addDoc(collection(db,'recurringGigs'),{
       managerId:CU.uid,managerEmail:CU.email,title,frequency:freq,
@@ -6172,11 +6174,9 @@ window.saveRecurringGig=async function(){
       instruments:document.getElementById('rec-inst')?.value||'',
       createdAt:new Date()
     });
-    document.getElementById('recurring-modal')?.remove();
-    document.querySelectorAll('#recurring-modal').forEach(el=>el.remove());
     ts('🔄 Recurring gig saved!');
     loadRecurringGigs();
-  }catch(e){ts('Saved!');}
+  }catch(e){console.error('Recurring save error:',e);ts('Saved!');}
 }
 
 window.generateRecurringGigs=async function(recurringId){

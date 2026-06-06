@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /gigs/{gigId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /applications/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /groups/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /invites/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /notifications/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /connections/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /ratings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /messages/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /conversations/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /broadcasts/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /responses/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /carpool/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /availability/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    match /contracts/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /cancellations/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /venues/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /earnings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /lessons/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /courses/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /studentProgress/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /recurringGigs/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /mail/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /reports/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
