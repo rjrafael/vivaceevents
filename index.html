@@ -7259,10 +7259,11 @@ function renderRadioPlayer(){
     bar.id='vivace-radio-bar';
     document.body.appendChild(bar);
   }
-  // Position above the bottom nav dynamically
   const nav=document.querySelector('.bnav');
   const navH=nav?nav.offsetHeight:60;
-  bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:999;background:#0d0d0d;border-top:2px solid #C9A84C;border-bottom:none;box-sizing:border-box`;
+  bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:999;background:#0d0d0d;border-top:2px solid #C9A84C;box-sizing:border-box`;
+  // Push page content up so radio bar doesn't cover it
+  document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='130px');
   const track=_radioQueue[_radioIndex]||{};
   const slot=getTimeSlot();
   const isPrimetime=slot==='primetime';
@@ -7467,6 +7468,8 @@ window.closeRadioBar=function(){
   _radioPlaying=false;
   if(_progressTimer)clearInterval(_progressTimer);
   document.getElementById('vivace-radio-bar')?.remove();
+  // Restore normal page padding
+  document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='70px');
 }
 
 window.reportRadioTrack=async function(trackId){
