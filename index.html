@@ -7257,9 +7257,12 @@ function renderRadioPlayer(){
   if(!bar){
     bar=document.createElement('div');
     bar.id='vivace-radio-bar';
-    bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;z-index:900;background:#0d0d0d;border-top:2px solid #C9A84C';
     document.body.appendChild(bar);
   }
+  // Position above the bottom nav dynamically
+  const nav=document.querySelector('.bnav');
+  const navH=nav?nav.offsetHeight:60;
+  bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:999;background:#0d0d0d;border-top:2px solid #C9A84C;border-bottom:none;box-sizing:border-box`;
   const track=_radioQueue[_radioIndex]||{};
   const slot=getTimeSlot();
   const isPrimetime=slot==='primetime';
@@ -7277,12 +7280,12 @@ function renderRadioPlayer(){
         `:`<span style="font-size:14px">🎙️</span>`}
       </div>
       <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioGenres()">
-        <div style="font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
+        <div style="font-size:12px;font-weight:700;color:#ffffff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
         <div style="font-size:9px;display:flex;align-items:center;gap:3px;margin-top:1px">
           <span style="color:#1D9E75;font-weight:600">${track.userName||'—'}</span>
-          <span style="color:#444">·</span>
-          <span style="color:#888">${track.genre||'—'}</span>
-          <span style="color:#444">·</span>
+          <span style="color:#666">·</span>
+          <span style="color:#bbb">${track.genre||'—'}</span>
+          <span style="color:#666">·</span>
           <span style="color:#C9A84C">${getTimeSlotLabel()}</span>
         </div>
       </div>
@@ -7520,7 +7523,9 @@ window.showRadioBar=async function(){
     if(!bar){
       bar=document.createElement('div');
       bar.id='vivace-radio-bar';
-      bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:2px solid #C9A84C;padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:900;max-width:480px;margin:0 auto';
+    const nav=document.querySelector('.bnav');
+    const navH=nav?nav.offsetHeight:60;
+    bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#0d0d0d;border-top:2px solid #C9A84C;padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:999;box-sizing:border-box`;
       document.body.appendChild(bar);
     }
     bar.innerHTML=`
