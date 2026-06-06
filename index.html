@@ -7163,7 +7163,26 @@ async function trackRadioPlay(){
 // Show radio bar button in Feed
 window.showRadioBar=async function(){
   if(_radioTracks.length===0)await initRadioPlayer();
-  else renderRadioPlayer();
+  if(_radioTracks.length===0){
+    // No tracks yet — show message
+    let bar=document.getElementById('vivace-radio-bar');
+    if(!bar){
+      bar=document.createElement('div');
+      bar.id='vivace-radio-bar';
+      bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:1px solid #C9A84C;padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:900';
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML=`
+      <span style="font-size:20px">🎙️</span>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:#fff">Vivace Radio</div>
+        <div style="font-size:11px;color:#C9A84C">No tracks yet — musicians can upload from their profile</div>
+      </div>
+      <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer">✕</button>
+    `;
+    return;
+  }
+  renderRadioPlayer();
 }
 
 window.doSignOut=async function(){
