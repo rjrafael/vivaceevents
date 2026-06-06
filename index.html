@@ -7266,41 +7266,38 @@ function renderRadioPlayer(){
   const isFeatured=track.radioPlan==='featured';
 
   bar.innerHTML=`
-    <!-- Genre channel selector -->
-    <div style="display:flex;gap:4px;padding:4px 12px;overflow-x:auto;border-bottom:1px solid #222;scrollbar-width:none">
-      ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Electronic / EDM','Rock / Pop','Folk / Celtic','Latin / Flamenco','World / Ethnic','Opera','Film / TV / Soundtrack'].map(g=>`
-        <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:2px 8px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#555'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ddd'};font-size:9px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
-      `).join('')}
-    </div>
-    <!-- Now playing -->
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px">
-      <div style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:flex-end;gap:2px;justify-content:center">
+    <!-- Now playing - compact single row -->
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px">
+      <div style="width:22px;height:22px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
         ${_radioPlaying?`
-          <div style="width:3px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:12px"></div>
-          <div style="width:3px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:18px"></div>
-          <div style="width:3px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:8px"></div>
-          <div style="width:3px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:14px"></div>
-        `:`<span style="font-size:16px">🎙️</span>`}
+          <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:10px"></div>
+          <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:16px"></div>
+          <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:8px"></div>
+          <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:12px"></div>
+        `:`<span style="font-size:14px">🎙️</span>`}
       </div>
-      <div style="flex:1;min-width:0">
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioGenres()">
         <div style="font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
-        <div style="font-size:9px;margin-top:1px;display:flex;align-items:center;gap:3px">
-          <span style="color:#1D9E75;cursor:pointer;font-weight:600" onclick="viewRadioArtist('${track.userId||''}')">${track.userName||'—'}</span>
-          <span style="color:#555">·</span>
+        <div style="font-size:9px;display:flex;align-items:center;gap:3px;margin-top:1px">
+          <span style="color:#1D9E75;font-weight:600">${track.userName||'—'}</span>
+          <span style="color:#444">·</span>
           <span style="color:#888">${track.genre||'—'}</span>
-          <span style="color:#555">·</span>
+          <span style="color:#444">·</span>
           <span style="color:#C9A84C">${getTimeSlotLabel()}</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-        <button onclick="radioPlayPause()" style="width:32px;height:32px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">
-          ${_radioPlaying?'⏸':'▶'}
-        </button>
-        <button onclick="radioNext()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:2px">⏭</button>
-        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#aaa;font-size:13px;cursor:pointer;padding:2px">ℹ️</button>
-        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:12px;cursor:pointer;padding:2px">🚩</button>
-        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:18px;cursor:pointer;padding:2px;font-weight:700;line-height:1">✕</button>
+      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+        <button onclick="radioPlayPause()" style="width:30px;height:30px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
+        <button onclick="radioNext()" style="background:none;border:none;color:#aaa;font-size:15px;cursor:pointer;padding:2px">⏭</button>
+        <button onclick="toggleRadioGenres()" style="background:none;border:none;color:#C9A84C;font-size:11px;cursor:pointer;padding:2px">🎚️</button>
+        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:16px;cursor:pointer;padding:2px;font-weight:700;line-height:1">✕</button>
       </div>
+    </div>
+    <!-- Genre selector - hidden by default -->
+    <div id="radio-genre-row" style="display:none;gap:4px;padding:4px 10px 6px;overflow-x:auto;border-top:1px solid #222;scrollbar-width:none">
+      ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Electronic / EDM','Rock / Pop','Folk / Celtic','Latin / Flamenco','World / Ethnic','Opera','Film / TV / Soundtrack'].map(g=>`
+        <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:2px 8px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#555'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ddd'};font-size:9px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
+      `).join('')}
     </div>
     <div id="radio-progress-bg" style="height:2px;background:#222;cursor:pointer" onclick="radioSeek(event)">
       <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);width:0%;transition:width 0.5s linear"></div>
@@ -7346,6 +7343,12 @@ window.radioSeek=function(e){
   if(!bg)return;
   const pct=e.offsetX/bg.offsetWidth;
   _radioAudio.currentTime=pct*_radioAudio.duration;
+}
+
+window.toggleRadioGenres=function(){
+  const row=document.getElementById('radio-genre-row');
+  if(!row)return;
+  row.style.display=row.style.display==='none'?'flex':'none';
 }
 
 window.switchRadioGenre=async function(genre){
