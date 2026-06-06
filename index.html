@@ -708,6 +708,8 @@ async function loadGigs(){
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
             ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
+                <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','${(g.description||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Add to Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
                 ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️ Vehicle info</button>`:''}
                 <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
@@ -719,6 +721,7 @@ async function loadGigs(){
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
                 <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
+                <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
                 <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
                 <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
@@ -6051,6 +6054,10 @@ async function loadPublicProfile(uid){
     const availSnap=await getDoc(doc(db,'availability',uid));
     const availData=availSnap.exists()?availSnap.data():{};
     const available=(availData.available||availData.dates||[]).filter(d=>d>=new Date().toISOString().split('T')[0]).slice(0,6);
+    const events=availData.events||{};
+    const upcomingPerfs=Object.entries(events)
+      .filter(([d,p])=>p.isPublic&&d>=new Date().toISOString().split('T')[0])
+      .sort(([a],[b])=>a.localeCompare(b)).slice(0,5);
     document.getElementById('public-profile-content').innerHTML=`
     <div style="text-align:center;margin-bottom:24px">
       ${u.photoURL?`<img src="${u.photoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px">`:`<div style="width:80px;height:80px;border-radius:50%;background:${bg};color:${tc};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin:0 auto 12px">${ini}</div>`}
@@ -6060,6 +6067,18 @@ async function loadPublicProfile(uid){
     </div>
     ${instruments?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:6px">🎵 Instruments</div><div style="font-size:14px;color:#111">${instruments}</div></div>`:''}
     ${(u.genres||[]).length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎼 Genres</div><div style="display:flex;flex-wrap:wrap;gap:6px">${(u.genres||[]).map(g=>{const gd=GENRE_LIST.find(gl=>gl.name===g)||{color:'#1a0a2e',text:'#C4B5FD'};return `<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${gd.color};color:${gd.text}">${g}</span>`;}).join('')}</div></div>`:''}
+    ${upcomingPerfs.length>0?`<div class="card" style="margin-bottom:12px">
+      <div style="font-size:12px;color:#aaa;margin-bottom:8px">🎵 Upcoming performances</div>
+      ${upcomingPerfs.map(([d,p])=>`
+        <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#111">${p.title||'Performance'}</div>
+            <div style="font-size:11px;color:#888;margin-top:2px">${new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})} ${p.time?'· '+p.time:''}</div>
+            ${p.venue?`<div style="font-size:11px;color:#aaa">📍 ${p.venue}</div>`:''}
+          </div>
+          ${p.ticketLink?`<a href="${p.ticketLink}" target="_blank" style="padding:5px 12px;border-radius:8px;background:#C9A84C;color:#fff;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">🎫 Tickets</a>`:''}
+        </div>`).join('')}
+    </div>`:''}
     ${available.length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">📅 Available dates</div><div style="display:flex;flex-wrap:wrap;gap:6px">${available.map(d=>`<span style="padding:4px 10px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">${new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`).join('')}</div></div>`:''}
     ${u.reelURL?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎥 Video reel</div><video src="${u.reelURL}" controls playsinline style="width:100%;border-radius:8px"></video></div>`:''}
     <div style="background:#f9f9f9;border-radius:12px;padding:16px;text-align:center;margin-bottom:12px">
@@ -6429,6 +6448,105 @@ window.joinStripeWaitlist=async function(){
     document.getElementById('stripe-connect-modal')?.remove();
     ts('✅ You\'re on the waitlist! We\'ll email you when payments launch.');
   }catch(e){ts('Added to waitlist!');}
+}
+
+// ─── CALENDAR SYNC ───────────────────────────────────────────────
+window.addToGoogleCalendar=function(title,date,time,location,description){
+  showCalendarPicker(title,date,time,location,description);
+}
+
+window.showCalendarPicker=function(title,date,time,location,description){
+  // Build datetime strings
+  const dateStr=date.replace(/-/g,'');
+  let startDt,endDt;
+  if(time){
+    const match=time.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if(match){
+      let h=parseInt(match[1]);const m=match[2];const ap=match[3].toUpperCase();
+      if(ap==='PM'&&h!==12)h+=12;if(ap==='AM'&&h===12)h=0;
+      const hStr=String(h).padStart(2,'0');
+      startDt=`${dateStr}T${hStr}${m}00`;
+      endDt=`${dateStr}T${String(Math.min(h+2,23)).padStart(2,'0')}${m}00`;
+    }
+  }
+  if(!startDt){startDt=dateStr;endDt=dateStr;}
+
+  const googleUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title+' — Vivace Events')}&dates=${startDt}/${endDt}&location=${encodeURIComponent(location||'')}&details=${encodeURIComponent(description||'Booked via vivaceevents.com')}`;
+  const outlookUrl=`https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&startdt=${date}T${time||'12:00'}&location=${encodeURIComponent(location||'')}&body=${encodeURIComponent('Booked via vivaceevents.com')}`;
+  const yahooUrl=`https://calendar.yahoo.com/?v=60&title=${encodeURIComponent(title)}&st=${startDt}&dur=0200&in_loc=${encodeURIComponent(location||'')}&desc=${encodeURIComponent('Booked via vivaceevents.com')}`;
+
+  // Build ICS file for Apple Calendar, Yandex, etc.
+  const icsContent=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:${startDt}\nDTEND:${endDt}\nSUMMARY:${title} — Vivace Events\nLOCATION:${location||''}\nDESCRIPTION:Booked via vivaceevents.com\nEND:VEVENT\nEND:VCALENDAR`;
+  const icsBlob=new Blob([icsContent],{type:'text/calendar'});
+  const icsUrl=URL.createObjectURL(icsBlob);
+
+  const m=document.createElement('div');m.className='modal-bg';m.id='cal-picker';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">📅 Add to Calendar</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${title} · ${date}${time?' at '+time:''}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <a href="${googleUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
+        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
+        <span style="font-size:22px">📅</span>
+        <div><div style="font-size:14px;font-weight:600;color:#111">Google Calendar</div><div style="font-size:11px;color:#888">Opens Google Calendar</div></div>
+      </a>
+      <a href="${outlookUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
+        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
+        <span style="font-size:22px">📆</span>
+        <div><div style="font-size:14px;font-weight:600;color:#111">Outlook / Microsoft</div><div style="font-size:11px;color:#888">Outlook, Hotmail, Office 365</div></div>
+      </a>
+      <a href="${yahooUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
+        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
+        <span style="font-size:22px">🗓️</span>
+        <div><div style="font-size:14px;font-weight:600;color:#111">Yahoo Calendar</div><div style="font-size:11px;color:#888">Opens Yahoo Calendar</div></div>
+      </a>
+      <a href="${icsUrl}" download="${title.replace(/\s+/g,'_')}.ics" onclick="setTimeout(()=>{document.getElementById('cal-picker')?.remove();URL.revokeObjectURL('${icsUrl}');},500)"
+        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f0f8ff;border:1px solid #378ADD;text-decoration:none">
+        <span style="font-size:22px">🍎</span>
+        <div><div style="font-size:14px;font-weight:600;color:#0C447C">Apple / iCal / Yandex</div><div style="font-size:11px;color:#888">Downloads .ics file — works with any calendar</div></div>
+      </a>
+    </div>
+    <button class="bg" style="width:100%;padding:12px" onclick="document.getElementById('cal-picker').remove()">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+// ─── CONCERT TICKET INTEGRATION ──────────────────────────────────
+// Ticket links added to public performances, shown on public profile
+window.showAddTicketLink=function(dateStr){
+  const perf=_perfEvents[dateStr];
+  if(!perf){ts('Add a performance first');return;}
+  const m=document.createElement('div');m.className='modal-bg';m.id='ticket-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎫 Ticket link</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${perf.title} · ${dateStr}</div>
+    <input class="finp" id="ticket-url" placeholder="https://tickets.example.com/..." value="${perf.ticketLink||''}" style="margin-bottom:10px"/>
+    <input class="finp" id="ticket-price" placeholder="Ticket price (e.g. $25)" value="${perf.ticketPrice||''}" style="margin-bottom:16px"/>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('ticket-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px" onclick="saveTicketLink('${dateStr}')">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+window.saveTicketLink=async function(dateStr){
+  const url=document.getElementById('ticket-url')?.value?.trim();
+  const price=document.getElementById('ticket-price')?.value?.trim();
+  document.getElementById('ticket-modal')?.remove();
+  if(_perfEvents[dateStr]){
+    _perfEvents[dateStr].ticketLink=url;
+    _perfEvents[dateStr].ticketPrice=price;
+    await saveAvailability();
+    ts('🎫 Ticket link saved!');
+    renderCalendarModal();
+  }
+}
+
+// Show ticket button in performance form
+window.showTicketOptions=function(){
+  const ticketRow=document.getElementById('ticket-row');
+  if(ticketRow)ticketRow.style.display=ticketRow.style.display==='none'?'block':'none';
 }
 
 window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
