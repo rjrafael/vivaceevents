@@ -5064,10 +5064,10 @@ function profileHTML(){
       <button onclick="triggerReelUpload()" style="flex:1;padding:10px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔄 Replace reel</button>
       <button onclick="deleteReel()" style="padding:10px 14px;border-radius:10px;background:#FCEBEB;border:1px solid #F09595;color:#C0392B;font-size:12px;cursor:pointer;font-family:inherit">🗑️</button>
     </div>`:`
-    <div style="background:#0d0d0d;border-radius:12px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid #333;border-style:dashed" onclick="triggerReelUpload()">
-      <div style="width:44px;height:44px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ic('play')}</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.6);font-weight:600">Upload your video reel</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">MP4, MOV · Max 100MB</div>
+    <div style="background:#0d0d0d;border-radius:12px;height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;border:2px dashed #1D9E75" onclick="triggerReelUpload()">
+      <div style="width:48px;height:48px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;margin-bottom:10px">${ic('play')}</div>
+      <div style="font-size:13px;color:#fff;font-weight:600">📹 Upload your video reel</div>
+      <div style="font-size:11px;color:#1D9E75;margin-top:4px">Tap here · MP4, MOV · Max 100MB</div>
     </div>`}
     <input type="file" id="reel-file-input" accept="video/*" style="display:none" onchange="uploadReel(this)"/>
     <div id="reel-progress" style="display:none;margin-top:8px">
