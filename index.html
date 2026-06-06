@@ -6160,23 +6160,26 @@ window.updateRecurringFields=function(){
 window.saveRecurringGig=async function(){
   const title=document.getElementById('rec-title')?.value;
   if(!title){ts('Please enter a title');return;}
-  const freq=document.getElementById('rec-freq')?.value;
-  // Close modal first
+  const freq=document.getElementById('rec-freq')?.value||'weekly';
+  const dow=document.getElementById('rec-dow')?.value||'Monday';
+  const dom=document.getElementById('rec-dom')?.value||'1';
+  const time=document.getElementById('rec-time')?.value||'';
+  const location=document.getElementById('rec-location')?.value||'';
+  const pay=document.getElementById('rec-pay')?.value||'';
+  const inst=document.getElementById('rec-inst')?.value||'';
+  // Close modal AFTER reading values
   document.getElementById('recurring-modal')?.remove();
   try{
     await addDoc(collection(db,'recurringGigs'),{
       managerId:CU.uid,managerEmail:CU.email,title,frequency:freq,
-      dayOfWeek:freq==='weekly'?document.getElementById('rec-dow')?.value:'',
-      dayOfMonth:freq==='monthly'?document.getElementById('rec-dom')?.value:'',
-      time:document.getElementById('rec-time')?.value||'',
-      location:document.getElementById('rec-location')?.value||'',
-      pay:document.getElementById('rec-pay')?.value||'',
-      instruments:document.getElementById('rec-inst')?.value||'',
+      dayOfWeek:freq==='weekly'?dow:'',
+      dayOfMonth:freq==='monthly'?dom:'',
+      time,location,pay,instruments:inst,
       createdAt:new Date()
     });
     ts('🔄 Recurring gig saved!');
-    loadRecurringGigs();
-  }catch(e){console.error('Recurring save error:',e);ts('Saved!');}
+    setTimeout(()=>loadRecurringGigs(),500);
+  }catch(e){console.error('Recurring save error:',e.message);ts('Error: '+e.message);}
 }
 
 window.generateRecurringGigs=async function(recurringId){
