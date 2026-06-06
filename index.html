@@ -7305,7 +7305,7 @@ function renderRadioPlayer(){
         <button onclick="radioNext()" style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:4px">⏭</button>
         <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:4px">ℹ️</button>
         <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:12px;cursor:pointer;padding:4px" title="Report">🚩</button>
-        <button onclick="closeRadioBar()" style="background:none;border:none;color:#333;font-size:16px;cursor:pointer;padding:4px">✕</button>
+        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:18px;cursor:pointer;padding:4px;font-weight:700">✕</button>
       </div>
     </div>
     <!-- Progress bar -->
@@ -7524,10 +7524,10 @@ window.showRadioBar=async function(){
     bar.innerHTML=`
       <span style="font-size:22px">🎙️</span>
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:#fff">Vivace Radio</div>
+        <div style="font-size:13px;font-weight:700;color:#fff">Vivace Radio</div>
         <div style="font-size:11px;color:#C9A84C;margin-top:2px">No tracks yet — musicians upload from their profile</div>
       </div>
-      <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button>
+      <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:22px;cursor:pointer;font-weight:700;line-height:1">✕</button>
     `;
     return;
   }
