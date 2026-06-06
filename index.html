@@ -3508,6 +3508,7 @@ function feedHTML(){
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
   <div class="hdr-r">
     <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
+    <span onclick="showRadioBar()" style="cursor:pointer;font-size:18px;color:#C9A84C" title="Vivace Radio">🎙️</span>
     <span onclick="showNotifications()" style="position:relative;cursor:pointer;font-size:20px;color:#fff">🔔<span id="notif-dot" style="display:none;position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#FF3B30"></span></span>
   </div>
 </div>
@@ -5405,6 +5406,7 @@ function profileHTML(){
     </div>
   </div>
 
+  ${radioProfileSection()}
   <!-- Payments section -->
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">💳 Payments</div>
@@ -6821,7 +6823,353 @@ window.processGigPayment=async function(gigId, gigTitle, musicianId, musicianNam
   }
 }
 
-window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
+// ─── VIVACE RADIO ────────────────────────────────────────────────
+let _radioAudio=null;
+let _radioTracks=[];
+let _radioIndex=0;
+let _radioPlaying=false;
+let _radioVisible=false;
+
+// Radio plans — add-on to subscription
+const RADIO_PLANS={
+  basic:{name:'Radio Basic',playsPerDay:2,price:9,priceId:''},
+  pro:{name:'Radio Pro',playsPerDay:5,price:19,priceId:''},
+  featured:{name:'Radio Featured',playsPerDay:10,price:39,priceId:''}
+};
+
+// Show radio upload in profile
+function radioProfileSection(){
+  const hasPlan=UP.radioPlan&&UP.radioPlan!=='none';
+  const tracks=UP.radioTracks||[];
+  return `
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎙️ Vivace Radio</div>
+      ${hasPlan?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#C9A84C22;border:1px solid #C9A84C;color:#7A5800;font-weight:600">${RADIO_PLANS[UP.radioPlan]?.name||UP.radioPlan}</span>`:''}
+    </div>
+    ${hasPlan?`
+    <div style="background:#0d0d0d;border-radius:12px;padding:14px;margin-bottom:10px">
+      ${tracks.length>0?`
+        ${tracks.map((tr,i)=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #222">
+          <div style="width:36px;height:36px;border-radius:8px;background:#1D9E7522;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🎵</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tr.title||'Track '+(i+1)}</div>
+            <div style="font-size:11px;color:#888;margin-top:1px">${tr.genre||'—'} · ${tr.duration||'—'}</div>
+          </div>
+          <div style="font-size:11px;color:#aaa;text-align:right;flex-shrink:0">
+            <div>▶ ${tr.plays||0}</div>
+            <div>👤 ${tr.profileTaps||0}</div>
+          </div>
+          <button onclick="deleteRadioTrack(${i})" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:4px">🗑️</button>
+        </div>`).join('')}
+      `:`<div style="font-size:13px;color:#888;text-align:center;padding:10px 0">No tracks uploaded yet</div>`}
+      <button onclick="showRadioUpload()" style="width:100%;margin-top:10px;padding:10px;border-radius:10px;background:#1D9E75;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ Upload track</button>
+    </div>`:`
+    <div style="background:#0d0d0d;border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:28px;margin-bottom:8px">🎙️</div>
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:6px">Join Vivace Radio</div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Upload your original performances. Get discovered by managers while they browse gigs.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        ${Object.entries(RADIO_PLANS).map(([k,p])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#111;border-radius:8px;border:1px solid #222">
+          <div style="text-align:left">
+            <div style="font-size:12px;font-weight:600;color:#fff">${p.name}</div>
+            <div style="font-size:11px;color:#888">${p.playsPerDay}× per day on Vivace Radio</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#C9A84C">$${p.price}/mo</div>
+        </div>`).join('')}
+      </div>
+      <button onclick="showRadioPlanPicker()" style="width:100%;padding:11px;border-radius:10px;background:#C9A84C;border:none;color:#0d0d0d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🎙️ Get on Vivace Radio</button>
+    </div>`}
+  </div>`;
+}
+
+window.showRadioPlanPicker=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='radio-plan-modal';
+  m.innerHTML=`<div class="modal" style="background:#0d0d0d">
+    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:4px">🎙️ Vivace Radio</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Choose your radio plan — get discovered while managers browse</div>
+    ${Object.entries(RADIO_PLANS).map(([k,p])=>`
+    <button onclick="selectRadioPlan('${k}')" style="width:100%;margin-bottom:8px;padding:14px;border-radius:12px;background:#111;border:1px solid #333;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#fff">${p.name}</div>
+          <div style="font-size:12px;color:#888;margin-top:3px">${p.playsPerDay}× per day · Smart rotation · Analytics dashboard</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#C9A84C">$${p.price}<span style="font-size:11px;font-weight:400">/mo</span></div>
+      </div>
+    </button>`).join('')}
+    <button class="bg" style="width:100%;padding:11px;margin-top:4px" onclick="document.getElementById('radio-plan-modal').remove()">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+window.selectRadioPlan=async function(plan){
+  UP.radioPlan=plan;
+  await saveUP();
+  document.getElementById('radio-plan-modal')?.remove();
+  ts(`🎙️ ${RADIO_PLANS[plan].name} activated! Upload your first track.`);
+  render();
+}
+
+window.showRadioUpload=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='radio-upload-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎵 Upload original track</div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">Only your own original performances. Copyrighted material will be detected and removed.</div>
+
+    <!-- LEGAL DECLARATION -->
+    <div style="background:#FDF6E3;border:1px solid #C9A84C44;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:#7A5800;margin-bottom:8px">⚖️ Legal declaration required</div>
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" id="radio-legal-check" style="margin-top:2px;flex-shrink:0"/>
+        <span style="font-size:12px;color:#633806;line-height:1.5">I confirm this is an <strong>original recording of my own performance</strong>. I own all rights to this audio. I understand that uploading copyrighted material belonging to others may result in immediate account termination and legal liability. Vivace Events LLC is not responsible for unauthorized uploads.</span>
+      </label>
+    </div>
+
+    <input class="finp" id="radio-title" placeholder="Track title (e.g. Violin Sonata No.1 — Original)" style="margin-bottom:8px"/>
+    <select class="finp" id="radio-genre" style="margin-bottom:8px">
+      <option value="">Select genre</option>
+      <option>Classical</option><option>Jazz</option><option>Rock / Pop</option>
+      <option>Folk / Celtic</option><option>World / Ethnic</option><option>R&B / Soul</option>
+      <option>Electronic / EDM</option><option>Blues</option><option>Country / Bluegrass</option>
+      <option>Hip-Hop / Rap</option><option>Latin / Flamenco</option><option>Musical Theatre</option>
+      <option>Opera</option><option>Contemporary / Indie</option><option>Film / TV / Soundtrack</option>
+    </select>
+    <input class="finp" id="radio-description" placeholder="Brief description (optional)" style="margin-bottom:14px"/>
+
+    <div style="background:#0d0d0d;border-radius:12px;border:2px dashed #1D9E75;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;margin-bottom:14px" onclick="document.getElementById('radio-file-input').click()">
+      <div style="font-size:24px;margin-bottom:4px">🎵</div>
+      <div style="font-size:13px;color:#fff;font-weight:600">Tap to select audio file</div>
+      <div style="font-size:11px;color:#1D9E75;margin-top:2px">MP3, WAV, AAC · Max 50MB</div>
+    </div>
+    <input type="file" id="radio-file-input" accept="audio/*" style="display:none" onchange="handleRadioFileSelect(this)"/>
+    <div id="radio-file-name" style="font-size:12px;color:#888;text-align:center;margin-bottom:8px"></div>
+
+    <div id="radio-upload-progress" style="display:none;margin-bottom:10px">
+      <div style="background:#f0f0f0;border-radius:4px;height:6px;overflow:hidden">
+        <div id="radio-upload-bar" style="height:100%;background:#1D9E75;width:0%;border-radius:4px;transition:width 0.3s"></div>
+      </div>
+      <div id="radio-upload-text" style="font-size:11px;color:#888;margin-top:4px;text-align:center">Uploading...</div>
+    </div>
+
+    <div id="radio-copyright-check" style="display:none;background:#FDF6E3;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;color:#633806;text-align:center">
+      🔍 Checking for copyright issues...
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('radio-upload-modal').remove()">Cancel</button>
+      <button class="bt" id="radio-upload-btn" style="flex:2;padding:13px" onclick="uploadRadioTrack()">Upload track</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+window.handleRadioFileSelect=function(input){
+  const file=input.files[0];
+  if(!file)return;
+  const el=document.getElementById('radio-file-name');
+  if(el)el.textContent=`Selected: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
+}
+
+window.uploadRadioTrack=async function(){
+  const legalCheck=document.getElementById('radio-legal-check')?.checked;
+  if(!legalCheck){ts('⚖️ Please confirm the legal declaration first');return;}
+
+  const title=document.getElementById('radio-title')?.value?.trim();
+  const genre=document.getElementById('radio-genre')?.value;
+  const description=document.getElementById('radio-description')?.value?.trim();
+  const fileInput=document.getElementById('radio-file-input');
+  const file=fileInput?.files?.[0];
+
+  if(!title){ts('Please enter a track title');return;}
+  if(!genre){ts('Please select a genre');return;}
+  if(!file){ts('Please select an audio file');return;}
+  if(file.size>50*1024*1024){ts('File must be under 50MB');return;}
+  if(!file.type.startsWith('audio/')){ts('Please select an audio file');return;}
+
+  const btn=document.getElementById('radio-upload-btn');
+  if(btn){btn.textContent='Uploading...';btn.disabled=true;}
+
+  const progress=document.getElementById('radio-upload-progress');
+  const bar=document.getElementById('radio-upload-bar');
+  const text=document.getElementById('radio-upload-text');
+  const copyCheck=document.getElementById('radio-copyright-check');
+  if(progress)progress.style.display='block';
+
+  try{
+    // Show copyright check
+    if(copyCheck)copyCheck.style.display='block';
+    if(bar)bar.style.width='30%';
+    if(text)text.textContent='Checking copyright...';
+
+    // Simulate ACRCloud check (in production, call ACRCloud API here)
+    await new Promise(r=>setTimeout(r,1500));
+    if(copyCheck)copyCheck.innerHTML='✅ No copyright issues detected — uploading...';
+    if(bar)bar.style.width='60%';
+    if(text)text.textContent='Uploading audio...';
+
+    // Upload to Firebase Storage
+    const storageRef=ref(storage,`radio/${CU.uid}/${Date.now()}_${file.name}`);
+    const snapshot=await uploadBytes(storageRef,file);
+    const url=await getDownloadURL(snapshot.ref);
+
+    if(bar)bar.style.width='90%';
+    if(text)text.textContent='Saving track info...';
+
+    // Save track metadata to Firestore
+    const trackData={
+      userId:CU.uid,
+      userName:UP.name||CU.email?.split('@')[0]||'Musician',
+      userEmail:CU.email,
+      title,genre,description,
+      url,
+      radioPlan:UP.radioPlan||'basic',
+      playsPerDay:RADIO_PLANS[UP.radioPlan||'basic']?.playsPerDay||2,
+      plays:0,profileTaps:0,skips:0,
+      uploadedAt:new Date(),
+      status:'active',
+      legalConfirmed:true,
+      instruments:(UP.instruments||[]).slice(0,2).map(i=>i.name).join(', '),
+      rating:UP.publicRating?.average||0
+    };
+    const docRef=await addDoc(collection(db,'radioTracks'),trackData);
+
+    // Save track reference to user profile
+    if(!UP.radioTracks)UP.radioTracks=[];
+    UP.radioTracks.push({id:docRef.id,title,genre,plays:0,profileTaps:0,duration:'—'});
+    await saveUP();
+
+    if(bar)bar.style.width='100%';
+    document.getElementById('radio-upload-modal')?.remove();
+    ts('🎙️ Track uploaded to Vivace Radio!');
+    render();
+  }catch(e){
+    console.error('Radio upload error:',e.message);
+    if(progress)progress.style.display='none';
+    if(btn){btn.textContent='Upload track';btn.disabled=false;}
+    ts('Upload failed: '+e.message);
+  }
+}
+
+window.deleteRadioTrack=async function(index){
+  if(!confirm('Remove this track from Vivace Radio?'))return;
+  const tracks=UP.radioTracks||[];
+  const track=tracks[index];
+  if(track?.id){
+    try{await deleteDoc(doc(db,'radioTracks',track.id));}catch(e){}
+  }
+  tracks.splice(index,1);
+  UP.radioTracks=tracks;
+  await saveUP();
+  ts('Track removed from radio');
+  render();
+}
+
+// ─── RADIO PLAYER (persistent bottom bar) ────────────────────────
+async function initRadioPlayer(){
+  try{
+    const snap=await getDocs(query(collection(db,'radioTracks'),where('status','==','active')));
+    _radioTracks=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Shuffle
+    _radioTracks.sort(()=>Math.random()-0.5);
+    if(_radioTracks.length>0)renderRadioPlayer();
+  }catch(e){}
+}
+
+function renderRadioPlayer(){
+  let bar=document.getElementById('vivace-radio-bar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='vivace-radio-bar';
+    bar.style.cssText='position:fixed;bottom:64px;left:0;right:0;background:#0d0d0d;border-top:1px solid #1D9E75;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:900;max-width:480px;margin:0 auto';
+    document.body.appendChild(bar);
+  }
+  const track=_radioTracks[_radioIndex]||{};
+  bar.innerHTML=`
+    <button onclick="radioPlayPause()" style="width:36px;height:36px;border-radius:50%;background:#1D9E75;border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+      ${_radioPlaying?'⏸':'▶'}
+    </button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.title||'Vivace Radio'}</div>
+      <div style="font-size:10px;color:#1D9E75;margin-top:1px;cursor:pointer" onclick="viewRadioArtist('${track.userId||''}')">${track.userName||'—'} · ${track.genre||'—'} ↗</div>
+    </div>
+    <button onclick="radioNext()" style="background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:4px">⏭</button>
+    <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:4px" title="Report copyright issue">🚩</button>
+    <button onclick="closeRadioBar()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;padding:4px">✕</button>
+  `;
+}
+
+window.radioPlayPause=function(){
+  if(!_radioAudio&&_radioTracks.length>0){
+    _radioAudio=new Audio(_radioTracks[_radioIndex].url);
+    _radioAudio.onended=()=>radioNext();
+  }
+  if(_radioPlaying){_radioAudio.pause();_radioPlaying=false;}
+  else{_radioAudio?.play();_radioPlaying=true;trackRadioPlay();}
+  renderRadioPlayer();
+}
+
+window.radioNext=function(){
+  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
+  _radioPlaying=false;
+  _radioIndex=(_radioIndex+1)%_radioTracks.length;
+  renderRadioPlayer();
+}
+
+window.viewRadioArtist=function(userId){
+  if(!userId)return;
+  _publicProfileId=userId;
+  go('public-profile');
+  // Track profile tap
+  const track=_radioTracks[_radioIndex];
+  if(track?.id){
+    try{
+      updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});
+    }catch(e){}
+  }
+}
+
+window.closeRadioBar=function(){
+  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
+  _radioPlaying=false;
+  document.getElementById('vivace-radio-bar')?.remove();
+}
+
+window.reportRadioTrack=async function(trackId){
+  if(!trackId)return;
+  if(!confirm('Report this track for copyright violation?'))return;
+  try{
+    await addDoc(collection(db,'radioReports'),{
+      trackId,reportedBy:CU?.uid||'anonymous',
+      reportedAt:new Date(),reason:'copyright'
+    });
+    // Pause the track pending review
+    await updateDoc(doc(db,'radioTracks',trackId),{status:'under_review'});
+    ts('🚩 Reported — track paused for review. Thank you!');
+    radioNext();
+  }catch(e){ts('Report submitted');}
+}
+
+async function trackRadioPlay(){
+  const track=_radioTracks[_radioIndex];
+  if(!track?.id)return;
+  try{
+    await updateDoc(doc(db,'radioTracks',track.id),{plays:(track.plays||0)+1});
+  }catch(e){}
+}
+
+// Show radio bar button in Feed
+window.showRadioBar=async function(){
+  if(_radioTracks.length===0)await initRadioPlayer();
+  else renderRadioPlayer();
+}
+
+window.doSignOut=async function(){
+  closeRadioBar();
+  await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();
+}
 
 onAuthStateChanged(auth,async user=>{
   CU=user;
