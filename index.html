@@ -3741,7 +3741,7 @@ function discoverHTML(){
 <!-- Search bar -->
 <div style="position:relative;margin-bottom:10px">
   <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-  <input class="finp" id="search-input" style="padding-left:38px;padding-right:36px" placeholder="Search by name, instrument, skill…" oninput="filterArtists()"/>
+  <input class="finp" id="search-input" style="padding-left:38px;padding-right:36px" placeholder="Search by name, instrument, skill…" oninput="filterArtists()" onkeydown="if(event.key==='Enter'){event.preventDefault();filterArtists();}"/>
   <span id="search-clear" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#aaa;cursor:pointer" onclick="clearSearch()">✕</span>
 </div>
 
@@ -3868,7 +3868,8 @@ window.filterArtists=function(){
       if(!skills.includes(_skillFilter))return false;
     }
     if(_genreFilter){
-      if(!genres.includes(_genreFilter)&&!genres.includes(_genreFilter.toLowerCase()))return false;
+      const genreArr=(a.genres||[]).map(g=>g.toLowerCase());
+      if(!genreArr.some(g=>g.includes(_genreFilter)||_genreFilter.includes(g)))return false;
     }
     if(_roleFilter==='available'){
       if(!a.avail)return false;
