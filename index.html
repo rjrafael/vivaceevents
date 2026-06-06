@@ -5253,9 +5253,13 @@ function profileHTML(){
         ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
       </div>
     </div>
-    <button style="padding:7px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="shareProfile()">🔗 Share</button>
-    <button style="padding:7px 14px;border-radius:8px;background:#333;border:none;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onclick="go('dmca')">⚖️ DMCA</button>
-    <button style="padding:7px 14px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Sign out</button>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+      <div style="display:flex;gap:6px">
+        <button style="padding:7px 12px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onclick="shareProfile()">🔗 Share</button>
+        <button style="padding:7px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onclick="doSignOut()">Sign out</button>
+      </div>
+      <button style="padding:5px 12px;border-radius:8px;background:#222;border:1px solid #333;color:#888;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;width:100%" onclick="go('dmca')">⚖️ DMCA Policy</button>
+    </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
     <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">${groups.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Groups</div></div>
