@@ -7540,15 +7540,15 @@ window.showRadioAnalytics=async function(){
   m.innerHTML=`<div class="modal" style="background:#111;max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:17px;font-weight:700;color:#fff">🎙️ Radio Analytics</div>
-      <button onclick="document.getElementById('radio-analytics-modal').remove()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer">✕</button>
+      <button onclick="document.getElementById('radio-analytics-modal').remove()" style="background:none;border:none;color:#C9A84C;font-size:22px;cursor:pointer;font-weight:700">✕</button>
     </div>
-    <div id="radio-analytics-content"><div style="text-align:center;padding:20px;color:#555">Loading...</div></div>
+    <div id="radio-analytics-content"><div style="text-align:center;padding:20px;color:#C9A84C">Loading...</div></div>
   </div>`;
   document.body.appendChild(m);
   try{
     const tracks=UP.radioTracks||[];
     if(tracks.length===0){
-      document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#555">No tracks uploaded yet</div>`;
+      document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:30px 20px"><div style="font-size:32px;margin-bottom:10px">🎙️</div><div style="font-size:14px;color:#C9A84C;font-weight:600">No tracks uploaded yet</div><div style="font-size:12px;color:#555;margin-top:6px">Upload your first track from your profile</div></div>`;
       return;
     }
     const totalPlays=tracks.reduce((s,t)=>s+(t.plays||0),0);
@@ -7597,7 +7597,7 @@ window.showRadioAnalytics=async function(){
         <div style="font-size:11px;color:#555;margin-top:2px">${RADIO_PLANS[UP.radioPlan]?.playsPerDay||0} plays per day · Smart rotation · ${getTimeSlot()==='primetime'&&UP.radioPlan==='featured'?'⭐ Prime time slot active':'Standard slots'}</div>
       </div>
     `;
-  }catch(e){document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#555">Could not load analytics</div>`;}
+  }catch(e){document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#C9A84C">Could not load analytics</div>`;}
 }
 
 // ─── GIG RADIO ANNOUNCEMENT ──────────────────────────────────────
