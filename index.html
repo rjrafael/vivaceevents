@@ -7266,13 +7266,14 @@ function renderRadioPlayer(){
   const track=_radioQueue[_radioIndex]||{};
   const isFeatured=track.radioPlan==='featured';
 
-  // Position bottom-right by default, only first time
+  // Position center-bottom, only first time
   if(!bar._positioned){
     const nav=document.querySelector('.bnav');
     const navH=nav?nav.offsetHeight:60;
-    bar.style.cssText=`position:fixed;bottom:${navH+10}px;left:50%;transform:translateX(-50%);z-index:9999;width:360px;border-radius:18px;background:rgba(13,13,13,0.97);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7);cursor:grab;user-select:none`;
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||window.innerWidth<500;
+    bar.style.cssText=`position:fixed;bottom:${navH+8}px;left:50%;transform:translateX(-50%);z-index:9999;width:340px;max-width:92vw;border-radius:18px;background:rgba(13,13,13,0.97);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7);user-select:none`;
     bar._positioned=true;
-    makeDraggable(bar);
+    if(!isMobile)makeDraggable(bar);
   }
 
   bar.innerHTML=`
@@ -7348,36 +7349,38 @@ window.toggleRadioExpand=function(){
 }
 
 function makeDraggable(el){
-  let startX,startY,startRight,startBottom,dragging=false,moved=false;
+  let startX,startY,startRight,startBottom,dragging=false,holdTimer=null;
   function dragStart(e){
-    if(e.target.tagName==='BUTTON')return;
-    dragging=true;moved=false;
+    if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT')return;
     const touch=e.touches?e.touches[0]:e;
     startX=touch.clientX;startY=touch.clientY;
     const rect=el.getBoundingClientRect();
     startRight=window.innerWidth-rect.right;
     startBottom=window.innerHeight-rect.bottom;
-    el.style.cursor='grabbing';
+    // Only start drag after 200ms hold
+    holdTimer=setTimeout(()=>{dragging=true;el.style.cursor='grabbing';},200);
   }
   function dragMove(e){
     if(!dragging)return;
     const touch=e.touches?e.touches[0]:e;
     const dx=touch.clientX-startX;
     const dy=touch.clientY-startY;
-    if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;
     const newRight=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,startRight-dx));
     const newBottom=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,startBottom-dy));
     el.style.right=newRight+'px';
     el.style.bottom=newBottom+'px';
     el.style.left='auto';
+    el.style.transform='none';
     e.preventDefault&&e.preventDefault();
   }
+  function dragEnd(){
+    clearTimeout(holdTimer);
+    dragging=false;
+    el.style.cursor='grab';
+  }
   el.addEventListener('mousedown',dragStart);
-  el.addEventListener('touchstart',dragStart,{passive:true});
   document.addEventListener('mousemove',dragMove);
-  document.addEventListener('touchmove',dragMove,{passive:false});
-  document.addEventListener('mouseup',()=>{dragging=false;el.style.cursor='grab';});
-  document.addEventListener('touchend',()=>{dragging=false;el.style.cursor='grab';});
+  document.addEventListener('mouseup',dragEnd);
 }
 
 let _progressTimer=null;
