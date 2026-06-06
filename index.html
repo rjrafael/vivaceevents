@@ -7482,12 +7482,15 @@ window.radioNext=function(){
 }
 
 window.viewRadioArtist=function(userId){
-  if(!userId)return;
+  if(!userId){ts('No artist profile available');return;}
   const track=_radioQueue[_radioIndex];
   if(track?.id){
     try{updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});}
     catch(e){}
   }
+  // Close any open modals first
+  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  // Navigate to public profile
   _publicProfileId=userId;
   go('public-profile');
 }
