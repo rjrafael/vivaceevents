@@ -7084,12 +7084,21 @@ window.showRadioUpload=function(){
     <div style="font-size:13px;color:#888;margin-bottom:14px">Only your own original performances. Copyrighted material will be detected and removed.</div>
 
     <!-- LEGAL DECLARATION -->
-    <div style="background:#FDF6E3;border:1px solid #C9A84C44;border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:#7A5800;margin-bottom:8px">⚖️ Legal declaration required</div>
-      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+    <div style="background:#FDF6E3;border:1px solid #C9A84C55;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:#7A5800;margin-bottom:8px">⚖️ Legal declaration — read carefully</div>
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
         <input type="checkbox" id="radio-legal-check" style="margin-top:2px;flex-shrink:0"/>
-        <span style="font-size:12px;color:#633806;line-height:1.5">I confirm this is an <strong>original recording of my own performance</strong>. I own all rights to this audio. I understand that uploading copyrighted material belonging to others may result in immediate account termination and legal liability. Vivace Events LLC is not responsible for unauthorized uploads.</span>
+        <span style="font-size:12px;color:#7A5800;line-height:1.5">This is an <strong>original recording of my own performance.</strong> I own all rights.</span>
       </label>
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
+        <input type="checkbox" id="radio-no-covers" style="margin-top:2px;flex-shrink:0"/>
+        <span style="font-size:12px;color:#7A5800;line-height:1.5">No cover songs, no samples, no third-party compositions.</span>
+      </label>
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" id="radio-no-ai" style="margin-top:2px;flex-shrink:0"/>
+        <span style="font-size:12px;color:#7A5800;line-height:1.5">This is not AI-generated music. I am the human performer.</span>
+      </label>
+      <div style="font-size:10px;color:#C9A84C;margin-top:8px">Violations result in immediate removal. Vivace Events LLC is not liable for unauthorized uploads.</div>
     </div>
 
     <input class="finp" id="radio-title" placeholder="Track title (e.g. Violin Sonata No.1 — Original)" style="margin-bottom:8px"/>
@@ -7103,9 +7112,9 @@ window.showRadioUpload=function(){
     </select>
     <input class="finp" id="radio-description" placeholder="Brief description (optional)" style="margin-bottom:14px"/>
 
-    <div style="background:#0d0d0d;border-radius:12px;border:2px dashed #1D9E75;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;margin-bottom:14px" onclick="document.getElementById('radio-file-input').click()">
+    <div style="background:#f5f5f5;border-radius:12px;border:2px dashed #1D9E75;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;margin-bottom:14px" onclick="document.getElementById('radio-file-input').click()">
       <div style="font-size:24px;margin-bottom:4px">🎵</div>
-      <div style="font-size:13px;color:#fff;font-weight:600">Tap to select audio file</div>
+      <div style="font-size:13px;color:#111;font-weight:600">Tap to select audio file</div>
       <div style="font-size:11px;color:#1D9E75;margin-top:2px">MP3, WAV, AAC · Max 50MB</div>
     </div>
     <input type="file" id="radio-file-input" accept="audio/*" style="display:none" onchange="handleRadioFileSelect(this)"/>
