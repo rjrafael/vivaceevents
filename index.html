@@ -3077,7 +3077,7 @@ async function loadArtistCards(){
         const skills=(u.skills||[]).slice(0,2).join(', ');
         const role=primaryInst+(skills?` · ${skills}`:'');
         const tags=[...(u.instruments||[]).slice(0,2).map(i=>i.name),...(u.skills||[]).slice(0,1)].filter(Boolean).join(',');
-        const rating=u.publicRating?.average?u.publicRating.average.toFixed(1):'New';
+        const rating=u.publicRating?.average?u.publicRating.average.toFixed(1):typeof u.publicRating==='number'?u.publicRating.toFixed(1):'New';
         return {ini,bg,tc,name,role:role||'Musician',avail:true,rat:rating,tags:tags||'Musician',
           id:u.id,email:u.email,priority:priorities[u.id]||'',trusted:trusted[u.id]||false,
           instruments:u.instruments||[],skills:u.skills||[],roles:u.roles||[],
@@ -5058,11 +5058,11 @@ function profileHTML(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <select class="finp" id="bday-month" onchange="saveBirthday()">
             <option value="">Month</option>
-            ${['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i)=>`<option value="${i+1}" ${UP.birthdayMonth==i+1?'selected':''}>${m}</option>`).join('')}
+            ${['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i)=>`<option value="${i+1}" ${parseInt(UP.birthdayMonth)===i+1?'selected':''}>${m}</option>`).join('')}
           </select>
           <select class="finp" id="bday-day" onchange="saveBirthday()">
             <option value="">Day</option>
-            ${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${UP.birthdayDay==i+1?'selected':''}>${i+1}</option>`).join('')}
+            ${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${parseInt(UP.birthdayDay)===i+1?'selected':''}>${i+1}</option>`).join('')}
           </select>
         </div>
       </div>
