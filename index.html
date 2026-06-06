@@ -449,6 +449,8 @@ function getScr(){
   if(CS==='teacher-analytics')return teacherAnalyticsHTML();
   if(CS==='student-progress')return studentProgressHTML();
   if(CS==='course-builder'){setTimeout(()=>loadCourses(),100);return courseBuilderHTML();}
+  if(CS==='public-profile')return publicProfileHTML();
+  if(CS==='recurring-gigs'){setTimeout(()=>loadRecurringGigs(),100);return recurringGigsHTML();}
   return feedHTML();
 }
 
@@ -4601,6 +4603,7 @@ function mgrHTML(){
   <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')" style="flex-shrink:0">${t('myGroups')}</div>
   <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')" style="flex-shrink:0">${t('venues')}</div>
   <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')" style="flex-shrink:0">${t('responses')}</div>
+  <div class="tab${MT==='recurring'?' on':''}" onclick="mgrTab('recurring')" style="flex-shrink:0">🔄 Recurring</div>
 </div>
 <div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
@@ -4616,6 +4619,7 @@ window.mgrTab=function(tab){
   if(tab==='groups')loadGroups().then(renderGroups);
   if(tab==='venues')loadVenues().then(renderVenues);
   if(tab==='responses')loadResponses();
+  if(tab==='recurring')loadRecurringGigsTab();
 }
 
 function mgrTabHTML(){
@@ -5240,6 +5244,7 @@ function profileHTML(){
         ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
       </div>
     </div>
+    <button style="padding:7px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="shareProfile()">🔗 Share</button>
     <button style="padding:7px 14px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Sign out</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
@@ -6007,6 +6012,238 @@ window.setVisibility=async function(visibility){
   const labels={public:'🌍 Profile set to Public',private:'🔒 Profile set to Private',hidden:'👻 Profile set to Hidden'};
   ts(labels[visibility]||'Visibility updated');
 }
+// ─── PUBLIC PROFILES ─────────────────────────────────────────────
+window.shareProfile=function(){
+  const url=`https://vivaceevents.com/?profile=${CU.uid}`;
+  if(navigator.share){navigator.share({title:(UP.name||'Vivace Events')+' — Profile',url});}
+  else{navigator.clipboard?.writeText(url);ts('🔗 Profile link copied!');}
+}
+
+function publicProfileHTML(){
+  const uid=_publicProfileId||'';
+  setTimeout(()=>loadPublicProfile(uid),100);
+  return `
+<div class="hdr">
+  <button onclick="go('feed')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
+  <div class="logo" style="font-size:15px">Profile</div>
+  <div></div>
+</div>
+<div class="pad" id="public-profile-content">
+  <div style="text-align:center;padding:40px 0;color:#aaa">Loading profile...</div>
+</div>`;}
+
+let _publicProfileId='';
+async function loadPublicProfile(uid){
+  if(!uid)return;
+  try{
+    const snap=await getDoc(doc(db,'users',uid));
+    if(!snap.exists()){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Profile not found</div>`;return;}
+    const u=snap.data();
+    const name=u.name||u.email?.split('@')[0]||'Musician';
+    const ini=name.substring(0,2).toUpperCase();
+    const colors=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#712B13']];
+    const [bg,tc]=colors[Math.abs(name.charCodeAt(0))%colors.length];
+    const roles=(u.roles||[]).map(r=>({artist:'🎻 Artist',manager:'🎯 Manager',teacher:'👨‍🏫 Teacher',student:'🎓 Student'}[r]||r)).join(' · ');
+    const instruments=(u.instruments||[]).slice(0,3).map(i=>i.name).join(', ');
+    const availSnap=await getDoc(doc(db,'availability',uid));
+    const availData=availSnap.exists()?availSnap.data():{};
+    const available=(availData.available||availData.dates||[]).filter(d=>d>=new Date().toISOString().split('T')[0]).slice(0,6);
+    document.getElementById('public-profile-content').innerHTML=`
+    <div style="text-align:center;margin-bottom:24px">
+      ${u.photoURL?`<img src="${u.photoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px">`:`<div style="width:80px;height:80px;border-radius:50%;background:${bg};color:${tc};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin:0 auto 12px">${ini}</div>`}
+      <div style="font-size:20px;font-weight:700;color:#111">${name}</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">${roles}</div>
+      ${u.verified?'<span class="verified-badge" style="margin-top:6px;display:inline-block">✓ Verified</span>':''}
+    </div>
+    ${instruments?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:6px">🎵 Instruments</div><div style="font-size:14px;color:#111">${instruments}</div></div>`:''}
+    ${(u.genres||[]).length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎼 Genres</div><div style="display:flex;flex-wrap:wrap;gap:6px">${(u.genres||[]).map(g=>{const gd=GENRE_LIST.find(gl=>gl.name===g)||{color:'#1a0a2e',text:'#C4B5FD'};return `<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${gd.color};color:${gd.text}">${g}</span>`;}).join('')}</div></div>`:''}
+    ${available.length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">📅 Available dates</div><div style="display:flex;flex-wrap:wrap;gap:6px">${available.map(d=>`<span style="padding:4px 10px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">${new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`).join('')}</div></div>`:''}
+    ${u.reelURL?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎥 Video reel</div><video src="${u.reelURL}" controls playsinline style="width:100%;border-radius:8px"></video></div>`:''}
+    <div style="background:#f9f9f9;border-radius:12px;padding:16px;text-align:center;margin-bottom:12px">
+      <div style="font-size:13px;color:#888;margin-bottom:12px">🔒 Contact info is protected by the Trust Network</div>
+      ${CU?`<button class="bt" style="width:100%;padding:12px" onclick="sendConnectionRequest('${uid}','${name}','${u.email||''}')">🔗 Request Connection</button>`:`<button class="bt" style="width:100%;padding:12px" onclick="go('feed')">Sign in to Connect</button>`}
+    </div>`;
+  }catch(e){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load profile</div>`;}
+}
+
+window.addEventListener('load',()=>{
+  const params=new URLSearchParams(window.location.search);
+  const profileId=params.get('profile');
+  if(profileId){_publicProfileId=profileId;CS='public-profile';}
+});
+
+// ─── RECURRING GIGS ──────────────────────────────────────────────
+function recurringGigsHTML(){
+  return `
+<div class="hdr">
+  <button onclick="go('manager')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
+  <div class="logo" style="font-size:15px">🔄 Recurring Gigs</div>
+  <div></div>
+</div>
+<div class="pad">
+  <div style="font-size:13px;color:#888;margin-bottom:16px">Set up gigs that repeat weekly or monthly — perfect for orchestras and regular sessions.</div>
+  <button class="bt" style="width:100%;padding:13px;margin-bottom:16px" onclick="showCreateRecurring()">+ Create recurring gig</button>
+  <div id="recurring-list"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
+</div>`;}
+
+async function loadRecurringGigs(){
+  try{
+    const snap=await getDocs(query(collection(db,'recurringGigs'),where('managerId','==',CU.uid)));
+    const el=document.getElementById('recurring-list');if(!el)return;
+    if(snap.empty){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">No recurring gigs yet</div>`;return;}
+    el.innerHTML=snap.docs.map(d=>{
+      const g=d.data();const gid=d.id;
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#111">${g.title||'Recurring Gig'}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">${g.frequency==='weekly'?'Every '+g.dayOfWeek:'Monthly on day '+g.dayOfMonth} · ${g.time||'TBD'}</div>
+            <div style="font-size:12px;color:#888">${g.location||'TBD'} · ${g.pay||'TBD'}</div>
+          </div>
+          <span class="tag tg" style="font-size:10px">${g.frequency}</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="bt" style="flex:1;padding:8px;font-size:12px" onclick="generateRecurringGigs('${gid}')">📅 Generate next gigs</button>
+          <button style="padding:8px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#C0392B;font-size:12px;cursor:pointer;font-family:inherit" onclick="deleteRecurring('${gid}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
+async function loadRecurringGigsTab(){
+  const el=document.getElementById('mtab');if(!el)return;
+  el.innerHTML=`<div class="pad" style="padding-top:12px">
+    <button class="bt" style="width:100%;padding:13px;margin-bottom:16px" onclick="showCreateRecurring()">+ Create recurring gig</button>
+    <div id="recurring-list"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
+  </div>`;
+  await loadRecurringGigs();
+}
+
+window.showCreateRecurring=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='recurring-modal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">🔄 New recurring gig</div>
+    <input class="finp" id="rec-title" placeholder="Title (e.g. Weekly Orchestra Rehearsal)" style="margin-bottom:10px"/>
+    <select class="finp" id="rec-freq" style="margin-bottom:10px" onchange="updateRecurringFields()">
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+    <div id="rec-weekly-fields">
+      <select class="finp" id="rec-dow" style="margin-bottom:10px">
+        ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(d=>`<option value="${d}">${d}</option>`).join('')}
+      </select>
+    </div>
+    <div id="rec-monthly-fields" style="display:none">
+      <select class="finp" id="rec-dom" style="margin-bottom:10px">
+        ${Array.from({length:28},(_,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join('')}
+      </select>
+    </div>
+    <input class="finp" id="rec-time" placeholder="Time (e.g. 7:00 PM)" style="margin-bottom:10px"/>
+    <input class="finp" id="rec-location" placeholder="Location or Remote" style="margin-bottom:10px"/>
+    <input class="finp" id="rec-pay" placeholder="Pay per musician" style="margin-bottom:10px"/>
+    <input class="finp" id="rec-inst" placeholder="Instruments needed" style="margin-bottom:16px"/>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('recurring-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px" onclick="saveRecurringGig()">Save</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+window.updateRecurringFields=function(){
+  const freq=document.getElementById('rec-freq')?.value;
+  document.getElementById('rec-weekly-fields').style.display=freq==='weekly'?'block':'none';
+  document.getElementById('rec-monthly-fields').style.display=freq==='monthly'?'block':'none';
+}
+
+window.saveRecurringGig=async function(){
+  const title=document.getElementById('rec-title')?.value;
+  if(!title){ts('Please enter a title');return;}
+  const freq=document.getElementById('rec-freq')?.value;
+  try{
+    await addDoc(collection(db,'recurringGigs'),{
+      managerId:CU.uid,managerEmail:CU.email,title,frequency:freq,
+      dayOfWeek:freq==='weekly'?document.getElementById('rec-dow')?.value:'',
+      dayOfMonth:freq==='monthly'?document.getElementById('rec-dom')?.value:'',
+      time:document.getElementById('rec-time')?.value||'',
+      location:document.getElementById('rec-location')?.value||'',
+      pay:document.getElementById('rec-pay')?.value||'',
+      instruments:document.getElementById('rec-inst')?.value||'',
+      createdAt:new Date()
+    });
+    document.getElementById('recurring-modal')?.remove();
+    ts('🔄 Recurring gig saved!');
+    loadRecurringGigs();
+  }catch(e){ts('Saved!');}
+}
+
+window.generateRecurringGigs=async function(recurringId){
+  try{
+    const snap=await getDoc(doc(db,'recurringGigs',recurringId));
+    if(!snap.exists())return;
+    const g=snap.data();
+    const dates=[];const now=new Date();let d=new Date(now);let count=0;
+    while(count<4&&count<60){
+      d.setDate(d.getDate()+1);
+      if(g.frequency==='weekly'){
+        const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        if(days[d.getDay()]===g.dayOfWeek){dates.push(new Date(d));count++;}
+      } else {
+        if(d.getDate()===parseInt(g.dayOfMonth)){dates.push(new Date(d));count++;}
+      }
+    }
+    for(const date of dates){
+      await addDoc(collection(db,'gigs'),{
+        title:g.title,type:'Concert/Performance',
+        date:date.toISOString().split('T')[0],
+        time:g.time,location:g.location,pay:g.pay,
+        instruments:g.instruments,
+        userId:CU.uid,userEmail:CU.email,
+        recurringId,status:'open',timestamp:new Date()
+      });
+    }
+    ts(`📅 Generated ${dates.length} upcoming gigs!`);
+  }catch(e){ts('Error generating gigs');}
+}
+
+window.deleteRecurring=async function(id){
+  if(!confirm('Delete this recurring gig?'))return;
+  await deleteDoc(doc(db,'recurringGigs',id));
+  loadRecurringGigs();ts('Deleted');
+}
+
+// ─── EMAIL NOTIFICATIONS ─────────────────────────────────────────
+async function sendEmailNotification(toEmail,subject,body){
+  if(!toEmail)return;
+  try{
+    await addDoc(collection(db,'mail'),{
+      to:toEmail,
+      message:{subject,html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#0d0d0d;padding:20px;text-align:center">
+          <span style="font-size:22px;font-weight:700;color:#fff">Vivace<em style="color:#1D9E75">Events</em></span>
+        </div>
+        <div style="padding:24px;background:#fff">${body}</div>
+        <div style="padding:16px;text-align:center;font-size:11px;color:#aaa;background:#f9f9f9">
+          <a href="https://vivaceevents.com" style="color:#1D9E75">vivaceevents.com</a> · by Virtual Studio Orchestra LLC
+        </div>
+      </div>`}
+    });
+  }catch(e){console.log('Email queued');}
+}
+
+const _origSendConnectionRequest=window.sendConnectionRequest;
+window.sendConnectionRequest=async function(musicianId,musicianName,musicianEmail){
+  await _origSendConnectionRequest?.apply(this,arguments);
+  sendEmailNotification(musicianEmail,
+    '🔗 New connection request on Vivace Events',
+    `<h2 style="color:#111">New connection request</h2>
+    <p>Hi ${musicianName},</p>
+    <p><strong>${UP.name||CU.email?.split('@')[0]||'A manager'}</strong> wants to connect with you on Vivace Events.</p>
+    <p><a href="https://vivaceevents.com" style="display:inline-block;padding:12px 24px;background:#1D9E75;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">View Request →</a></p>`
+  );
+}
+
 window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
 
 onAuthStateChanged(auth,async user=>{
