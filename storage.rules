@@ -1,31 +1,19 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Profile photos — owner writes, authenticated users read
-    match /profiles/{userId}/{fileName} {
+    match /profiles/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Contracts - only accessible by named parties
-    match /contracts/{contractId}/{fileName} {
-      allow read: if request.auth != null && (
-        request.auth.token.email == resource.metadata.managerEmail ||
-        request.auth.token.email == resource.metadata.musicianEmail
-      );
-      allow write: if request.auth != null;
+    match /contracts/{contractId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
-    
-    // Cancellation documentation — owner writes, authenticated reads
-    match /cancellation-docs/{userId}/{gigId}/{fileName} {
+    match /cancellation-docs/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+    match /reels/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Deny all other access
-    match /{allPaths=**} {
-      allow read, write: if false;
     }
   }
 }
