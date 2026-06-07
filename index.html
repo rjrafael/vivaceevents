@@ -7289,7 +7289,7 @@ function renderRadioPlayer(){
         </div>
         <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioExpand()">
           <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${track.title||'Vivace Radio'}</div>
-          <div style="font-size:10px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'} · <span style="color:#666">tap to expand</span></div>
+          <div style="font-size:10px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'} · <span style="color:#aaa">tap to expand</span></div>
         </div>
         <button onclick="radioPlayPause()" style="width:30px;height:30px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
         <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:14px;cursor:pointer;padding:0 0 0 2px;font-weight:700;line-height:1;flex-shrink:0">✕</button>
@@ -7307,8 +7307,8 @@ function renderRadioPlayer(){
         <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:13px;cursor:pointer">🚩</button>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px">🎚️ Genre channel</div>
-        <div style="font-size:9px;color:#444">swipe →</div>
+        <div style="font-size:9px;color:#C9A84C;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">🎚️ Genre channel</div>
+        <div style="font-size:9px;color:#aaa">swipe →</div>
       </div>
       <div id="genre-scroll-row" style="display:flex;gap:4px;overflow-x:scroll;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:4px;scroll-behavior:smooth">
         ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Rock / Pop','World / Ethnic','Electronic / EDM','Opera'].map(g=>`
