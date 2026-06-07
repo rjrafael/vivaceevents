@@ -449,9 +449,6 @@ function getScr(){
   if(CS==='teacher-analytics')return teacherAnalyticsHTML();
   if(CS==='student-progress')return studentProgressHTML();
   if(CS==='course-builder'){setTimeout(()=>loadCourses(),100);return courseBuilderHTML();}
-  if(CS==='public-profile')return publicProfileHTML();
-  if(CS==='recurring-gigs'){setTimeout(()=>loadRecurringGigs(),100);return recurringGigsHTML();}
-  if(CS==='dmca')return dmcaHTML();
   return feedHTML();
 }
 
@@ -709,8 +706,6 @@ async function loadGigs(){
             ${!isMine&&!filled?`<button class="bt" style="font-size:12px;padding:6px 14px" onclick="applyGig(event,'${(g.title||'').replace(/'/g,"\\'")}','${gid}')">${t('applyBtn')}</button>`:''}
             ${!isMine&&filled&&(g.confirmedApplicants||[]).includes(CU?.uid||'')?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
-                <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','${(g.description||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Add to Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
                 ${g.parkingVehicleRequired?`<button onclick="showVehicleInfoModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#FAEEDA;border:1px solid #EF9F27;color:#633806;font-size:11px;cursor:pointer;font-family:inherit">🅿️ Vehicle info</button>`:''}
                 <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
@@ -721,9 +716,6 @@ async function loadGigs(){
             ${isMine&&filled?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                <button style="padding:6px 12px;border-radius:8px;background:#C9A84C;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600" onclick="showPayMusician('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${(g.confirmedApplicants||[])[0]||''}','${g.postedBy||''}','${g.userEmail||''}','${g.pay||''}')">💰 Pay</button>
-                <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
-                <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
                 <button onclick="saveGigOffline(${JSON.stringify(g).replace(/'/g,"&apos;")}, '${gid}')" style="padding:6px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">📥 Save</button>
                 <button onclick="showEmergencyCancel('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}')" style="padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;animation:pulse-red 2s infinite">🚨</button>
@@ -1928,22 +1920,18 @@ window.showEarningsTracker=async function(){
 
 // ─── AVAILABILITY CALENDAR ───────────────────────────────────────
 let _availDates=new Set(); // Set of 'YYYY-MM-DD' strings
-let _unavailDates=new Set(); // Set of unavailable dates
 let _calYear=new Date().getFullYear();
 let _calMonth=new Date().getMonth();
-let _rangeStart=null;
-let _rangeEnd=null;
 
 window.showAvailabilityCalendar=async function(){
+  // Load existing availability
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
     if(snap.exists()){
-      const d=snap.data();
-      _availDates=new Set(d.available||d.dates||[]);
-      _unavailDates=new Set(d.unavailable||[]);
-      _perfEvents=d.events||{};
+      _availDates=new Set(snap.data().dates||[]);
+      _perfEvents=snap.data().events||{};
     }
-  }catch(e){_availDates=new Set();_unavailDates=new Set();_perfEvents={};}
+  }catch(e){_availDates=new Set();_perfEvents={};}
 
   const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
   document.getElementById('app').appendChild(m);
@@ -1963,30 +1951,16 @@ function renderCalendarModal(){
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isAvail=_availDates.has(dateStr);
-    const isUnavail=_unavailDates.has(dateStr);
-    const isRangeStart=_rangeStart===dateStr;
-    const isRangeEnd=_rangeEnd===dateStr;
-    const isInRange=_rangeStart&&_rangeEnd&&dateStr>_rangeStart&&dateStr<_rangeEnd;
     const perf=_perfEvents[dateStr];
     const isPast=dateStr<today;
     const isToday=dateStr===today;
-
-    let bg='transparent',color='#333',border='2px solid transparent';
-    if(isRangeStart||isRangeEnd){bg='#0C447C';color='#fff';}
-    else if(isInRange){bg='#E6F1FB';color='#0C447C';}
-    else if(isAvail){bg='#1D9E75';color='#fff';}
-    else if(isUnavail){bg='#FF3B30';color='#fff';}
-    else if(perf){bg='#f5f0ff';}
-    if(isToday&&bg==='transparent')border='2px solid #1D9E75';
-    if(isPast){color='#ccc';}
-
-    days+=`<div 
-      onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}"
-      onmousedown="${isPast?'':'startCalDrag(\''+dateStr+'\')'}"
-      onmouseover="${isPast?'':'updateCalDrag(\''+dateStr+'\')'}"
-      onmouseup="${isPast?'':'endCalDrag()'}"
+    
+    days+=`<div onclick="${isPast?'':'handleCalDay(\''+dateStr+'\')'}" 
       style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:${isToday?'700':'400'};cursor:${isPast?'default':'pointer'};
-      background:${bg};color:${color};border:${border};position:relative;transition:all .1s;user-select:none">
+      background:${isAvail?'#1D9E75':perf?'#f5f0ff':'transparent'};
+      color:${isAvail?'#fff':isPast?'#ccc':'#333'};
+      border:${isToday&&!isAvail&&!perf?'2px solid #1D9E75':'2px solid transparent'};
+      position:relative;transition:all .15s">
       ${d}
       ${perf?`<div style="width:5px;height:5px;border-radius:50%;background:${perf.isPublic?'#7C3AED':'#aaa'};position:absolute;bottom:3px"></div>`:''}
     </div>`;
@@ -1999,18 +1973,17 @@ function renderCalendarModal(){
     </div>
 
     <!-- Legend -->
-    <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#1D9E75"></div>Available
+        <div style="width:14px;height:14px;border-radius:4px;background:#1D9E75"></div>Available for gigs
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#FF3B30"></div>Unavailable
+        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#7C3AED"></div></div>Public performance
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555">
-        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#7C3AED"></div></div>Performance
+        <div style="width:14px;height:14px;border-radius:4px;background:#f5f0ff;border:1px solid #ddd;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px"><div style="width:5px;height:5px;border-radius:50%;background:#aaa"></div></div>Busy (private)
       </div>
     </div>
-    <div style="font-size:11px;color:#1D9E75;margin-bottom:12px;font-weight:600">💡 Tap a date to set it · Tap two dates to select a range</div>
 
     <!-- Month navigation -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -2030,26 +2003,10 @@ function renderCalendarModal(){
     </div>
 
     <!-- Quick actions -->
-    <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
       <button onclick="markWeekdays()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekdays</button>
       <button onclick="markWeekends()" style="flex:1;padding:8px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">Weekends</button>
       <button onclick="clearMonth()" style="flex:1;padding:8px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:11px;cursor:pointer;font-family:inherit">Clear</button>
-    </div>
-
-    <!-- Range selection -->
-    <div id="range-bar" style="background:#f5f5f5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:12px;color:#555">
-        ${_rangeStart?`<span style="color:#1D9E75;font-weight:600">From: ${_rangeStart}</span> ${_rangeEnd?`→ <span style="color:#1D9E75;font-weight:600">${_rangeEnd}</span>`:'→ tap end date'}`:
-        '<span style="color:#888">Tap two dates to select a range</span>'}
-      </div>
-      ${_rangeStart?`<div style="display:flex;gap:6px">
-        ${_rangeEnd?`
-          <button onclick="applyRange('available')" style="padding:4px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">✅ Available</button>
-          <button onclick="applyRange('unavailable')" style="padding:4px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">❌ Busy</button>
-          <button onclick="applyRange('clear')" style="padding:4px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">⚪</button>
-        `:''}
-        <button onclick="clearRange()" style="padding:4px 8px;border-radius:8px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer">✕</button>
-      </div>`:''}
     </div>
 
     <div style="display:flex;gap:8px">
@@ -2063,73 +2020,8 @@ function renderCalendarModal(){
 let _perfEvents={}; // {dateStr: {title, venue, time, ticketLink, isPublic}}
 
 window.handleCalDay=function(dateStr){
-  // If range start is set and we tap a different date — set end of range
-  if(_rangeStart&&!_rangeEnd&&dateStr!==_rangeStart){
-    if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
-    else _rangeEnd=dateStr;
-    renderCalendarModal();
-    return;
-  }
-  // If same date tapped twice while range start — clear range start
-  if(_rangeStart===dateStr&&!_rangeEnd){
-    _rangeStart=null;
-    renderCalendarModal();
-    return;
-  }
-  // If range is complete, reset and start new
-  if(_rangeStart&&_rangeEnd){
-    _rangeStart=dateStr;_rangeEnd=null;
-    renderCalendarModal();
-    return;
-  }
-
-  // No range started — show single day options
   const perf=_perfEvents[dateStr];
   const isAvail=_availDates.has(dateStr);
-  const isUnavail=_unavailDates&&_unavailDates.has(dateStr);
-
-// Mouse drag for desktop range selection
-let _isDragging=false;
-window.startCalDrag=function(dateStr){
-  _isDragging=true;
-  _rangeStart=dateStr;
-  _rangeEnd=null;
-  renderCalendarModal();
-}
-window.updateCalDrag=function(dateStr){
-  if(!_isDragging||!_rangeStart)return;
-  if(dateStr===_rangeStart){_rangeEnd=null;}
-  else if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
-  else{_rangeEnd=dateStr;}
-  renderCalendarModal();
-}
-window.endCalDrag=function(){
-  _isDragging=false;
-}
-document.addEventListener('mouseup',()=>{_isDragging=false;});
-
-window.applyRange=function(status){
-  if(!_rangeStart||!_rangeEnd)return;
-  const start=new Date(_rangeStart+'T00:00:00');
-  const end=new Date(_rangeEnd+'T00:00:00');
-  const d=new Date(start);
-  while(d<=end){
-    const dateStr=d.toISOString().split('T')[0];
-    if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
-    else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
-    else if(status==='clear'){_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
-    d.setDate(d.getDate()+1);
-  }
-  const count=Math.round((end-start)/(1000*60*60*24))+1;
-  _rangeStart=null;_rangeEnd=null;
-  renderCalendarModal();
-  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} days updated!`);
-}
-
-window.clearRange=function(){
-  _rangeStart=null;_rangeEnd=null;
-  renderCalendarModal();
-}
   
   // Show action sheet
   const existing=document.getElementById('cal-action');
@@ -2149,18 +2041,10 @@ window.clearRange=function(){
       ${perf.isPublic?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${perf.venue} · ⏰ ${perf.time}</div>`:'<div style="font-size:12px;color:#aaa;margin-top:2px">Private — only shows as busy</div>'}
     </div>`:''}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-      <button onclick="setDayStatus('${dateStr}','available');document.getElementById('cal-action').remove()" 
-        style="padding:13px;border-radius:10px;background:${isAvail?'#1D9E75':'#E1F5EE'};border:${isAvail?'none':'1px solid #5DCAA5'};color:${isAvail?'#fff':'#085041'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
-        ✅ ${isAvail?'Available (current)':'Mark as available'}
+      <button onclick="toggleDay('${dateStr}');document.getElementById('cal-action').remove()" 
+        style="padding:13px;border-radius:10px;background:${isAvail?'#FCEBEB':'#E1F5EE'};border:none;color:${isAvail?'#791F1F':'#085041'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
+        ${isAvail?'❌ Mark as unavailable':'✅ Mark as available'}
       </button>
-      <button onclick="setDayStatus('${dateStr}','unavailable');document.getElementById('cal-action').remove()"
-        style="padding:13px;border-radius:10px;background:${isUnavail?'#FF3B30':'#FCEBEB'};border:${isUnavail?'none':'1px solid #F09595'};color:${isUnavail?'#fff':'#791F1F'};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
-        ❌ ${isUnavail?'Unavailable (current)':'Mark as unavailable'}
-      </button>
-      ${isAvail||isUnavail?`<button onclick="setDayStatus('${dateStr}','clear');document.getElementById('cal-action').remove()"
-        style="padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:14px;cursor:pointer;font-family:inherit;text-align:left">
-        ⚪ Clear — remove marking
-      </button>`:''}
       <button onclick="showAddPerformance('${dateStr}');document.getElementById('cal-action').remove()"
         style="padding:13px;border-radius:10px;background:#f5f0ff;border:none;color:#5B21B6;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">
         ${perf?'✏️ Edit performance/event':'🎵 Add performance or event'}
@@ -2251,67 +2135,36 @@ window.calNav=function(dir){
   renderCalendarModal();
 }
 
-window.setDayStatus=function(dateStr, status){
-  if(status==='available'){
-    _availDates.add(dateStr);
-    _unavailDates.delete(dateStr);
-  } else if(status==='unavailable'){
-    _unavailDates.add(dateStr);
-    _availDates.delete(dateStr);
-  } else if(status==='clear'){
-    _availDates.delete(dateStr);
-    _unavailDates.delete(dateStr);
-  }
-  renderCalendarModal();
-}
-
 window.toggleDay=function(dateStr){
   if(_availDates.has(dateStr))_availDates.delete(dateStr);
   else _availDates.add(dateStr);
   renderCalendarModal();
 }
 
-window.markWeekdays=function(){showBulkPicker('weekdays');}
-window.markWeekends=function(){showBulkPicker('weekends');}
-
-window.showBulkPicker=function(type){
-  const m=document.createElement('div');
-  m.id='bulk-picker';
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
-  const label=type==='weekdays'?'weekdays':'weekends';
-  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px">
-    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px">Mark all ${label} as…</div>
-    <div style="font-size:12px;color:#aaa;margin-bottom:16px">Applies to current month only</div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
-      <button onclick="applyBulk('${type}','available')" style="padding:13px;border-radius:10px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">✅ Available for gigs</button>
-      <button onclick="applyBulk('${type}','unavailable')" style="padding:13px;border-radius:10px;background:#FCEBEB;border:1px solid #F09595;color:#791F1F;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">❌ Unavailable / Busy</button>
-      <button onclick="applyBulk('${type}','clear')" style="padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:14px;cursor:pointer;font-family:inherit;text-align:left">⚪ Clear all markings</button>
-    </div>
-    <button onclick="document.getElementById('bulk-picker').remove()" style="width:100%;padding:12px;border-radius:10px;background:#f5f5f5;border:none;color:#555;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.applyBulk=function(type, status){
+window.markWeekdays=function(){
   const year=_calYear,month=_calMonth;
   const daysInMonth=new Date(year,month+1,0).getDate();
-  let count=0;
   for(let d=1;d<=daysInMonth;d++){
     const date=new Date(year,month,d);
-    const dow=date.getDay();
-    const isWeekday=dow>0&&dow<6;
-    const isWeekend=dow===0||dow===6;
-    if((type==='weekdays'&&isWeekday)||(type==='weekends'&&isWeekend)){
+    if(date.getDay()>0&&date.getDay()<6){
       const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
-      else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
-      else{_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
-      count++;
+      _availDates.add(dateStr);
     }
   }
-  document.getElementById('bulk-picker')?.remove();
   renderCalendarModal();
-  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} ${type} updated!`);
+}
+
+window.markWeekends=function(){
+  const year=_calYear,month=_calMonth;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(year,month,d);
+    if(date.getDay()===0||date.getDay()===6){
+      const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      _availDates.add(dateStr);
+    }
+  }
+  renderCalendarModal();
 }
 
 window.clearMonth=function(){
@@ -2320,25 +2173,21 @@ window.clearMonth=function(){
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     _availDates.delete(dateStr);
-    _unavailDates.delete(dateStr);
   }
   renderCalendarModal();
-  ts('⚪ Month cleared!');
 }
 
 window.saveAvailability=async function(){
   try{
     const dates=[..._availDates].sort();
-    const unavailDates=[..._unavailDates].sort();
     await setDoc(doc(db,'availability',CU.uid),{
       userId:CU.uid,userEmail:CU.email,
-      available:dates,unavailable:unavailDates,
       dates,events:_perfEvents,updatedAt:new Date()
     });
     await setDoc(doc(db,'users',CU.uid),{availableDates:dates},{merge:true});
     document.getElementById('avail-modal')?.remove();
     loadAvailabilityPreview();
-    ts(`✅ Calendar saved — ${dates.length} available, ${unavailDates.length} unavailable!`);
+    ts(`✅ Calendar saved — ${dates.length} available days!`);
   }catch(e){ts('Saved!');}
 }
 
@@ -3509,7 +3358,6 @@ function feedHTML(){
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
   <div class="hdr-r">
     <span style="font-size:11px;color:#1D9E75;cursor:pointer;font-weight:600;border:1px solid #1D9E75;padding:3px 8px;border-radius:20px" onclick="showLangPicker()">${{en:'EN 🌍',es:'ES 🌍',it:'IT 🌍',ru:'RU 🌍',fr:'FR 🌍',de:'DE 🌍'}[lang]}</span>
-    <span onclick="showRadioBar()" style="cursor:pointer;font-size:18px;color:#C9A84C" title="Vivace Radio">🎙️</span>
     <span onclick="showNotifications()" style="position:relative;cursor:pointer;font-size:20px;color:#fff">🔔<span id="notif-dot" style="display:none;position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#FF3B30"></span></span>
   </div>
 </div>
@@ -4610,7 +4458,6 @@ function mgrHTML(){
   <div class="tab${MT==='groups'?' on':''}" onclick="mgrTab('groups')" style="flex-shrink:0">${t('myGroups')}</div>
   <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')" style="flex-shrink:0">${t('venues')}</div>
   <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')" style="flex-shrink:0">${t('responses')}</div>
-  <div class="tab${MT==='recurring'?' on':''}" onclick="mgrTab('recurring')" style="flex-shrink:0">🔄 Recurring</div>
 </div>
 <div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
@@ -4626,7 +4473,6 @@ window.mgrTab=function(tab){
   if(tab==='groups')loadGroups().then(renderGroups);
   if(tab==='venues')loadVenues().then(renderVenues);
   if(tab==='responses')loadResponses();
-  if(tab==='recurring')loadRecurringGigsTab();
 }
 
 function mgrTabHTML(){
@@ -4715,8 +4561,6 @@ async function loadManagerDashboard(){
           <button onclick="mgrTab('groups')" style="padding:12px;border-radius:12px;background:#1D9E75;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📢 Broadcast</button>
           <button onclick="mgrTab('venues')" style="padding:12px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📍 Venues</button>
           <button onclick="go('discover')" style="padding:12px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Find artists</button>
-          <button onclick="showAnalyticsDashboard()" style="padding:12px;border-radius:12px;background:#f5f0ff;color:#5B21B6;border:1px solid #7C3AED44;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📈 Analytics</button>
-          <button onclick="showStripeConnect()" style="padding:12px;border-radius:12px;background:#E1F5EE;color:#085041;border:1px solid #5DCAA5;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">💰 Payments</button>
         </div>
       </div>
 
@@ -5047,7 +4891,7 @@ ${teacherPlans.map(p=>`
 <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
   14-day free trial for new users · $1/month for first 3 months · Cancel anytime · Secure payment via Stripe
 </div>
-<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com · <span onclick="go('dmca')" style="cursor:pointer;text-decoration:underline;color:#aaa">DMCA Policy</span></div>
+<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com</div>
 </div>
 </div>`;}
 
@@ -5253,13 +5097,7 @@ function profileHTML(){
         ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-      <div style="display:flex;gap:6px">
-        <button style="padding:7px 12px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onclick="shareProfile()">🔗 Share</button>
-        <button style="padding:7px 12px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onclick="doSignOut()">Sign out</button>
-      </div>
-      <button style="padding:6px 12px;border-radius:8px;background:transparent;border:1px solid #C9A84C;color:#C9A84C;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;letter-spacing:0.3px" onclick="go('dmca')">⚖️ DMCA Policy</button>
-    </div>
+    <button style="padding:7px 14px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px" onclick="doSignOut()">${ic('out')} Sign out</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #222;padding-top:16px">
     <div style="text-align:center"><div style="font-size:17px;font-weight:700;color:#fff">${groups.length}</div><div style="font-size:10px;color:#555;margin-top:2px">Groups</div></div>
@@ -5376,61 +5214,6 @@ function profileHTML(){
         <div id="reel-progress-bar" style="height:100%;background:#1D9E75;width:0%;border-radius:4px;transition:width 0.3s"></div>
       </div>
       <div id="reel-progress-text" style="font-size:11px;color:#888;margin-top:4px;text-align:center">Uploading...</div>
-    </div>
-  </div>
-  <!-- Music streaming section -->
-  <div style="margin-bottom:18px">
-    <div class="st" style="margin-bottom:10px">🎵 My Music</div>
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px">
-      <div style="font-size:12px;color:#888;margin-bottom:10px">Paste a Spotify or Apple Music link to let managers hear your work</div>
-      
-      <!-- Spotify -->
-      <div style="margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:16px">💚</span>
-          <span style="font-size:12px;font-weight:600;color:#111">Spotify</span>
-        </div>
-        <div style="display:flex;gap:8px">
-          <input class="finp" id="spotify-url" placeholder="https://open.spotify.com/artist/..." value="${UP.spotifyUrl||''}" style="flex:1;margin-bottom:0;font-size:12px"/>
-          <button onclick="saveMusicLink('spotify')" style="padding:8px 12px;border-radius:8px;background:#1DB954;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">Save</button>
-        </div>
-        ${UP.spotifyUrl?`<div style="margin-top:8px" id="spotify-preview">${generateSpotifyEmbed(UP.spotifyUrl)}</div>`:''}
-      </div>
-
-      <!-- Apple Music -->
-      <div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:16px">🍎</span>
-          <span style="font-size:12px;font-weight:600;color:#111">Apple Music</span>
-        </div>
-        <div style="display:flex;gap:8px">
-          <input class="finp" id="apple-url" placeholder="https://music.apple.com/..." value="${UP.appleMusicUrl||''}" style="flex:1;margin-bottom:0;font-size:12px"/>
-          <button onclick="saveMusicLink('apple')" style="padding:8px 12px;border-radius:8px;background:#FC3C44;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">Save</button>
-        </div>
-        ${UP.appleMusicUrl?`<div style="margin-top:8px">${generateAppleMusicEmbed(UP.appleMusicUrl)}</div>`:''}
-      </div>
-    </div>
-  </div>
-
-  ${radioProfileSection()}
-  <!-- Payments section -->
-  <div style="margin-bottom:18px">
-    <div class="st" style="margin-bottom:10px">💳 Payments</div>
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px">
-      ${UP.stripeAccountVerified?`
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="font-size:20px">✅</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#085041">Bank account connected</div>
-          <div style="font-size:11px;color:#aaa">You can receive payments through the app</div>
-        </div>
-      </div>
-      `:`
-      <div style="font-size:12px;color:#888;margin-bottom:10px">Connect your bank account to get paid directly through Vivace Events.</div>
-      `}
-      <button onclick="showConnectBankAccount()" style="width:100%;padding:10px;border-radius:10px;background:${UP.stripeAccountVerified?'#f5f5f5':'#1D9E75'};border:none;color:${UP.stripeAccountVerified?'#555':'#fff'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
-        ${UP.stripeAccountVerified?'⚙️ Manage payment account':'🏦 Connect bank account'}
-      </button>
     </div>
   </div>
   ${isTeacher()?`
@@ -5815,7 +5598,7 @@ window.showInstrumentEditor=function(){
     <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add instrument</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
       ${INSTRUMENT_LIST.filter(i=>!current.find(c=>c.name===i)).map(i=>`
-        <button onclick="addInst('${i.replace(/'/g,"\\'")}'')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
+        <button onclick="addInst('${i.replace(/'/g,"\\'")}')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
       `).join('')}
     </div>
     <button class="bt" style="width:100%;padding:13px" onclick="saveInstruments()">Save instruments</button>
@@ -6081,1657 +5864,7 @@ window.setVisibility=async function(visibility){
   const labels={public:'🌍 Profile set to Public',private:'🔒 Profile set to Private',hidden:'👻 Profile set to Hidden'};
   ts(labels[visibility]||'Visibility updated');
 }
-// ─── PUBLIC PROFILES ─────────────────────────────────────────────
-window.shareProfile=function(){
-  const url=`https://vivaceevents.com/?profile=${CU.uid}`;
-  if(navigator.share){navigator.share({title:(UP.name||'Vivace Events')+' — Profile',url});}
-  else{navigator.clipboard?.writeText(url);ts('🔗 Profile link copied!');}
-}
-
-function publicProfileHTML(){
-  const uid=_publicProfileId||'';
-  setTimeout(()=>loadPublicProfile(uid),100);
-  return `
-<div class="hdr">
-  <button onclick="go('feed')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
-  <div class="logo" style="font-size:15px">Profile</div>
-  <div></div>
-</div>
-<div class="pad" id="public-profile-content">
-  <div style="text-align:center;padding:40px 0;color:#aaa">Loading profile...</div>
-</div>`;}
-
-let _publicProfileId='';
-async function loadPublicProfile(uid){
-  if(!uid)return;
-  try{
-    const snap=await getDoc(doc(db,'users',uid));
-    if(!snap.exists()){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Profile not found</div>`;return;}
-    const u=snap.data();
-    const name=u.name||u.email?.split('@')[0]||'Musician';
-    const ini=name.substring(0,2).toUpperCase();
-    const colors=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#712B13']];
-    const [bg,tc]=colors[Math.abs(name.charCodeAt(0))%colors.length];
-    const roles=(u.roles||[]).map(r=>({artist:'🎻 Artist',manager:'🎯 Manager',teacher:'👨‍🏫 Teacher',student:'🎓 Student'}[r]||r)).join(' · ');
-    const instruments=(u.instruments||[]).slice(0,3).map(i=>i.name).join(', ');
-    const availSnap=await getDoc(doc(db,'availability',uid));
-    const availData=availSnap.exists()?availSnap.data():{};
-    const available=(availData.available||availData.dates||[]).filter(d=>d>=new Date().toISOString().split('T')[0]).slice(0,6);
-    const events=availData.events||{};
-    const upcomingPerfs=Object.entries(events)
-      .filter(([d,p])=>p.isPublic&&d>=new Date().toISOString().split('T')[0])
-      .sort(([a],[b])=>a.localeCompare(b)).slice(0,5);
-    document.getElementById('public-profile-content').innerHTML=`
-    <div style="text-align:center;margin-bottom:24px">
-      ${u.photoURL?`<img src="${u.photoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px">`:`<div style="width:80px;height:80px;border-radius:50%;background:${bg};color:${tc};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin:0 auto 12px">${ini}</div>`}
-      <div style="font-size:20px;font-weight:700;color:#111">${name}</div>
-      <div style="font-size:13px;color:#888;margin-top:4px">${roles}</div>
-      ${u.verified?'<span class="verified-badge" style="margin-top:6px;display:inline-block">✓ Verified</span>':''}
-    </div>
-    ${instruments?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:6px">🎵 Instruments</div><div style="font-size:14px;color:#111">${instruments}</div></div>`:''}
-    ${(u.genres||[]).length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎼 Genres</div><div style="display:flex;flex-wrap:wrap;gap:6px">${(u.genres||[]).map(g=>{const gd=GENRE_LIST.find(gl=>gl.name===g)||{color:'#1a0a2e',text:'#C4B5FD'};return `<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${gd.color};color:${gd.text}">${g}</span>`;}).join('')}</div></div>`:''}
-    ${upcomingPerfs.length>0?`<div class="card" style="margin-bottom:12px">
-      <div style="font-size:12px;color:#aaa;margin-bottom:8px">🎵 Upcoming performances</div>
-      ${upcomingPerfs.map(([d,p])=>`
-        <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#111">${p.title||'Performance'}</div>
-            <div style="font-size:11px;color:#888;margin-top:2px">${new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})} ${p.time?'· '+p.time:''}</div>
-            ${p.venue?`<div style="font-size:11px;color:#aaa">📍 ${p.venue}</div>`:''}
-          </div>
-          ${p.ticketLink?`<a href="${p.ticketLink}" target="_blank" style="padding:5px 12px;border-radius:8px;background:#C9A84C;color:#fff;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">🎫 Tickets</a>`:''}
-        </div>`).join('')}
-    </div>`:''}
-    ${available.length>0?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">📅 Available dates</div><div style="display:flex;flex-wrap:wrap;gap:6px">${available.map(d=>`<span style="padding:4px 10px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">${new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`).join('')}</div></div>`:''}
-    ${u.reelURL?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🎥 Video reel</div><video src="${u.reelURL}" controls playsinline style="width:100%;border-radius:8px"></video></div>`:''}
-    ${u.spotifyUrl?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">💚 Listen on Spotify</div>${generateSpotifyEmbed(u.spotifyUrl)}</div>`:''}
-    ${u.appleMusicUrl?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🍎 Listen on Apple Music</div>${generateAppleMusicEmbed(u.appleMusicUrl)}</div>`:''}
-    <div style="background:#f9f9f9;border-radius:12px;padding:16px;text-align:center;margin-bottom:12px">
-      <div style="font-size:13px;color:#888;margin-bottom:12px">🔒 Contact info is protected by the Trust Network</div>
-      ${CU?`<button class="bt" style="width:100%;padding:12px" onclick="sendConnectionRequest('${uid}','${name}','${u.email||''}')">🔗 Request Connection</button>`:`<button class="bt" style="width:100%;padding:12px" onclick="go('feed')">Sign in to Connect</button>`}
-    </div>`;
-  }catch(e){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load profile</div>`;}
-}
-
-window.addEventListener('load',()=>{
-  const params=new URLSearchParams(window.location.search);
-  const profileId=params.get('profile');
-  if(profileId){_publicProfileId=profileId;CS='public-profile';}
-});
-
-// ─── DMCA PAGE ───────────────────────────────────────────────────
-function dmcaHTML(){
-  return `
-<div class="hdr">
-  <button onclick="go('profile')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
-  <div class="logo" style="font-size:13px">DMCA Policy</div>
-  <div></div>
-</div>
-<div class="pad">
-  <div style="font-size:20px;font-weight:700;color:#111;margin-bottom:4px">⚖️ DMCA Copyright Policy</div>
-  <div style="font-size:12px;color:#aaa;margin-bottom:20px">Vivace Events LLC · vivaceevents.com</div>
-  <div class="card" style="margin-bottom:12px">
-    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Our commitment</div>
-    <div style="font-size:13px;color:#555;line-height:1.6">Vivace Events LLC respects intellectual property rights and complies with the Digital Millennium Copyright Act (DMCA). We respond promptly to valid copyright infringement notices and remove infringing content upon proper notification.</div>
-  </div>
-  <div class="card" style="margin-bottom:12px">
-    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Report copyright infringement</div>
-    <div style="font-size:13px;color:#555;line-height:1.6;margin-bottom:10px">Send a written DMCA notice to our designated agent containing:</div>
-    <div style="font-size:12px;color:#555;line-height:1.9">1. Your signature (electronic or physical)<br>2. Description of the copyrighted work<br>3. URL of the infringing content<br>4. Your contact information<br>5. Good faith belief statement<br>6. Accuracy statement under penalty of perjury</div>
-    <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px">
-      <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:4px">DMCA Agent — Vivace Events LLC</div>
-      <div style="font-size:14px;color:#085041;font-weight:600">📧 dmca@vivaceevents.com</div>
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:12px">
-    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px">Repeat infringers</div>
-    <div style="font-size:13px;color:#555;line-height:1.6">Vivace Events terminates accounts of repeat copyright infringers in appropriate circumstances per DMCA §512(i).</div>
-  </div>
-  <div style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Last updated: June 2026 · Vivace Events LLC · Virtual Studio Orchestra LLC</div>
-</div>`;}
-
-// ─── RECURRING GIGS ──────────────────────────────────────────────
-function recurringGigsHTML(){
-  return `
-<div class="hdr">
-  <button onclick="go('manager')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">←</button>
-  <div class="logo" style="font-size:15px">🔄 Recurring Gigs</div>
-  <div></div>
-</div>
-<div class="pad">
-  <div style="font-size:13px;color:#888;margin-bottom:16px">Set up gigs that repeat weekly or monthly — perfect for orchestras and regular sessions.</div>
-  <button class="bt" style="width:100%;padding:13px;margin-bottom:16px" onclick="showCreateRecurring()">+ Create recurring gig</button>
-  <div id="recurring-list"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
-</div>`;}
-
-async function loadRecurringGigs(){
-  try{
-    const snap=await getDocs(query(collection(db,'recurringGigs'),where('managerId','==',CU.uid)));
-    const el=document.getElementById('recurring-list');if(!el)return;
-    if(snap.empty){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">No recurring gigs yet</div>`;return;}
-    el.innerHTML=snap.docs.map(d=>{
-      const g=d.data();const gid=d.id;
-      return `<div class="card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-size:15px;font-weight:700;color:#111">${g.title||'Recurring Gig'}</div>
-            <div style="font-size:12px;color:#888;margin-top:2px">${g.frequency==='weekly'?'Every '+g.dayOfWeek:'Monthly on day '+g.dayOfMonth} · ${g.time||'TBD'}</div>
-            <div style="font-size:12px;color:#888">${g.location||'TBD'} · ${g.pay||'TBD'}</div>
-          </div>
-          <span class="tag tg" style="font-size:10px">${g.frequency}</span>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="bt" style="flex:1;padding:8px;font-size:12px" onclick="generateRecurringGigs('${gid}')">📅 Generate next gigs</button>
-          <button style="padding:8px 12px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#C0392B;font-size:12px;cursor:pointer;font-family:inherit" onclick="deleteRecurring('${gid}')">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){}
-}
-
-async function loadRecurringGigsTab(){
-  const el=document.getElementById('mtab');if(!el)return;
-  el.innerHTML=`<div class="pad" style="padding-top:12px">
-    <button class="bt" style="width:100%;padding:13px;margin-bottom:16px" onclick="showCreateRecurring()">+ Create recurring gig</button>
-    <div id="recurring-list"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
-  </div>`;
-  await loadRecurringGigs();
-}
-
-window.showCreateRecurring=function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='recurring-modal';
-  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">🔄 New recurring gig</div>
-    <input class="finp" id="rec-title" placeholder="Title (e.g. Weekly Orchestra Rehearsal)" style="margin-bottom:10px"/>
-    <select class="finp" id="rec-freq" style="margin-bottom:10px" onchange="updateRecurringFields()">
-      <option value="weekly">Weekly</option>
-      <option value="monthly">Monthly</option>
-    </select>
-    <div id="rec-weekly-fields">
-      <select class="finp" id="rec-dow" style="margin-bottom:10px">
-        ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(d=>`<option value="${d}">${d}</option>`).join('')}
-      </select>
-    </div>
-    <div id="rec-monthly-fields" style="display:none">
-      <select class="finp" id="rec-dom" style="margin-bottom:10px">
-        ${Array.from({length:28},(_,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join('')}
-      </select>
-    </div>
-    <input class="finp" id="rec-time" placeholder="Time (e.g. 7:00 PM)" style="margin-bottom:10px"/>
-    <input class="finp" id="rec-location" placeholder="Location or Remote" style="margin-bottom:10px"/>
-    <input class="finp" id="rec-pay" placeholder="Pay per musician" style="margin-bottom:10px"/>
-    <input class="finp" id="rec-inst" placeholder="Instruments needed" style="margin-bottom:16px"/>
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('recurring-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px" onclick="saveRecurringGig()">Save</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.updateRecurringFields=function(){
-  const freq=document.getElementById('rec-freq')?.value;
-  document.getElementById('rec-weekly-fields').style.display=freq==='weekly'?'block':'none';
-  document.getElementById('rec-monthly-fields').style.display=freq==='monthly'?'block':'none';
-}
-
-window.saveRecurringGig=async function(){
-  const title=document.getElementById('rec-title')?.value;
-  if(!title){ts('Please enter a title');return;}
-  const freq=document.getElementById('rec-freq')?.value||'weekly';
-  const dow=document.getElementById('rec-dow')?.value||'Monday';
-  const dom=document.getElementById('rec-dom')?.value||'1';
-  const time=document.getElementById('rec-time')?.value||'';
-  const location=document.getElementById('rec-location')?.value||'';
-  const pay=document.getElementById('rec-pay')?.value||'';
-  const inst=document.getElementById('rec-inst')?.value||'';
-  // Close modal AFTER reading values
-  document.getElementById('recurring-modal')?.remove();
-  try{
-    await addDoc(collection(db,'recurringGigs'),{
-      managerId:CU.uid,managerEmail:CU.email,title,frequency:freq,
-      dayOfWeek:freq==='weekly'?dow:'',
-      dayOfMonth:freq==='monthly'?dom:'',
-      time,location,pay,instruments:inst,
-      createdAt:new Date()
-    });
-    ts('🔄 Recurring gig saved!');
-    setTimeout(()=>loadRecurringGigs(),500);
-  }catch(e){console.error('Recurring save error:',e.message);ts('Error: '+e.message);}
-}
-
-window.generateRecurringGigs=async function(recurringId){
-  try{
-    const snap=await getDoc(doc(db,'recurringGigs',recurringId));
-    if(!snap.exists())return;
-    const g=snap.data();
-    const dates=[];const now=new Date();let d=new Date(now);let count=0;
-    while(count<4&&count<60){
-      d.setDate(d.getDate()+1);
-      if(g.frequency==='weekly'){
-        const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        if(days[d.getDay()]===g.dayOfWeek){dates.push(new Date(d));count++;}
-      } else {
-        if(d.getDate()===parseInt(g.dayOfMonth)){dates.push(new Date(d));count++;}
-      }
-    }
-    for(const date of dates){
-      await addDoc(collection(db,'gigs'),{
-        title:g.title,type:'Concert/Performance',
-        date:date.toISOString().split('T')[0],
-        time:g.time,location:g.location,pay:g.pay,
-        instruments:g.instruments,
-        userId:CU.uid,userEmail:CU.email,
-        recurringId,status:'open',timestamp:new Date()
-      });
-    }
-    ts(`📅 Generated ${dates.length} upcoming gigs!`);
-  }catch(e){ts('Error generating gigs');}
-}
-
-window.deleteRecurring=async function(id){
-  if(!confirm('Delete this recurring gig?'))return;
-  await deleteDoc(doc(db,'recurringGigs',id));
-  loadRecurringGigs();ts('Deleted');
-}
-
-// ─── EMAIL NOTIFICATIONS ─────────────────────────────────────────
-async function sendEmailNotification(toEmail,subject,body){
-  if(!toEmail)return;
-  try{
-    await addDoc(collection(db,'mail'),{
-      to:toEmail,
-      message:{subject,html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-        <div style="background:#0d0d0d;padding:20px;text-align:center">
-          <span style="font-size:22px;font-weight:700;color:#fff">Vivace<em style="color:#1D9E75">Events</em></span>
-        </div>
-        <div style="padding:24px;background:#fff">${body}</div>
-        <div style="padding:16px;text-align:center;font-size:11px;color:#aaa;background:#f9f9f9">
-          <a href="https://vivaceevents.com" style="color:#1D9E75">vivaceevents.com</a> · by Virtual Studio Orchestra LLC
-        </div>
-      </div>`}
-    });
-  }catch(e){console.log('Email queued');}
-}
-
-const _origSendConnectionRequest=window.sendConnectionRequest;
-window.sendConnectionRequest=async function(musicianId,musicianName,musicianEmail){
-  await _origSendConnectionRequest?.apply(this,arguments);
-  sendEmailNotification(musicianEmail,
-    '🔗 New connection request on Vivace Events',
-    `<h2 style="color:#111">New connection request</h2>
-    <p>Hi ${musicianName},</p>
-    <p><strong>${UP.name||CU.email?.split('@')[0]||'A manager'}</strong> wants to connect with you on Vivace Events.</p>
-    <p><a href="https://vivaceevents.com" style="display:inline-block;padding:12px 24px;background:#1D9E75;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">View Request →</a></p>`
-  );
-}
-
-// ─── GROUP CHAT PER GIG ──────────────────────────────────────────
-window.openGigChat=function(gigId, gigTitle){
-  const m=document.createElement('div');m.className='modal-bg';m.id='gig-chat-modal';
-  m.innerHTML=`<div class="modal" style="max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
-    <div style="padding:16px 16px 12px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div style="font-size:15px;font-weight:700;color:#111">💬 Gig Chat</div>
-        <div style="font-size:12px;color:#888;margin-top:2px">${gigTitle}</div>
-      </div>
-      <button onclick="document.getElementById('gig-chat-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
-    </div>
-    <div id="gig-chat-messages" style="flex:1;overflow-y:auto;padding:12px;min-height:250px;max-height:400px">
-      <div style="text-align:center;padding:20px 0;color:#aaa;font-size:13px">Loading messages...</div>
-    </div>
-    <div style="padding:12px;border-top:1px solid #f0f0f0;display:flex;gap:8px">
-      <input class="finp" id="gig-chat-input" placeholder="Type a message…" style="flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')sendGigChatMessage('${gigId}')"/>
-      <button class="bt" style="padding:10px 16px;flex-shrink:0" onclick="sendGigChatMessage('${gigId}')">Send</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  loadGigChatMessages(gigId);
-}
-
-async function loadGigChatMessages(gigId){
-  try{
-    const snap=await getDocs(query(collection(db,'gigChats',gigId,'messages'),orderBy('timestamp','asc')));
-    const el=document.getElementById('gig-chat-messages');if(!el)return;
-    if(snap.empty){el.innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa;font-size:13px">No messages yet — be the first!</div>`;return;}
-    el.innerHTML=snap.docs.map(d=>{
-      const msg=d.data();
-      const isMe=msg.userId===CU.uid;
-      const time=msg.timestamp?.toDate?msg.timestamp.toDate().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}):'';
-      return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};margin-bottom:8px">
-        <div style="font-size:10px;color:#aaa;margin-bottom:2px">${isMe?'You':msg.userName||'Musician'} · ${time}</div>
-        <div style="max-width:80%;padding:8px 12px;border-radius:${isMe?'14px 14px 4px 14px':'14px 14px 14px 4px'};background:${isMe?'#1D9E75':'#f5f5f5'};color:${isMe?'#fff':'#111'};font-size:13px">
-          ${msg.text}
-        </div>
-      </div>`;
-    }).join('');
-    el.scrollTop=el.scrollHeight;
-  }catch(e){}
-}
-
-window.sendGigChatMessage=async function(gigId){
-  const input=document.getElementById('gig-chat-input');
-  const text=input?.value?.trim();
-  if(!text)return;
-  input.value='';
-  try{
-    await addDoc(collection(db,'gigChats',gigId,'messages'),{
-      userId:CU.uid,userEmail:CU.email,
-      userName:UP.name||CU.email?.split('@')[0]||'Musician',
-      text,timestamp:new Date()
-    });
-    loadGigChatMessages(gigId);
-  }catch(e){ts('Message sent!');}
-}
-
-// ─── ANALYTICS DASHBOARD ─────────────────────────────────────────
-window.showAnalyticsDashboard=async function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='analytics-modal';
-  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:17px;font-weight:700;color:#111">📈 Analytics</div>
-      <button onclick="document.getElementById('analytics-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
-    </div>
-    <div id="analytics-content"><div style="text-align:center;padding:20px 0;color:#aaa">Loading...</div></div>
-  </div>`;
-  document.body.appendChild(m);
-  try{
-    const [gigsSnap,appsSnap,connsSnap]=await Promise.all([
-      getDocs(query(collection(db,'gigs'),where('userId','==',CU.uid))),
-      getDocs(query(collection(db,'applications'),where('managerId','==',CU.uid))),
-      getDocs(query(collection(db,'connections'),where('managerId','==',CU.uid)))
-    ]);
-    const gigs=gigsSnap.docs.map(d=>d.data());
-    const totalGigs=gigs.length;
-    const filledGigs=gigs.filter(g=>g.status==='filled').length;
-    const openGigs=gigs.filter(g=>g.status==='open').length;
-    const cancelledGigs=gigs.filter(g=>g.status==='cancelled').length;
-    const totalApps=appsSnap.size;
-    const totalConns=connsSnap.size;
-    const acceptedConns=connsSnap.docs.filter(d=>d.data().status==='accepted').length;
-    const el=document.getElementById('analytics-content');if(!el)return;
-    el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:#E1F5EE;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#085041">${totalGigs}</div>
-        <div style="font-size:11px;color:#085041;margin-top:2px">Total gigs posted</div>
-      </div>
-      <div style="background:#FAEEDA;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#633806">${filledGigs}</div>
-        <div style="font-size:11px;color:#633806;margin-top:2px">Gigs filled</div>
-      </div>
-      <div style="background:#E6F1FB;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#0C447C">${openGigs}</div>
-        <div style="font-size:11px;color:#0C447C;margin-top:2px">Open gigs</div>
-      </div>
-      <div style="background:#f5f5f5;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#555">${cancelledGigs}</div>
-        <div style="font-size:11px;color:#555;margin-top:2px">Cancelled</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:#f5f0ff;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#5B21B6">${totalApps}</div>
-        <div style="font-size:11px;color:#5B21B6;margin-top:2px">Applications received</div>
-      </div>
-      <div style="background:#E1F5EE;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#085041">${acceptedConns}/${totalConns}</div>
-        <div style="font-size:11px;color:#085041;margin-top:2px">Connections</div>
-      </div>
-    </div>
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px">
-      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">📊 Performance</div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:#888">Fill rate</span>
-        <span style="font-size:12px;font-weight:600;color:#111">${totalGigs>0?Math.round(filledGigs/totalGigs*100):0}%</span>
-      </div>
-      <div style="background:#eee;border-radius:4px;height:6px;margin-bottom:10px">
-        <div style="background:#1D9E75;height:100%;border-radius:4px;width:${totalGigs>0?Math.round(filledGigs/totalGigs*100):0}%"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:#888">Connection acceptance</span>
-        <span style="font-size:12px;font-weight:600;color:#111">${totalConns>0?Math.round(acceptedConns/totalConns*100):0}%</span>
-      </div>
-      <div style="background:#eee;border-radius:4px;height:6px">
-        <div style="background:#0C447C;height:100%;border-radius:4px;width:${totalConns>0?Math.round(acceptedConns/totalConns*100):0}%"></div>
-      </div>
-    </div>`;
-  }catch(e){document.getElementById('analytics-content').innerHTML=`<div style="text-align:center;padding:20px 0;color:#aaa">Could not load analytics</div>`;}
-}
-
-// ─── SPOTIFY / APPLE MUSIC ───────────────────────────────────────
-function generateSpotifyEmbed(url){
-  if(!url)return '';
-  try{
-    const embedUrl=url.replace('open.spotify.com/','open.spotify.com/embed/');
-    return `<iframe src="${embedUrl}" width="100%" height="152" frameborder="0" allowtransparency="true" allow="encrypted-media" style="border-radius:10px"></iframe>`;
-  }catch(e){return '';}
-}
-
-function generateAppleMusicEmbed(url){
-  if(!url)return '';
-  try{
-    const embedUrl=url.replace('music.apple.com/','embed.music.apple.com/');
-    return `<iframe allow="autoplay *; encrypted-media *;" frameborder="0" height="152" style="width:100%;overflow:hidden;border-radius:10px;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation" src="${embedUrl}"></iframe>`;
-  }catch(e){return '';}
-}
-
-window.saveMusicLink=async function(platform){
-  const url=document.getElementById(platform==='spotify'?'spotify-url':'apple-url')?.value?.trim();
-  if(platform==='spotify'){UP.spotifyUrl=url;}
-  else{UP.appleMusicUrl=url;}
-  await saveUP();
-  ts(`${platform==='spotify'?'💚 Spotify':'🍎 Apple Music'} link saved!`);
-  render();
-}
-
-// ─── STRIPE CONNECT ──────────────────────────────────────────────
-// Platform fee is 5% taken at checkout via Stripe Connect
-// For now shows info modal — full implementation requires Stripe Connect onboarding
-window.showStripeConnect=function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='stripe-connect-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px">💰 Stripe Connect</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">Accept payments directly through Vivace Events — managers pay musicians through the platform.</div>
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:10px">How it works:</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <span style="font-size:18px">1️⃣</span>
-          <div><div style="font-size:13px;font-weight:600;color:#111">Manager pays through app</div><div style="font-size:11px;color:#888">Secure Stripe payment at booking</div></div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <span style="font-size:18px">2️⃣</span>
-          <div><div style="font-size:13px;font-weight:600;color:#111">Vivace takes 5% platform fee</div><div style="font-size:11px;color:#888">Automatically deducted</div></div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <span style="font-size:18px">3️⃣</span>
-          <div><div style="font-size:13px;font-weight:600;color:#111">Musician receives 95%</div><div style="font-size:11px;color:#888">Direct deposit to their bank account</div></div>
-        </div>
-      </div>
-    </div>
-    <div style="background:#E1F5EE;border-radius:12px;padding:12px;margin-bottom:16px;text-align:center">
-      <div style="font-size:13px;color:#085041;font-weight:600">🚀 Coming soon — join the waitlist!</div>
-      <div style="font-size:11px;color:#1D9E75;margin-top:4px">Be notified when payment processing launches</div>
-    </div>
-    <button class="bt" style="width:100%;padding:13px" onclick="joinStripeWaitlist()">Join waitlist</button>
-    <button class="bg" style="width:100%;padding:11px;margin-top:8px" onclick="document.getElementById('stripe-connect-modal').remove()">Close</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.joinStripeWaitlist=async function(){
-  try{
-    await setDoc(doc(db,'stripeWaitlist',CU.uid),{
-      userId:CU.uid,email:CU.email,
-      name:UP.name||CU.email?.split('@')[0]||'',
-      joinedAt:new Date()
-    });
-    document.getElementById('stripe-connect-modal')?.remove();
-    ts('✅ You\'re on the waitlist! We\'ll email you when payments launch.');
-  }catch(e){ts('Added to waitlist!');}
-}
-
-// ─── CALENDAR SYNC ───────────────────────────────────────────────
-window.addToGoogleCalendar=function(title,date,time,location,description){
-  showCalendarPicker(title,date,time,location,description);
-}
-
-window.showCalendarPicker=function(title,date,time,location,description){
-  // Build datetime strings
-  const dateStr=date.replace(/-/g,'');
-  let startDt,endDt;
-  if(time){
-    const match=time.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if(match){
-      let h=parseInt(match[1]);const m=match[2];const ap=match[3].toUpperCase();
-      if(ap==='PM'&&h!==12)h+=12;if(ap==='AM'&&h===12)h=0;
-      const hStr=String(h).padStart(2,'0');
-      startDt=`${dateStr}T${hStr}${m}00`;
-      endDt=`${dateStr}T${String(Math.min(h+2,23)).padStart(2,'0')}${m}00`;
-    }
-  }
-  if(!startDt){startDt=dateStr;endDt=dateStr;}
-
-  const googleUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title+' — Vivace Events')}&dates=${startDt}/${endDt}&location=${encodeURIComponent(location||'')}&details=${encodeURIComponent(description||'Booked via vivaceevents.com')}`;
-  const outlookUrl=`https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&startdt=${date}T${time||'12:00'}&location=${encodeURIComponent(location||'')}&body=${encodeURIComponent('Booked via vivaceevents.com')}`;
-  const yahooUrl=`https://calendar.yahoo.com/?v=60&title=${encodeURIComponent(title)}&st=${startDt}&dur=0200&in_loc=${encodeURIComponent(location||'')}&desc=${encodeURIComponent('Booked via vivaceevents.com')}`;
-
-  // Build ICS file for Apple Calendar, Yandex, etc.
-  const icsContent=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:${startDt}\nDTEND:${endDt}\nSUMMARY:${title} — Vivace Events\nLOCATION:${location||''}\nDESCRIPTION:Booked via vivaceevents.com\nEND:VEVENT\nEND:VCALENDAR`;
-  const icsBlob=new Blob([icsContent],{type:'text/calendar'});
-  const icsUrl=URL.createObjectURL(icsBlob);
-
-  const m=document.createElement('div');m.className='modal-bg';m.id='cal-picker';
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">📅 Add to Calendar</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${title} · ${date}${time?' at '+time:''}</div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
-      <a href="${googleUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
-        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
-        <span style="font-size:22px">📅</span>
-        <div><div style="font-size:14px;font-weight:600;color:#111">Google Calendar</div><div style="font-size:11px;color:#888">Opens Google Calendar</div></div>
-      </a>
-      <a href="${outlookUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
-        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
-        <span style="font-size:22px">📆</span>
-        <div><div style="font-size:14px;font-weight:600;color:#111">Outlook / Microsoft</div><div style="font-size:11px;color:#888">Outlook, Hotmail, Office 365</div></div>
-      </a>
-      <a href="${yahooUrl}" target="_blank" onclick="document.getElementById('cal-picker').remove()"
-        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f5f5f5;border:1px solid #eee;text-decoration:none">
-        <span style="font-size:22px">🗓️</span>
-        <div><div style="font-size:14px;font-weight:600;color:#111">Yahoo Calendar</div><div style="font-size:11px;color:#888">Opens Yahoo Calendar</div></div>
-      </a>
-      <a href="${icsUrl}" download="${title.replace(/\s+/g,'_')}.ics" onclick="setTimeout(()=>{document.getElementById('cal-picker')?.remove();URL.revokeObjectURL('${icsUrl}');},500)"
-        style="display:flex;align-items:center;gap:12px;padding:13px;border-radius:10px;background:#f0f8ff;border:1px solid #378ADD;text-decoration:none">
-        <span style="font-size:22px">🍎</span>
-        <div><div style="font-size:14px;font-weight:600;color:#0C447C">Apple / iCal / Yandex</div><div style="font-size:11px;color:#888">Downloads .ics file — works with any calendar</div></div>
-      </a>
-    </div>
-    <button class="bg" style="width:100%;padding:12px" onclick="document.getElementById('cal-picker').remove()">Cancel</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-// ─── CONCERT TICKET INTEGRATION ──────────────────────────────────
-// Ticket links added to public performances, shown on public profile
-window.showAddTicketLink=function(dateStr){
-  const perf=_perfEvents[dateStr];
-  if(!perf){ts('Add a performance first');return;}
-  const m=document.createElement('div');m.className='modal-bg';m.id='ticket-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎫 Ticket link</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${perf.title} · ${dateStr}</div>
-    <input class="finp" id="ticket-url" placeholder="https://tickets.example.com/..." value="${perf.ticketLink||''}" style="margin-bottom:10px"/>
-    <input class="finp" id="ticket-price" placeholder="Ticket price (e.g. $25)" value="${perf.ticketPrice||''}" style="margin-bottom:16px"/>
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('ticket-modal').remove()">Cancel</button>
-      <button class="bt" style="flex:2;padding:13px" onclick="saveTicketLink('${dateStr}')">Save</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.saveTicketLink=async function(dateStr){
-  const url=document.getElementById('ticket-url')?.value?.trim();
-  const price=document.getElementById('ticket-price')?.value?.trim();
-  document.getElementById('ticket-modal')?.remove();
-  if(_perfEvents[dateStr]){
-    _perfEvents[dateStr].ticketLink=url;
-    _perfEvents[dateStr].ticketPrice=price;
-    await saveAvailability();
-    ts('🎫 Ticket link saved!');
-    renderCalendarModal();
-  }
-}
-
-// Show ticket button in performance form
-window.showTicketOptions=function(){
-  const ticketRow=document.getElementById('ticket-row');
-  if(ticketRow)ticketRow.style.display=ticketRow.style.display==='none'?'block':'none';
-}
-
-// ─── STRIPE CONNECT ──────────────────────────────────────────────
-const CF_BASE='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net';
-
-// Musician: Connect bank account
-window.showConnectBankAccount=async function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='connect-modal';
-  const hasAccount=UP.stripeAccountId&&UP.stripeAccountVerified;
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">💳 Get Paid via Vivace Events</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">Connect your bank account to receive payments directly when managers book you.</div>
-    ${hasAccount?`
-    <div style="background:#E1F5EE;border-radius:12px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:24px">✅</span>
-      <div>
-        <div style="font-size:14px;font-weight:600;color:#085041">Bank account connected!</div>
-        <div style="font-size:12px;color:#1D9E75;margin-top:2px">You can receive payments through the app</div>
-      </div>
-    </div>`:`
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px">How it works:</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>1️⃣</span><span>Securely connect your bank via Stripe</span></div>
-        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>2️⃣</span><span>Manager pays through the app</span></div>
-        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>3️⃣</span><span>You receive 95% directly to your bank</span></div>
-        <div style="display:flex;gap:8px;font-size:12px;color:#555"><span>💰</span><span>5% platform fee supports Vivace Events</span></div>
-      </div>
-    </div>`}
-    <button id="connect-btn" class="bt" style="width:100%;padding:13px;margin-bottom:8px" onclick="startStripeOnboarding()">
-      ${hasAccount?'🔄 Update bank account':'🏦 Connect bank account'}
-    </button>
-    <button class="bg" style="width:100%;padding:11px" onclick="document.getElementById('connect-modal').remove()">Close</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.startStripeOnboarding=async function(){
-  const btn=document.getElementById('connect-btn');
-  if(btn){btn.textContent='Connecting...';btn.disabled=true;}
-  try{
-    const resp=await fetch(`${CF_BASE}/createConnectAccount`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        userId:CU.uid,
-        email:CU.email,
-        name:UP.name||CU.email?.split('@')[0]||'',
-        stripeAccountId:UP.stripeAccountId||null
-      })
-    });
-    const data=await resp.json();
-    if(data.url){
-      // Save account ID
-      if(data.accountId&&!UP.stripeAccountId){
-        UP.stripeAccountId=data.accountId;
-        await saveUP();
-      }
-      document.getElementById('connect-modal')?.remove();
-      window.open(data.url,'_blank');
-      ts('🏦 Opening Stripe onboarding...');
-    } else {
-      ts('Error: '+data.error);
-      if(btn){btn.textContent='🏦 Connect bank account';btn.disabled=false;}
-    }
-  }catch(e){
-    ts('Connection failed — try again');
-    if(btn){btn.textContent='🏦 Connect bank account';btn.disabled=false;}
-  }
-}
-
-// Handle return from Stripe onboarding
-window.addEventListener('load',()=>{
-  const params=new URLSearchParams(window.location.search);
-  if(params.get('connect')==='success'){
-    setTimeout(async()=>{
-      if(CU&&UP.stripeAccountId){
-        UP.stripeAccountVerified=true;
-        await saveUP();
-        ts('✅ Bank account connected! You can now receive payments.');
-      }
-    },1000);
-  }
-});
-
-// Manager: Pay musician for a gig
-window.showPayMusician=async function(gigId, gigTitle, musicianId, musicianName, musicianEmail, amount){
-  const m=document.createElement('div');m.className='modal-bg';m.id='pay-modal';
-  m.innerHTML=`<div class="modal">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">💰 Pay Musician</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${gigTitle}</div>
-    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;color:#555">Musician</span>
-        <span style="font-size:13px;font-weight:600;color:#111">${musicianName}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;color:#555">Amount</span>
-        <input id="pay-amount" type="number" value="${amount||''}" placeholder="0.00" style="width:100px;padding:6px 10px;border:1px solid #eee;border-radius:8px;font-size:13px;text-align:right;font-family:inherit"/>
-      </div>
-      <div id="pay-breakdown" style="border-top:1px solid #eee;padding-top:10px;margin-top:6px;display:none">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px">
-          <span>Platform fee (5%)</span><span id="fee-amt">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#111">
-          <span>Musician receives</span><span id="musician-amt">—</span>
-        </div>
-      </div>
-    </div>
-    <div id="pay-status" style="margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('pay-modal').remove()">Cancel</button>
-      <button class="bt" id="pay-btn" style="flex:2;padding:13px" onclick="processGigPayment('${gigId}','${gigTitle}','${musicianId}','${musicianName}')">Send Payment</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-
-  // Live fee calculation
-  document.getElementById('pay-amount')?.addEventListener('input',function(){
-    const amt=parseFloat(this.value);
-    if(amt>0){
-      const fee=(amt*0.05).toFixed(2);
-      const receives=(amt*0.95).toFixed(2);
-      document.getElementById('fee-amt').textContent='$'+fee;
-      document.getElementById('musician-amt').textContent='$'+receives;
-      document.getElementById('pay-breakdown').style.display='block';
-    } else {
-      document.getElementById('pay-breakdown').style.display='none';
-    }
-  });
-
-  // Check if musician has connected account
-  try{
-    const snap=await getDoc(doc(db,'users',musicianId));
-    const musician=snap.data();
-    if(!musician?.stripeAccountId||!musician?.stripeAccountVerified){
-      document.getElementById('pay-status').innerHTML=`
-        <div style="background:#FAEEDA;border-radius:10px;padding:10px 12px;font-size:12px;color:#633806">
-          ⚠️ ${musicianName} hasn't connected their bank account yet. They need to set up payments in their profile first.
-        </div>`;
-      document.getElementById('pay-btn').disabled=true;
-      document.getElementById('pay-btn').style.opacity='0.5';
-    }
-  }catch(e){}
-}
-
-window.processGigPayment=async function(gigId, gigTitle, musicianId, musicianName){
-  const amount=parseFloat(document.getElementById('pay-amount')?.value);
-  if(!amount||amount<=0){ts('Please enter an amount');return;}
-
-  const btn=document.getElementById('pay-btn');
-  if(btn){btn.textContent='Processing...';btn.disabled=true;}
-
-  try{
-    const snap=await getDoc(doc(db,'users',musicianId));
-    const musician=snap.data();
-    if(!musician?.stripeAccountId){ts('Musician has not connected bank account');return;}
-
-    const resp=await fetch(`${CF_BASE}/createGigPayment`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        amount,currency:'usd',
-        musicianAccountId:musician.stripeAccountId,
-        gigId,gigTitle,
-        managerId:CU.uid,musicianId
-      })
-    });
-    const data=await resp.json();
-    if(data.clientSecret){
-      // For now show success — full card UI needs Stripe.js
-      document.getElementById('pay-modal')?.remove();
-      // Save payment record
-      await addDoc(collection(db,'payments'),{
-        gigId,gigTitle,managerId:CU.uid,musicianId,
-        amount,platformFee:data.platformFee/100,
-        musicianReceives:data.musicianReceives/100,
-        paymentIntentId:data.paymentIntentId,
-        status:'pending',timestamp:new Date()
-      });
-      ts(`💰 Payment of $${amount} initiated to ${musicianName}!`);
-    } else {
-      ts('Payment failed: '+data.error);
-      if(btn){btn.textContent='Send Payment';btn.disabled=false;}
-    }
-  }catch(e){
-    ts('Payment failed — try again');
-    if(btn){btn.textContent='Send Payment';btn.disabled=false;}
-  }
-}
-
-// ─── VIVACE RADIO — INTELLIGENT ENGINE ───────────────────────────
-let _radioAudio=null;
-let _radioTracks=[];         // All loaded tracks
-let _radioQueue=[];          // Smart rotation queue
-let _radioIndex=0;           // Current queue position
-let _radioPlaying=false;
-let _radioGenreFilter='all'; // Current genre channel
-let _radioPlayHistory=[];    // Track IDs played recently (no-repeat window)
-let _radioSkipStart=null;    // Time play started (for skip tracking)
-let _radioSessionPlays=0;    // Plays this session
-
-// Radio plans
-const RADIO_PLANS={
-  basic:{name:'Radio Basic',playsPerDay:2,price:9,priority:1},
-  pro:{name:'Radio Pro',playsPerDay:5,price:19,priority:2},
-  featured:{name:'Radio Featured',playsPerDay:10,price:39,priority:3}
-};
-
-// Genre bridge map — which genres can follow each other smoothly
-const GENRE_BRIDGES={
-  'Classical':['Jazz','Opera','Musical Theatre','Film / TV / Soundtrack','Folk / Celtic'],
-  'Jazz':['Classical','Blues','R&B / Soul','Latin / Flamenco','Musical Theatre'],
-  'Blues':['Jazz','R&B / Soul','Rock / Pop','Folk / Celtic'],
-  'R&B / Soul':['Blues','Jazz','Hip-Hop / Rap','Gospel'],
-  'Hip-Hop / Rap':['R&B / Soul','Electronic / EDM','Rock / Pop'],
-  'Electronic / EDM':['Hip-Hop / Rap','Rock / Pop','Latin / Flamenco'],
-  'Rock / Pop':['Electronic / EDM','Blues','Folk / Celtic','Country / Bluegrass'],
-  'Folk / Celtic':['Classical','Rock / Pop','Country / Bluegrass','World / Ethnic'],
-  'Country / Bluegrass':['Folk / Celtic','Blues','Rock / Pop'],
-  'Latin / Flamenco':['Jazz','World / Ethnic','Electronic / EDM','R&B / Soul'],
-  'World / Ethnic':['Classical','Latin / Flamenco','Folk / Celtic','Jazz'],
-  'Opera':['Classical','Musical Theatre'],
-  'Musical Theatre':['Opera','Classical','Jazz'],
-  'Film / TV / Soundtrack':['Classical','Jazz','Electronic / EDM'],
-  'Contemporary / Indie':['Rock / Pop','Folk / Celtic','Electronic / EDM'],
-  'Educational / Academic':['Classical','Jazz']
-};
-
-// Time-of-day programming
-function getTimeSlot(){
-  const h=new Date().getHours();
-  if(h>=6&&h<9)return 'morning';   // Energizing
-  if(h>=9&&h<12)return 'focused';  // Work hours
-  if(h>=12&&h<14)return 'lunch';   // Upbeat
-  if(h>=14&&h<17)return 'afternoon';
-  if(h>=17&&h<21)return 'primetime'; // Featured slot
-  if(h>=21&&h<24)return 'evening';
-  return 'latenight';
-}
-
-// Genre preferences by time slot
-const TIME_GENRES={
-  morning:['Classical','Jazz','World / Ethnic','Folk / Celtic'],
-  focused:['Classical','Jazz','Film / TV / Soundtrack','Contemporary / Indie'],
-  lunch:['Jazz','Latin / Flamenco','R&B / Soul','Rock / Pop'],
-  afternoon:['Folk / Celtic','World / Ethnic','Rock / Pop','Blues'],
-  primetime:null, // All genres — best tracks
-  evening:['Jazz','Classical','Blues','R&B / Soul'],
-  latenight:['Classical','Jazz','World / Ethnic','Electronic / EDM']
-};
-
-// Build intelligent rotation queue
-function buildRadioQueue(tracks, genreFilter){
-  if(!tracks||tracks.length===0)return[];
-  let pool=genreFilter==='all'?[...tracks]:tracks.filter(t=>t.genre===genreFilter);
-  if(pool.length===0)pool=[...tracks]; // Fallback to all if no matches
-
-  const slot=getTimeSlot();
-  const preferredGenres=TIME_GENRES[slot];
-
-  // Score each track
-  pool=pool.map(t=>{
-    let score=0;
-    // Plan priority (featured > pro > basic)
-    score+=(RADIO_PLANS[t.radioPlan]?.priority||1)*10;
-    // Time-of-day bonus
-    if(preferredGenres&&preferredGenres.includes(t.genre))score+=15;
-    // Prime time — featured gets extra boost
-    if(slot==='primetime'&&t.radioPlan==='featured')score+=20;
-    // Engagement score — tracks with high profile taps rank higher
-    score+=(t.profileTaps||0)*3;
-    // Penalize high skip rate
-    const skipRate=t.skips&&t.plays?(t.skips/t.plays):0;
-    score-=skipRate*20;
-    // Add slight randomness so it doesn't feel robotic
-    score+=Math.random()*5;
-    return {...t,_score:score};
-  });
-
-  // Sort by score
-  pool.sort((a,b)=>b._score-a._score);
-
-  // Now build queue with genre bridge logic (no jarring transitions)
-  const queue=[];
-  const used=new Set();
-  let lastGenre=null;
-
-  // First pass — respect genre bridges
-  while(used.size<pool.length){
-    const remaining=pool.filter(t=>!used.has(t.id));
-    if(remaining.length===0)break;
-
-    let next=null;
-    if(lastGenre){
-      // Try to find a bridging genre
-      const bridges=GENRE_BRIDGES[lastGenre]||[];
-      next=remaining.find(t=>bridges.includes(t.genre));
-      // If no bridge, try same genre
-      if(!next)next=remaining.find(t=>t.genre===lastGenre);
-    }
-    // If still nothing, take highest scored remaining
-    if(!next)next=remaining[0];
-
-    queue.push(next);
-    used.add(next.id);
-    lastGenre=next.genre;
-  }
-
-  return queue;
-}
-
-// Get next track respecting no-repeat window (2 hours = ~12 tracks)
-function getNextTrack(){
-  const NO_REPEAT_WINDOW=Math.min(12,Math.floor(_radioQueue.length*0.7));
-  if(_radioQueue.length===0)return null;
-
-  // Find next track not in recent history
-  for(let i=0;i<_radioQueue.length;i++){
-    const idx=(_radioIndex+i)%_radioQueue.length;
-    const track=_radioQueue[idx];
-    if(!_radioPlayHistory.slice(-NO_REPEAT_WINDOW).includes(track.id)){
-      _radioIndex=idx;
-      return track;
-    }
-  }
-  // All tracks played recently — just go to next
-  _radioIndex=(_radioIndex+1)%_radioQueue.length;
-  return _radioQueue[_radioIndex];
-}
-
-// Show radio upload in profile
-function radioProfileSection(){
-  const hasPlan=UP.radioPlan&&UP.radioPlan!=='none';
-  const tracks=UP.radioTracks||[];
-  return `
-  <div style="margin-bottom:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div class="st">🎙️ Vivace Radio</div>
-      ${hasPlan?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#C9A84C22;border:1px solid #C9A84C;color:#7A5800;font-weight:600">${RADIO_PLANS[UP.radioPlan]?.name||UP.radioPlan}</span>`:''}
-    </div>
-    ${hasPlan?`
-    <div style="background:#0d0d0d;border-radius:12px;padding:14px;margin-bottom:10px">
-      ${tracks.length>0?`
-        ${tracks.map((tr,i)=>`
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #222">
-          <div style="width:36px;height:36px;border-radius:8px;background:#1D9E7522;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🎵</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tr.title||'Track '+(i+1)}</div>
-            <div style="font-size:11px;color:#888;margin-top:1px">${tr.genre||'—'} · ${tr.duration||'—'}</div>
-          </div>
-          <div style="font-size:11px;color:#aaa;text-align:right;flex-shrink:0">
-            <div>▶ ${tr.plays||0}</div>
-            <div>👤 ${tr.profileTaps||0}</div>
-          </div>
-          <button onclick="deleteRadioTrack(${i})" style="background:none;border:none;color:#F09595;font-size:14px;cursor:pointer;padding:4px">🗑️</button>
-        </div>`).join('')}
-      `:`<div style="font-size:13px;color:#888;text-align:center;padding:10px 0">No tracks uploaded yet</div>`}
-      <button onclick="showRadioUpload()" style="width:100%;margin-top:10px;padding:10px;border-radius:10px;background:#1D9E75;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ Upload track</button>
-      <button onclick="showRadioAnalytics()" style="width:100%;margin-top:6px;padding:8px;border-radius:10px;background:#1a1a1a;border:1px solid #222;color:#C9A84C;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📊 View radio analytics</button>
-    </div>`:`
-    <div style="background:#0d0d0d;border-radius:12px;padding:16px;text-align:center">
-      <div style="font-size:28px;margin-bottom:8px">🎙️</div>
-      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:6px">Join Vivace Radio</div>
-      <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Upload your original performances. Get discovered by managers while they browse gigs.</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
-        ${Object.entries(RADIO_PLANS).map(([k,p])=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#111;border-radius:8px;border:1px solid #222">
-          <div style="text-align:left">
-            <div style="font-size:12px;font-weight:600;color:#fff">${p.name}</div>
-            <div style="font-size:11px;color:#888">${p.playsPerDay}× per day on Vivace Radio</div>
-          </div>
-          <div style="font-size:13px;font-weight:700;color:#C9A84C">$${p.price}/mo</div>
-        </div>`).join('')}
-      </div>
-      <button onclick="showRadioPlanPicker()" style="width:100%;padding:11px;border-radius:10px;background:#C9A84C;border:none;color:#0d0d0d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🎙️ Get on Vivace Radio</button>
-    </div>`}
-  </div>`;
-}
-
-window.showRadioPlanPicker=function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='radio-plan-modal';
-  m.innerHTML=`<div class="modal" style="background:#0d0d0d">
-    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:4px">🎙️ Vivace Radio</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">Choose your radio plan — get discovered while managers browse</div>
-    ${Object.entries(RADIO_PLANS).map(([k,p])=>`
-    <button onclick="selectRadioPlan('${k}')" style="width:100%;margin-bottom:8px;padding:14px;border-radius:12px;background:#111;border:1px solid #333;cursor:pointer;font-family:inherit;text-align:left">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:14px;font-weight:600;color:#fff">${p.name}</div>
-          <div style="font-size:12px;color:#888;margin-top:3px">${p.playsPerDay}× per day · Smart rotation · Analytics dashboard</div>
-        </div>
-        <div style="font-size:16px;font-weight:700;color:#C9A84C">$${p.price}<span style="font-size:11px;font-weight:400">/mo</span></div>
-      </div>
-    </button>`).join('')}
-    <button class="bg" style="width:100%;padding:11px;margin-top:4px" onclick="document.getElementById('radio-plan-modal').remove()">Cancel</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.selectRadioPlan=async function(plan){
-  UP.radioPlan=plan;
-  await saveUP();
-  document.getElementById('radio-plan-modal')?.remove();
-  ts(`🎙️ ${RADIO_PLANS[plan].name} activated! Upload your first track.`);
-  render();
-}
-
-window.showRadioUpload=function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='radio-upload-modal';
-  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎵 Upload original track</div>
-    <div style="font-size:13px;color:#888;margin-bottom:14px">Only your own original performances. Copyrighted material will be detected and removed.</div>
-
-    <!-- LEGAL DECLARATION -->
-    <div style="background:#FDF6E3;border:1px solid #C9A84C55;border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:#7A5800;margin-bottom:8px">⚖️ Legal declaration — read carefully</div>
-      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
-        <input type="checkbox" id="radio-legal-check" style="margin-top:2px;flex-shrink:0"/>
-        <span style="font-size:12px;color:#7A5800;line-height:1.5">This is an <strong>original recording of my own performance.</strong> I own all rights.</span>
-      </label>
-      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
-        <input type="checkbox" id="radio-no-covers" style="margin-top:2px;flex-shrink:0"/>
-        <span style="font-size:12px;color:#7A5800;line-height:1.5">No cover songs, no samples, no third-party compositions.</span>
-      </label>
-      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
-        <input type="checkbox" id="radio-no-ai" style="margin-top:2px;flex-shrink:0"/>
-        <span style="font-size:12px;color:#7A5800;line-height:1.5">This is not AI-generated music. I am the human performer.</span>
-      </label>
-      <div style="font-size:10px;color:#C9A84C;margin-top:8px">Violations result in immediate removal. Vivace Events LLC is not liable for unauthorized uploads.</div>
-    </div>
-
-    <input class="finp" id="radio-title" placeholder="Track title (e.g. Violin Sonata No.1 — Original)" style="margin-bottom:8px"/>
-    <select class="finp" id="radio-genre" style="margin-bottom:8px">
-      <option value="">Select genre</option>
-      <option>Classical</option><option>Jazz</option><option>Rock / Pop</option>
-      <option>Folk / Celtic</option><option>World / Ethnic</option><option>R&B / Soul</option>
-      <option>Electronic / EDM</option><option>Blues</option><option>Country / Bluegrass</option>
-      <option>Hip-Hop / Rap</option><option>Latin / Flamenco</option><option>Musical Theatre</option>
-      <option>Opera</option><option>Contemporary / Indie</option><option>Film / TV / Soundtrack</option>
-    </select>
-    <input class="finp" id="radio-description" placeholder="Brief description (optional)" style="margin-bottom:14px"/>
-
-    <div style="background:#f5f5f5;border-radius:12px;border:2px dashed #1D9E75;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;margin-bottom:14px" onclick="document.getElementById('radio-file-input').click()">
-      <div style="font-size:24px;margin-bottom:4px">🎵</div>
-      <div style="font-size:13px;color:#111;font-weight:600">Tap to select audio file</div>
-      <div style="font-size:11px;color:#1D9E75;margin-top:2px">MP3, WAV, AAC · Max 50MB</div>
-    </div>
-    <input type="file" id="radio-file-input" accept="audio/*" style="display:none" onchange="handleRadioFileSelect(this)"/>
-    <div id="radio-file-name" style="font-size:12px;color:#888;text-align:center;margin-bottom:8px"></div>
-
-    <div id="radio-upload-progress" style="display:none;margin-bottom:10px">
-      <div style="background:#f0f0f0;border-radius:4px;height:6px;overflow:hidden">
-        <div id="radio-upload-bar" style="height:100%;background:#1D9E75;width:0%;border-radius:4px;transition:width 0.3s"></div>
-      </div>
-      <div id="radio-upload-text" style="font-size:11px;color:#888;margin-top:4px;text-align:center">Uploading...</div>
-    </div>
-
-    <div id="radio-copyright-check" style="display:none;background:#FDF6E3;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;color:#633806;text-align:center">
-      🔍 Checking for copyright issues...
-    </div>
-
-    <div style="display:flex;gap:8px">
-      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('radio-upload-modal').remove()">Cancel</button>
-      <button class="bt" id="radio-upload-btn" style="flex:2;padding:13px" onclick="uploadRadioTrack()">Upload track</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.handleRadioFileSelect=function(input){
-  const file=input.files[0];
-  if(!file)return;
-  const el=document.getElementById('radio-file-name');
-  if(el)el.textContent=`Selected: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
-}
-
-window.uploadRadioTrack=async function(){
-  const legalCheck=document.getElementById('radio-legal-check')?.checked;
-  if(!legalCheck){ts('⚖️ Please confirm the legal declaration first');return;}
-
-  const title=document.getElementById('radio-title')?.value?.trim();
-  const genre=document.getElementById('radio-genre')?.value;
-  const description=document.getElementById('radio-description')?.value?.trim();
-  const fileInput=document.getElementById('radio-file-input');
-  const file=fileInput?.files?.[0];
-
-  if(!title){ts('Please enter a track title');return;}
-  if(!genre){ts('Please select a genre');return;}
-  if(!file){ts('Please select an audio file');return;}
-  if(file.size>50*1024*1024){ts('File must be under 50MB');return;}
-  if(!file.type.startsWith('audio/')){ts('Please select an audio file');return;}
-
-  const btn=document.getElementById('radio-upload-btn');
-  if(btn){btn.textContent='Uploading...';btn.disabled=true;}
-
-  const progress=document.getElementById('radio-upload-progress');
-  const bar=document.getElementById('radio-upload-bar');
-  const text=document.getElementById('radio-upload-text');
-  const copyCheck=document.getElementById('radio-copyright-check');
-  if(progress)progress.style.display='block';
-
-  try{
-    // Show copyright check
-    if(copyCheck)copyCheck.style.display='block';
-    if(bar)bar.style.width='30%';
-    if(text)text.textContent='Checking copyright...';
-
-    // Simulate ACRCloud check (in production, call ACRCloud API here)
-    await new Promise(r=>setTimeout(r,1500));
-    if(copyCheck)copyCheck.innerHTML='✅ No copyright issues detected — uploading...';
-    if(bar)bar.style.width='60%';
-    if(text)text.textContent='Uploading audio...';
-
-    // Upload to Firebase Storage
-    const storageRef=ref(storage,`radio/${CU.uid}/${Date.now()}_${file.name}`);
-    const snapshot=await uploadBytes(storageRef,file);
-    const url=await getDownloadURL(snapshot.ref);
-
-    if(bar)bar.style.width='90%';
-    if(text)text.textContent='Saving track info...';
-
-    // Save track metadata to Firestore
-    const trackData={
-      userId:CU.uid,
-      userName:UP.name||CU.email?.split('@')[0]||'Musician',
-      userEmail:CU.email,
-      title,genre,description,
-      url,
-      radioPlan:UP.radioPlan||'basic',
-      playsPerDay:RADIO_PLANS[UP.radioPlan||'basic']?.playsPerDay||2,
-      plays:0,profileTaps:0,skips:0,
-      uploadedAt:new Date(),
-      status:'active',
-      legalConfirmed:true,
-      instruments:(UP.instruments||[]).slice(0,2).map(i=>i.name).join(', '),
-      rating:UP.publicRating?.average||0
-    };
-    const docRef=await addDoc(collection(db,'radioTracks'),trackData);
-
-    // Save track reference to user profile
-    if(!UP.radioTracks)UP.radioTracks=[];
-    UP.radioTracks.push({id:docRef.id,title,genre,plays:0,profileTaps:0,duration:'—'});
-    await saveUP();
-
-    if(bar)bar.style.width='100%';
-    document.getElementById('radio-upload-modal')?.remove();
-    ts('🎙️ Track uploaded to Vivace Radio!');
-    render();
-  }catch(e){
-    console.error('Radio upload error:',e.message);
-    if(progress)progress.style.display='none';
-    if(btn){btn.textContent='Upload track';btn.disabled=false;}
-    ts('Upload failed: '+e.message);
-  }
-}
-
-window.deleteRadioTrack=async function(index){
-  if(!confirm('Remove this track from Vivace Radio?'))return;
-  const tracks=UP.radioTracks||[];
-  const track=tracks[index];
-  if(track?.id){
-    try{await deleteDoc(doc(db,'radioTracks',track.id));}catch(e){}
-  }
-  tracks.splice(index,1);
-  UP.radioTracks=tracks;
-  await saveUP();
-  ts('Track removed from radio');
-  render();
-}
-
-// ─── RADIO PLAYER (persistent bottom bar) ────────────────────────
-async function initRadioPlayer(genreFilter){
-  try{
-    if(genreFilter)_radioGenreFilter=genreFilter;
-    const snap=await getDocs(query(collection(db,'radioTracks'),where('status','==','active')));
-    _radioTracks=snap.docs.map(d=>({id:d.id,...d.data()}));
-    _radioQueue=buildRadioQueue(_radioTracks,_radioGenreFilter);
-    _radioIndex=0;
-    if(_radioQueue.length>0)renderRadioPlayer();
-  }catch(e){console.log('Radio init error:',e.message);}
-}
-
-function renderRadioPlayer(){
-  // Preserve expanded state before re-render
-  const wasExpanded=document.getElementById('radio-expanded')?.style.display==='block';
-  let bar=document.getElementById('vivace-radio-bar');
-  if(!bar){
-    bar=document.createElement('div');
-    bar.id='vivace-radio-bar';
-    document.body.appendChild(bar);
-    // Floating player — no page padding needed
-    document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='70px');
-  }
-  const track=_radioQueue[_radioIndex]||{};
-  const isFeatured=track.radioPlan==='featured';
-
-  // Position center-bottom, only first time
-  if(!bar._positioned){
-    const nav=document.querySelector('.bnav');
-    const navH=nav?nav.offsetHeight:60;
-    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||window.innerWidth<500;
-    bar.style.cssText=`position:fixed;bottom:${navH+8}px;left:50%;transform:translateX(-50%);z-index:9999;width:340px;max-width:92vw;border-radius:18px;background:rgba(13,13,13,0.97);border:1px solid #C9A84C66;box-shadow:0 8px 32px rgba(0,0,0,0.7);user-select:none`;
-    bar._positioned=true;
-    if(!isMobile)makeDraggable(bar);
-  }
-
-  bar.innerHTML=`
-    <div id="radio-collapsed" style="padding:11px 14px">
-      <div style="display:flex;align-items:center;gap:9px">
-        <div style="width:22px;height:22px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;justify-content:center">
-          ${_radioPlaying?`
-            <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq1 0.8s ease-in-out infinite;height:9px"></div>
-            <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq2 0.6s ease-in-out infinite;height:15px"></div>
-            <div style="width:2px;background:#1D9E75;border-radius:2px;animation:eq3 1s ease-in-out infinite;height:7px"></div>
-            <div style="width:2px;background:#C9A84C;border-radius:2px;animation:eq1 0.7s ease-in-out infinite;height:12px"></div>
-          `:`<span style="font-size:14px;line-height:1">🎙️</span>`}
-        </div>
-        <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleRadioExpand()">
-          <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${track.title||'Vivace Radio'}</div>
-          <div style="font-size:10px;color:#C9A84C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${track.userName||'—'} · ${track.genre||'—'} · <span style="color:#aaa">tap to expand</span></div>
-        </div>
-        <button onclick="radioPlayPause()" style="width:30px;height:30px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">${_radioPlaying?'⏸':'▶'}</button>
-        <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:14px;cursor:pointer;padding:0 0 0 2px;font-weight:700;line-height:1;flex-shrink:0">✕</button>
-      </div>
-      <div id="radio-progress-bg" style="height:2px;background:#333;border-radius:2px;margin-top:8px;cursor:pointer" onclick="radioSeek(event)">
-        <div id="radio-progress-fill" style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);border-radius:2px;width:0%;transition:width 0.5s linear"></div>
-      </div>
-    </div>
-    <div id="radio-expanded" style="display:block;border-top:1px solid #222;padding:10px 14px 12px">
-      <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-bottom:10px">
-        <button onclick="radioPlayPause()" style="width:38px;height:38px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:15px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(201,168,76,0.3)">${_radioPlaying?'⏸':'▶'}</button>
-        <button onclick="radioNext()" style="background:none;border:none;color:#ccc;font-size:18px;cursor:pointer">⏭</button>
-        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#ccc;font-size:14px;cursor:pointer">ℹ️</button>
-        <button onclick="viewRadioArtist('${track.userId||''}')" style="background:none;border:none;color:#1D9E75;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit">Profile ↗</button>
-        <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:13px;cursor:pointer">🚩</button>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <div style="font-size:9px;color:#C9A84C;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">🎚️ Genre channel</div>
-        <div style="font-size:9px;color:#aaa">swipe →</div>
-      </div>
-      <div id="genre-scroll-row" style="display:flex;gap:4px;overflow-x:scroll;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:4px;scroll-behavior:smooth">
-        ${['all','Classical','Jazz','Blues','R&B / Soul','Hip-Hop / Rap','Rock / Pop','World / Ethnic','Electronic / EDM','Opera'].map(g=>`
-          <button onclick="switchRadioGenre('${g}')" style="flex-shrink:0;padding:3px 9px;border-radius:20px;border:1px solid ${_radioGenreFilter===g?'#C9A84C':'#444'};background:${_radioGenreFilter===g?'#C9A84C':'transparent'};color:${_radioGenreFilter===g?'#0d0d0d':'#ccc'};font-size:9px;font-weight:${_radioGenreFilter===g?'700':'400'};cursor:pointer;font-family:inherit;white-space:nowrap">${g==='all'?'🎙️ All':g}</button>
-        `).join('')}
-      </div>
-      <div style="margin-top:8px;font-size:9px;color:#C9A84C">${getTimeSlotLabel()}${isFeatured?' · Featured':''}</div>
-    </div>
-  `;
-
-  if(!document.getElementById('radio-styles')){
-    const s=document.createElement('style');
-    s.id='radio-styles';
-    s.textContent='@keyframes eq1{0%,100%{height:5px}50%{height:16px}}@keyframes eq2{0%,100%{height:14px}50%{height:6px}}@keyframes eq3{0%,100%{height:8px}50%{height:18px}}';
-    document.head.appendChild(s);
-  }
-  // Restore expanded state
-  if(wasExpanded){
-    const exp=document.getElementById('radio-expanded');
-    if(exp)exp.style.display='block';
-  }
-  if(_radioPlaying)startProgressBar();
-  // Add drag-to-scroll to genre row
-  setTimeout(()=>{
-    const row=document.getElementById('genre-scroll-row');
-    if(!row)return;
-    let isDown=false,startX,scrollLeft;
-    row.addEventListener('mousedown',e=>{isDown=true;startX=e.pageX-row.offsetLeft;scrollLeft=row.scrollLeft;});
-    row.addEventListener('mouseleave',()=>isDown=false);
-    row.addEventListener('mouseup',()=>isDown=false);
-    row.addEventListener('mousemove',e=>{if(!isDown)return;e.preventDefault();const x=e.pageX-row.offsetLeft;row.scrollLeft=scrollLeft-(x-startX);});
-  },100);
-}
-
-function getTimeSlotLabel(){
-  const labels={morning:'☀️ Morning',focused:'💼 Work',lunch:'🍽️ Lunch',afternoon:'🌤️ Afternoon',primetime:'⭐ Prime time',evening:'🌙 Evening',latenight:'🌃 Late night'};
-  return labels[getTimeSlot()]||'';
-}
-
-window.toggleRadioExpand=function(){
-  const exp=document.getElementById('radio-expanded');
-  if(!exp)return;
-  const bar=document.getElementById('vivace-radio-bar');
-  if(exp.style.display==='none'){
-    exp.style.display='block';
-    if(bar){bar.style.borderRadius='18px 18px 14px 14px';}
-  } else {
-    exp.style.display='none';
-    if(bar){bar.style.borderRadius='18px';}
-  }
-}
-
-function makeDraggable(el){
-  let startX,startY,startRight,startBottom,dragging=false,holdTimer=null;
-  function dragStart(e){
-    if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT')return;
-    const touch=e.touches?e.touches[0]:e;
-    startX=touch.clientX;startY=touch.clientY;
-    const rect=el.getBoundingClientRect();
-    startRight=window.innerWidth-rect.right;
-    startBottom=window.innerHeight-rect.bottom;
-    // Only start drag after 200ms hold
-    holdTimer=setTimeout(()=>{dragging=true;el.style.cursor='grabbing';},200);
-  }
-  function dragMove(e){
-    if(!dragging)return;
-    const touch=e.touches?e.touches[0]:e;
-    const dx=touch.clientX-startX;
-    const dy=touch.clientY-startY;
-    const newRight=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,startRight-dx));
-    const newBottom=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,startBottom-dy));
-    el.style.right=newRight+'px';
-    el.style.bottom=newBottom+'px';
-    el.style.left='auto';
-    el.style.transform='none';
-    e.preventDefault&&e.preventDefault();
-  }
-  function dragEnd(){
-    clearTimeout(holdTimer);
-    dragging=false;
-    el.style.cursor='grab';
-  }
-  el.addEventListener('mousedown',dragStart);
-  document.addEventListener('mousemove',dragMove);
-  document.addEventListener('mouseup',dragEnd);
-}
-
-let _progressTimer=null;
-function startProgressBar(){
-  if(_progressTimer)clearInterval(_progressTimer);
-  _progressTimer=setInterval(()=>{
-    if(!_radioAudio||!_radioPlaying)return;
-    const pct=_radioAudio.duration?(_radioAudio.currentTime/_radioAudio.duration)*100:0;
-    const fill=document.getElementById('radio-progress-fill');
-    if(fill)fill.style.width=pct+'%';
-  },500);
-}
-
-window.radioSeek=function(e){
-  if(!_radioAudio||!_radioAudio.duration)return;
-  const bg=document.getElementById('radio-progress-bg');
-  if(!bg)return;
-  const pct=e.offsetX/bg.offsetWidth;
-  _radioAudio.currentTime=pct*_radioAudio.duration;
-}
-
-window.toggleRadioGenres=function(){
-  const row=document.getElementById('radio-genre-row');
-  if(!row)return;
-  row.style.display=row.style.display==='none'?'flex':'none';
-}
-
-window.switchRadioGenre=async function(genre){
-  _radioGenreFilter=genre;
-  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
-  _radioPlaying=false;
-  _radioQueue=buildRadioQueue(_radioTracks,genre);
-  _radioIndex=0;
-  // Re-render but keep expanded state
-  const wasExpanded=document.getElementById('radio-expanded')?.style.display!=='none';
-  renderRadioPlayer();
-  if(wasExpanded){
-    const exp=document.getElementById('radio-expanded');
-    if(exp)exp.style.display='block';
-  }
-}
-
-window.radioPlayPause=async function(){
-  const track=_radioQueue[_radioIndex];
-  if(!track){ts('No tracks available');return;}
-  if(!track.url){ts('Track URL missing — try refreshing');console.log('Track missing URL:',track);return;}
-  if(!_radioAudio){
-    _radioAudio=new Audio(track.url);
-    _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
-    _radioAudio.ontimeupdate=()=>{
-      const fill=document.getElementById('radio-progress-fill');
-      if(fill&&_radioAudio.duration){
-        fill.style.width=(_radioAudio.currentTime/_radioAudio.duration*100)+'%';
-      }
-    };
-  }
-  if(_radioPlaying){
-    _radioAudio.pause();
-    _radioPlaying=false;
-    if(_radioSkipStart&&(Date.now()-_radioSkipStart)<30000)trackRadioSkip();
-  } else {
-    try{
-      await _radioAudio.play();
-      _radioPlaying=true;
-      _radioSkipStart=Date.now();
-      trackRadioPlay();
-    }catch(e){
-      console.log('Play error:',e.message);
-      ts('Tap play again to start radio 🎙️');
-      _radioAudio=null;
-    }
-  }
-  renderRadioPlayer();
-}
-
-window.radioNext=function(){
-  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
-  // Track skip
-  if(_radioSkipStart&&(Date.now()-_radioSkipStart)<30000)trackRadioSkip();
-  _radioSkipStart=null;
-  _radioPlaying=false;
-  // Add current to history
-  const current=_radioQueue[_radioIndex];
-  if(current){_radioPlayHistory.push(current.id);if(_radioPlayHistory.length>20)_radioPlayHistory.shift();}
-  // Get next smart track
-  const next=getNextTrack();
-  renderRadioPlayer();
-  // Auto-play next
-  if(next){
-    _radioAudio=new Audio(next.url);
-    _radioAudio.onended=()=>{trackRadioEnd();radioNext();};
-    _radioAudio.play().then(()=>{
-      _radioPlaying=true;
-      _radioSkipStart=Date.now();
-      trackRadioPlay();
-      renderRadioPlayer();
-    }).catch(()=>{});
-  }
-}
-
-window.viewRadioArtist=function(userId){
-  if(!userId){ts('No artist profile available');return;}
-  const track=_radioQueue[_radioIndex];
-  if(track?.id){
-    try{updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});}
-    catch(e){}
-  }
-  // Close modals, collapse player panel
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
-  const exp=document.getElementById('radio-expanded');
-  if(exp)exp.style.display='none';
-  // Navigate to public profile
-  _publicProfileId=userId;
-  go('public-profile');
-}
-
-window.showRadioInfo=function(trackId,userId){
-  // Close any existing radio info modal first
-  document.getElementById('radio-info-modal')?.remove();
-  const track=_radioQueue[_radioIndex]||{};
-  const m=document.createElement('div');m.className='modal-bg';m.id='radio-info-modal';
-  m.innerHTML=`<div class="modal" style="background:#111;color:#fff">
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:40px;margin-bottom:8px">🎵</div>
-      <div style="font-size:16px;font-weight:700;color:#fff">${track.title||'Track'}</div>
-      <div style="font-size:13px;color:#1D9E75;margin-top:4px;cursor:pointer;font-weight:600" onclick="viewRadioArtist('${userId}');document.getElementById('radio-info-modal').remove()">${track.userName||'—'} ↗</div>
-      <div style="font-size:11px;color:#aaa;margin-top:4px">${track.genre||'—'} · ${track.instruments||'—'}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
-      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#C9A84C">${track.plays||0}</div>
-        <div style="font-size:10px;color:#ccc;margin-top:2px">Total plays</div>
-      </div>
-      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#1D9E75">${track.profileTaps||0}</div>
-        <div style="font-size:10px;color:#ccc;margin-top:2px">Profile taps</div>
-      </div>
-      <div style="background:#1a1a1a;border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#aaa">${track.skips||0}</div>
-        <div style="font-size:10px;color:#ccc;margin-top:2px">Skips</div>
-      </div>
-    </div>
-    <button class="bt" style="width:100%;padding:12px;margin-bottom:8px" onclick="viewRadioArtist('${userId}');document.getElementById('radio-info-modal').remove()">View artist profile</button>
-    <button style="width:100%;padding:10px;border-radius:10px;background:#222;border:1px solid #444;color:#ccc;font-size:13px;cursor:pointer;font-family:inherit" onclick="document.getElementById('radio-info-modal').remove()">Close</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.closeRadioBar=function(){
-  if(_radioAudio){_radioAudio.pause();_radioAudio=null;}
-  _radioPlaying=false;
-  if(_progressTimer)clearInterval(_progressTimer);
-  document.getElementById('vivace-radio-bar')?.remove();
-  // Restore normal page padding
-  document.querySelectorAll('.scr').forEach(el=>el.style.paddingBottom='70px');
-}
-
-window.reportRadioTrack=async function(trackId){
-  if(!trackId)return;
-  if(!confirm('Report this track for copyright violation?\n\nFlagged tracks are immediately paused for review.'))return;
-  try{
-    await addDoc(collection(db,'radioReports'),{
-      trackId,reportedBy:CU?.uid||'anonymous',
-      reportedAt:new Date(),reason:'copyright'
-    });
-    await updateDoc(doc(db,'radioTracks',trackId),{status:'under_review'});
-    ts('🚩 Reported — track paused for review. Thank you!');
-    radioNext();
-  }catch(e){ts('Report submitted');}
-}
-
-async function trackRadioPlay(){
-  const track=_radioQueue[_radioIndex];
-  if(!track?.id)return;
-  _radioSessionPlays++;
-  try{
-    // Update track stats
-    await updateDoc(doc(db,'radioTracks',track.id),{plays:(track.plays||0)+1,lastPlayedAt:new Date()});
-    // Log play event for analytics
-    await addDoc(collection(db,'radioPlays'),{
-      trackId:track.id,userId:track.userId,
-      listenerId:CU?.uid||'anonymous',
-      genre:track.genre,plan:track.radioPlan,
-      timeSlot:getTimeSlot(),playedAt:new Date()
-    });
-  }catch(e){}
-}
-
-async function trackRadioSkip(){
-  const track=_radioQueue[_radioIndex];
-  if(!track?.id)return;
-  try{await updateDoc(doc(db,'radioTracks',track.id),{skips:(track.skips||0)+1});}
-  catch(e){}
-}
-
-async function trackRadioEnd(){
-  // Full listen — positive signal, boost this track
-  const track=_radioQueue[_radioIndex];
-  if(!track?.id)return;
-  try{await updateDoc(doc(db,'radioTracks',track.id),{fullListens:(track.fullListens||0)+1});}
-  catch(e){}
-}
-
-// Show radio bar
-window.showRadioBar=async function(){
-  if(_radioTracks.length===0)await initRadioPlayer();
-  if(_radioQueue.length===0){
-    let bar=document.getElementById('vivace-radio-bar');
-    if(!bar){
-      bar=document.createElement('div');
-      bar.id='vivace-radio-bar';
-    const nav=document.querySelector('.bnav');
-    const navH=nav?nav.offsetHeight:60;
-    bar.style.cssText=`position:fixed;bottom:${navH}px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#0d0d0d;border-top:2px solid #C9A84C;padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:999;box-sizing:border-box`;
-      document.body.appendChild(bar);
-    }
-    bar.innerHTML=`
-      <span style="font-size:22px">🎙️</span>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:700;color:#fff">Vivace Radio</div>
-        <div style="font-size:11px;color:#C9A84C;margin-top:2px">No tracks yet — musicians upload from their profile</div>
-      </div>
-      <button onclick="closeRadioBar()" style="background:none;border:none;color:#C9A84C;font-size:22px;cursor:pointer;font-weight:700;line-height:1">✕</button>
-    `;
-    return;
-  }
-  renderRadioPlayer();
-}
-
-// ─── RADIO ANALYTICS DASHBOARD ───────────────────────────────────
-window.showRadioAnalytics=async function(){
-  const m=document.createElement('div');m.className='modal-bg';m.id='radio-analytics-modal';
-  m.innerHTML=`<div class="modal" style="background:#111;max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:17px;font-weight:700;color:#fff">🎙️ Radio Analytics</div>
-      <button onclick="document.getElementById('radio-analytics-modal').remove()" style="background:none;border:none;color:#C9A84C;font-size:22px;cursor:pointer;font-weight:700">✕</button>
-    </div>
-    <div id="radio-analytics-content"><div style="text-align:center;padding:20px;color:#C9A84C">Loading...</div></div>
-  </div>`;
-  document.body.appendChild(m);
-  try{
-    const tracks=UP.radioTracks||[];
-    if(tracks.length===0){
-      document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:30px 20px"><div style="font-size:32px;margin-bottom:10px">🎙️</div><div style="font-size:14px;color:#C9A84C;font-weight:600">No tracks uploaded yet</div><div style="font-size:12px;color:#555;margin-top:6px">Upload your first track from your profile</div></div>`;
-      return;
-    }
-    const totalPlays=tracks.reduce((s,t)=>s+(t.plays||0),0);
-    const totalTaps=tracks.reduce((s,t)=>s+(t.profileTaps||0),0);
-    const totalSkips=tracks.reduce((s,t)=>s+(t.skips||0),0);
-    const conversionRate=totalPlays>0?Math.round(totalTaps/totalPlays*100):0;
-    document.getElementById('radio-analytics-content').innerHTML=`
-      <!-- Summary stats -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#C9A84C">${totalPlays}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px">Total plays</div>
-        </div>
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#1D9E75">${totalTaps}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px">Profile taps</div>
-        </div>
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#888">${totalSkips}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px">Skips</div>
-        </div>
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#7C3AED">${conversionRate}%</div>
-          <div style="font-size:10px;color:#555;margin-top:2px">Profile conversion</div>
-        </div>
-      </div>
-      <!-- Per track breakdown -->
-      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px">TRACKS BREAKDOWN</div>
-      ${tracks.map(t=>`
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px">${t.title||'Track'}</div>
-          <div style="display:flex;gap:12px;font-size:11px">
-            <span style="color:#C9A84C">▶ ${t.plays||0} plays</span>
-            <span style="color:#1D9E75">👤 ${t.profileTaps||0} taps</span>
-            <span style="color:#555">⏭ ${t.skips||0} skips</span>
-          </div>
-          <!-- Play bar -->
-          <div style="margin-top:8px;background:#111;border-radius:4px;height:4px">
-            <div style="height:100%;background:linear-gradient(90deg,#1D9E75,#C9A84C);border-radius:4px;width:${Math.min(100,(t.plays||0)*5)}%"></div>
-          </div>
-        </div>`).join('')}
-      <!-- Plan info -->
-      <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-top:8px">
-        <div style="font-size:11px;color:#555;margin-bottom:4px">CURRENT PLAN</div>
-        <div style="font-size:13px;font-weight:600;color:#C9A84C">${RADIO_PLANS[UP.radioPlan]?.name||'No plan'}</div>
-        <div style="font-size:11px;color:#555;margin-top:2px">${RADIO_PLANS[UP.radioPlan]?.playsPerDay||0} plays per day · Smart rotation · ${getTimeSlot()==='primetime'&&UP.radioPlan==='featured'?'⭐ Prime time slot active':'Standard slots'}</div>
-      </div>
-    `;
-  }catch(e){document.getElementById('radio-analytics-content').innerHTML=`<div style="text-align:center;padding:20px;color:#C9A84C">Could not load analytics</div>`;}
-}
-
-// ─── GIG RADIO ANNOUNCEMENT ──────────────────────────────────────
-// Managers pay $9 to broadcast a gig as a radio announcement
-window.showGigRadioAd=function(gigId, gigTitle, gigDate, gigLocation){
-  const m=document.createElement('div');m.className='modal-bg';m.id='gig-ad-modal';
-  m.innerHTML=`<div class="modal" style="background:#111">
-    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:4px">📢 Radio Announcement</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">Broadcast your gig to all Vivace Radio listeners</div>
-    <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;color:#555;margin-bottom:6px">Your announcement will play as:</div>
-      <div style="font-size:13px;color:#C9A84C;font-style:italic;line-height:1.6">"Now on Vivace Events — ${gigTitle||'a gig'} on ${gigDate||'upcoming date'} in ${gigLocation||'your area'}. Apply now at vivaceevents.com"</div>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#1a1a1a;border-radius:10px;margin-bottom:16px">
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#fff">3× per day for 7 days</div>
-        <div style="font-size:11px;color:#555">Heard by all active listeners</div>
-      </div>
-      <div style="font-size:18px;font-weight:700;color:#C9A84C">$9</div>
-    </div>
-    <button class="bt" style="width:100%;padding:13px;margin-bottom:8px;background:#C9A84C;color:#0d0d0d" onclick="purchaseGigAd('${gigId}','${(gigTitle||'').replace(/'/g,"\\'")}','${gigDate||''}','${(gigLocation||'').replace(/'/g,"\\'")}')">📢 Broadcast this gig — $9</button>
-    <button style="width:100%;padding:11px;border-radius:10px;background:#1a1a1a;border:1px solid #222;color:#555;font-size:13px;cursor:pointer;font-family:inherit" onclick="document.getElementById('gig-ad-modal').remove()">Cancel</button>
-  </div>`;
-  document.body.appendChild(m);
-}
-
-window.purchaseGigAd=async function(gigId, gigTitle, gigDate, gigLocation){
-  document.getElementById('gig-ad-modal')?.remove();
-  try{
-    await addDoc(collection(db,'radioAds'),{
-      type:'gig',gigId,gigTitle,gigDate,gigLocation,
-      managerId:CU.uid,managerEmail:CU.email,
-      playsPerDay:3,durationDays:7,
-      startDate:new Date(),
-      status:'active',price:9,
-      text:`Now on Vivace Events — ${gigTitle} on ${gigDate} in ${gigLocation}. Apply now at vivaceevents.com`
-    });
-    ts('📢 Gig announcement live on Vivace Radio!');
-  }catch(e){ts('Announcement scheduled!');}
-}
-
-window.doSignOut=async function(){
-  closeRadioBar();
-  await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();
-}
+window.doSignOut=async function(){await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();}
 
 onAuthStateChanged(auth,async user=>{
   CU=user;
