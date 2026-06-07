@@ -5580,8 +5580,8 @@ window.showInstrumentEditor=function(){
               ${i.primary&&i.part&&i.part!=='No preference'?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#0C447C;color:#fff;font-weight:600">${i.part}</span>`:''}
             </div>
             <div style="display:flex;gap:4px">
-              ${!i.primary?`<button onclick="setPrimary('${i.name.replace(/'/g,"\\'")}'')" style="font-size:11px;color:#1D9E75;background:#E1F5EE;border:none;cursor:pointer;padding:2px 8px;border-radius:6px">★ Primary</button>`:'<span style="font-size:10px;color:#1D9E75;font-weight:600">★ Primary</span>'}
-              <button onclick="removeInst('${i.name.replace(/'/g,"\\'")}'')" style="background:none;border:1px solid #F09595;color:#F09595;font-size:11px;cursor:pointer;padding:2px 8px;border-radius:6px">Remove</button>
+              ${!i.primary?`<button onclick="setPrimary('${i.name.replace(/'/g,"\\'")}')\" style=\"font-size:11px;color:#1D9E75;background:#E1F5EE;border:none;cursor:pointer;padding:2px 8px;border-radius:6px\">★ Primary</button>`:'<span style="font-size:10px;color:#1D9E75;font-weight:600">★ Primary</span>'}
+              <button onclick="removeInst('${i.name.replace(/'/g,"\\'")}')\" style=\"background:none;border:1px solid #F09595;color:#F09595;font-size:11px;cursor:pointer;padding:2px 8px;border-radius:6px\">Remove</button>
             </div>
           </div>
           ${i.primary?`
