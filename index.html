@@ -7303,7 +7303,7 @@ function renderRadioPlayer(){
         <button onclick="radioPlayPause()" style="width:38px;height:38px;border-radius:50%;background:${_radioPlaying?'#1D9E75':'#C9A84C'};border:none;color:#0d0d0d;font-size:15px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(201,168,76,0.3)">${_radioPlaying?'⏸':'▶'}</button>
         <button onclick="radioNext()" style="background:none;border:none;color:#ccc;font-size:18px;cursor:pointer">⏭</button>
         <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#ccc;font-size:14px;cursor:pointer">ℹ️</button>
-        <button onclick="showRadioInfo('${track.id||''}','${track.userId||''}')" style="background:none;border:none;color:#1D9E75;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit">Profile ↗</button>
+        <button onclick="viewRadioArtist('${track.userId||''}')" style="background:none;border:none;color:#1D9E75;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit">Profile ↗</button>
         <button onclick="reportRadioTrack('${track.id||''}')" style="background:none;border:none;color:#F09595;font-size:13px;cursor:pointer">🚩</button>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
@@ -7501,8 +7501,10 @@ window.viewRadioArtist=function(userId){
     try{updateDoc(doc(db,'radioTracks',track.id),{profileTaps:(track.profileTaps||0)+1});}
     catch(e){}
   }
-  // Close any open modals first
+  // Close modals, collapse player panel
   document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  const exp=document.getElementById('radio-expanded');
+  if(exp)exp.style.display='none';
   // Navigate to public profile
   _publicProfileId=userId;
   go('public-profile');
