@@ -7981,7 +7981,7 @@ onAuthStateChanged(auth,async user=>{
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
-    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();initRadioPlayer();},1500);
+    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();},1500);
   } else {
     render();
   }
