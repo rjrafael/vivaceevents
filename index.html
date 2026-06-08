@@ -435,7 +435,7 @@ function render(){
     </nav>`;
 }
 
-function go(s){CS=s;document.getElementById('scr').innerHTML=getScr();window.scrollTo({top:0,behavior:'instant'});}
+function go(s){CS=s;const scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;}
 window.go=go;window.ts=ts;
 
 function getScr(){
