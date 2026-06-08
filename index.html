@@ -113,7 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
@@ -3519,7 +3519,7 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();},100);
+  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();initVUMeter();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
@@ -3559,6 +3559,7 @@ function feedHTML(){
 </div>
 
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
+<div id="vu-meter-widget" style="margin:0 0 16px 0"></div>
 <div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
 
@@ -5183,6 +5184,189 @@ window.reopenAvailability=async function(userId,gigDate){
     ts('Availability updated ✅');
   }
 };
+
+// ─── VU METER LIVE COMMUNITY WIDGET ──────────────────────────────
+var _vuUnsubscribe = null;
+
+window.initVUMeter = function(){
+  var el = document.getElementById('vu-meter-widget');
+  if(!el) return;
+
+  // Build the HTML
+  el.innerHTML = [
+    '<div id="vum" style="background:#0d0d0d;border-radius:14px;padding:16px 14px 14px;margin-bottom:4px">',
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">',
+        '<span style="font-size:11px;font-weight:500;color:#1D9E75;letter-spacing:.08em">VIVACE COMMUNITY</span>',
+        '<span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#555">',
+          '<span id="vu-dot" style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;animation:vupulse 1.5s ease-in-out infinite"></span>',
+          'Live',
+        '</span>',
+      '</div>',
+      '<style>',
+        '@keyframes vupulse{0%,100%{opacity:1}50%{opacity:.25}}',
+      '</style>',
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px" id="vu-groups">',
+        _vuGroup('mus','#1D9E75','Musicians'),
+        _vuGroup('mgr','#378ADD','Managers'),
+        _vuGroup('tch','#A855F7','Teachers'),
+        _vuGroup('org','#F97316','Organizers'),
+      '</div>',
+      '<div style="background:#111;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px">',
+        '<div>',
+          '<div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.07em">Total</div>',
+          '<div id="vu-total" style="font-size:22px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums;line-height:1.1">—</div>',
+        '</div>',
+        '<div style="flex:1;height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden">',
+          '<div id="vu-master-bar" style="height:100%;background:#1D9E75;border-radius:3px;width:0%;transition:width 1s cubic-bezier(.4,0,.2,1)"></div>',
+        '</div>',
+        '<div id="vu-badge" style="font-size:10px;color:#1D9E75;background:#0f2e22;padding:2px 8px;border-radius:20px;white-space:nowrap">Growing</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  // Start Firebase listener
+  if(_vuUnsubscribe) _vuUnsubscribe();
+  _vuUnsubscribe = onSnapshot(
+    query(collection(db,'users')),
+    function(snap){
+      var counts = {
+        mus:{free:0,pro:0,studio:0,agency:0},
+        mgr:{free:0,pro:0,studio:0,agency:0},
+        tch:{free:0,teacher_basic:0,teacher_pro:0,teacher_studio:0},
+        org:{free:0,organizer_pro:0,organizer_elite:0}
+      };
+      snap.forEach(function(d){
+        var u = d.data();
+        var roles = u.roles || ['artist'];
+        var plan = u.plan || 'free';
+        if(roles.includes('organizer')){
+          var ok = plan==='organizer_pro'?'organizer_pro':plan==='organizer_elite'?'organizer_elite':'free';
+          counts.org[ok] = (counts.org[ok]||0)+1;
+        } else if(roles.includes('manager')){
+          var mk = ['pro','studio','agency'].includes(plan)?plan:'free';
+          counts.mgr[mk] = (counts.mgr[mk]||0)+1;
+        } else if(roles.includes('teacher')){
+          var tk = ['teacher_basic','teacher_pro','teacher_studio'].includes(plan)?plan:'free';
+          counts.tch[tk] = (counts.tch[tk]||0)+1;
+        } else {
+          var ak = ['pro','studio','agency'].includes(plan)?plan:'free';
+          counts.mus[ak] = (counts.mus[ak]||0)+1;
+        }
+      });
+      _vuRender(counts, snap.size);
+    },
+    function(err){ console.log('VU meter:', err.message); }
+  );
+};
+
+function _vuGroup(id, color, label){
+  return [
+    '<div style="background:#111;border-radius:8px;padding:8px 6px 10px">',
+      '<div style="font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;text-align:center;color:'+color+';margin-bottom:8px">'+label+'</div>',
+      '<div style="display:flex;align-items:flex-end;justify-content:center;gap:4px;height:60px" id="'+id+'-bars">',
+        _vuBar(id+'-b1','#444'),
+        _vuBar(id+'-b2',color),
+        _vuBar(id+'-b3',color,'0.6'),
+      '</div>',
+      '<div style="text-align:center;margin-top:6px;border-top:0.5px solid #1a1a1a;padding-top:6px">',
+        '<div id="'+id+'-tot" style="font-size:15px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums">0</div>',
+        '<div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.05em">members</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+}
+
+function _vuBar(id, color, opacity){
+  opacity = opacity || '1';
+  return [
+    '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">',
+      '<div style="position:relative;width:14px;height:50px">',
+        '<div style="position:absolute;bottom:0;left:0;right:0;background:#1a1a1a;border-radius:2px;height:100%"></div>',
+        '<div id="'+id+'-fill" style="position:absolute;bottom:0;left:0;right:0;background:'+color+';border-radius:2px;height:0%;opacity:'+opacity+';transition:height .5s cubic-bezier(.4,0,.2,1)"></div>',
+        '<div id="'+id+'-peak" style="position:absolute;left:0;right:0;height:2px;background:'+color+';border-radius:1px;bottom:0%;opacity:0.9;transition:bottom .1s ease-out"></div>',
+      '</div>',
+      '<div id="'+id+'-num" style="font-size:9px;color:#555;font-variant-numeric:tabular-nums">0</div>',
+    '</div>'
+  ].join('');
+}
+
+var _vuPeaks = {};
+
+function _vuSetBar(id, val, max){
+  var fill = document.getElementById(id+'-fill');
+  var peak = document.getElementById(id+'-peak');
+  var num = document.getElementById(id+'-num');
+  if(!fill) return;
+  var pct = max > 0 ? Math.round((val/max)*90)+4 : 4;
+  fill.style.height = pct + '%';
+  if(num) num.textContent = val;
+  // Peak indicator - belt tactic
+  if(!_vuPeaks[id] || pct > _vuPeaks[id]){
+    _vuPeaks[id] = pct;
+    if(peak){ peak.style.bottom = pct+'%'; peak.style.opacity='1'; }
+    // Slowly fall after 1.5s
+    setTimeout(function(){
+      if(peak){
+        peak.style.transition = 'bottom 2s ease-in';
+        peak.style.bottom = '0%';
+        peak.style.opacity = '0.4';
+      }
+      _vuPeaks[id] = 0;
+    }, 1500);
+  }
+}
+
+function _vuRender(counts, total){
+  // Musicians
+  var mv = [counts.mus.free, counts.mus.pro, counts.mus.studio+counts.mus.agency];
+  var mm = Math.max.apply(null, mv.concat([1]));
+  _vuSetBar('mus-b1', mv[0], mm);
+  _vuSetBar('mus-b2', mv[1], mm);
+  _vuSetBar('mus-b3', mv[2], mm);
+  var mt = mv.reduce(function(a,b){return a+b;},0);
+  var mel = document.getElementById('mus-tot'); if(mel) mel.textContent = mt;
+
+  // Managers
+  var mgv = [counts.mgr.free, counts.mgr.pro, counts.mgr.studio+counts.mgr.agency];
+  var mgm = Math.max.apply(null, mgv.concat([1]));
+  _vuSetBar('mgr-b1', mgv[0], mgm);
+  _vuSetBar('mgr-b2', mgv[1], mgm);
+  _vuSetBar('mgr-b3', mgv[2], mgm);
+  var mgt = mgv.reduce(function(a,b){return a+b;},0);
+  var mgel = document.getElementById('mgr-tot'); if(mgel) mgel.textContent = mgt;
+
+  // Teachers
+  var tv = [counts.tch.free+counts.tch.teacher_basic, counts.tch.teacher_pro, counts.tch.teacher_studio];
+  var tm = Math.max.apply(null, tv.concat([1]));
+  _vuSetBar('tch-b1', tv[0], tm);
+  _vuSetBar('tch-b2', tv[1], tm);
+  _vuSetBar('tch-b3', tv[2], tm);
+  var tt = tv.reduce(function(a,b){return a+b;},0);
+  var tel = document.getElementById('tch-tot'); if(tel) tel.textContent = tt;
+
+  // Organizers
+  var ov = [counts.org.free, counts.org.organizer_pro, counts.org.organizer_elite];
+  var om = Math.max.apply(null, ov.concat([1]));
+  _vuSetBar('org-b1', ov[0], om);
+  _vuSetBar('org-b2', ov[1], om);
+  _vuSetBar('org-b3', ov[2], om);
+  var ot = ov.reduce(function(a,b){return a+b;},0);
+  var oel = document.getElementById('org-tot'); if(oel) oel.textContent = ot;
+
+  // Master
+  var totalEl = document.getElementById('vu-total');
+  var masterBar = document.getElementById('vu-master-bar');
+  var badge = document.getElementById('vu-badge');
+  if(totalEl) totalEl.textContent = total.toLocaleString();
+  if(masterBar) masterBar.style.width = Math.min(100, Math.round(total/500*100)) + '%';
+  if(badge){
+    badge.textContent = total === 0 ? 'Growing' :
+      total < 50 ? 'Early access' :
+      total < 100 ? 'Growing fast' :
+      total < 1000 ? total+' strong' :
+      (total/1000).toFixed(1)+'k members';
+  }
+}
 
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
