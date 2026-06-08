@@ -4988,7 +4988,7 @@ function billingHTML(){
     <div style="font-size:12px;color:#085041;font-weight:600">Your current plan</div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-top:2px">${{free:'Free',pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'}[plan]||'Free'}</div>
   </div>
-  ${plan!=='free'&&CU.email!=='rafael.javadov@gmail.com'?`<button onclick="cancelSubscription()" style="font-size:11px;color:#E24B4A;background:#FEF2F2;border:1px solid #FECACA;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit">Cancel plan</button>`:'<span class="tag tg">${plan==="free"?"Free":"Active ✅"}</span>'}
+  ${plan!=='free'&&CU.email!=='rafael.javadov@gmail.com'?`<button onclick="cancelSubscription()" style="font-size:11px;color:#E24B4A;background:#FEF2F2;border:1px solid #FECACA;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit">Cancel plan</button>`:`<span class="tag tg">${plan==='free'?'Free':'Active ✅'}</span>`}
 </div>
 
 ${plan==='free'&&!UP.trialUsed?`
