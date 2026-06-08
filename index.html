@@ -435,7 +435,7 @@ function render(){
     </nav>`;
 }
 
-function go(s){CS=s;document.getElementById('scr').innerHTML=getScr();}
+function go(s){CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;if(s==='feed')setTimeout(injectVU,80);}
 window.go=go;window.ts=ts;
 
 function getScr(){
@@ -603,7 +603,7 @@ window.verifySMS=async function(){
     CU=r.user;
     document.getElementById('phone-modal')?.remove();
     await saveTOS(CU.uid);
-    await loadUP();await loadGroups();await loadVenues();render();
+    await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
     ts('Phone verified! Welcome to Vivace Events 🎉');
   }catch(e){ts('Invalid code. Please try again.');}
 }
@@ -615,7 +615,7 @@ function bindAuth(){
     try{
       const r=await signInWithPopup(auth,fp);CU=r.user;
       await saveTOS(CU.uid);
-      await loadUP();await loadGroups();await loadVenues();render();
+      await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
     }catch(e){ts('Facebook sign-in failed: '+e.message);}
     finally{btn.disabled=false;btn.textContent='Continue with Facebook';}
   };
@@ -627,7 +627,7 @@ function bindAuth(){
     try{
       const r=await signInWithPopup(auth,gp);CU=r.user;
       await saveTOS(CU.uid);
-      await loadUP();await loadGroups();await loadVenues();render();
+      await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
     }catch(e){ts('Google sign-in failed');}
     finally{btn.disabled=false;btn.textContent='Continue with Google';}
   };
@@ -657,7 +657,7 @@ function bindAuth(){
   document.getElementById('btn-signin').onclick=async()=>{
     const btn=document.getElementById('btn-signin');
     btn.disabled=true;btn.textContent='Signing in...';
-    try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
+    try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);}
     catch(e){ts(e.message);btn.disabled=false;btn.textContent='Sign in';}
   };
 }
@@ -3519,7 +3519,7 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();initVUMeter();},100);
+  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
@@ -3559,7 +3559,6 @@ function feedHTML(){
 </div>
 
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
-<div id="vu-meter-widget" style="margin:0 0 16px 0"></div>
 <div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
 
@@ -5188,9 +5187,16 @@ window.reopenAvailability=async function(userId,gigDate){
 // ─── VU METER LIVE COMMUNITY WIDGET ──────────────────────────────
 var _vuUnsubscribe = null;
 
-window.initVUMeter = function(){
-  var el = document.getElementById('vu-meter-widget');
-  if(!el) return;
+window.injectVU = function(){
+  if(CS!=='feed') return;
+  var gigList = document.getElementById('gig-list');
+  if(!gigList) return;
+  var existing = document.getElementById('vu-meter-widget');
+  if(existing) return;
+  var el = document.createElement('div');
+  el.id = 'vu-meter-widget';
+  el.style.margin = '0 0 16px 0';
+  gigList.parentNode.insertBefore(el, gigList);
 
   // Build the HTML
   el.innerHTML = [
