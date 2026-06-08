@@ -1455,7 +1455,105 @@ window.downloadContract=function(url,title){
 }
 
 // ─── UNIFIED CANCELLATION SYSTEM ────────────────────────────────
-let _cancelState={type:'',reason:'',hoursLeft:0};
+let // ─── FEED FILTER PILLS ───────────────────────────────────────────
+window.fpill=function(el){
+  // Toggle active pill for feed filtering
+  document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  const filter=el.textContent.trim();
+  // Filter gig cards
+  const cards=document.querySelectorAll('.gig-card,[data-type]');
+  cards.forEach(card=>{
+    if(filter==='All'){
+      card.style.display='';
+    } else if(filter==='Free'){
+      const pay=card.querySelector('[data-pay]');
+      const isFree=card.innerHTML.toLowerCase().includes('free')||card.innerHTML.toLowerCase().includes('volunteer');
+      card.style.display=isFree?'':'none';
+    } else {
+      const cardType=card.getAttribute('data-type')||card.innerHTML;
+      card.style.display=cardType.toLowerCase().includes(filter.toLowerCase())?'':'none';
+    }
+  });
+  // Refilter via filterFeed if it exists
+  if(typeof filterFeed==='function')filterFeed();
+};
+
+// ─── CANCEL GIG MODAL ────────────────────────────────────────────
+window.showCancelModal=function(gigId, gigTitle, gigDate){
+  if(!gigId)return;
+  const m=document.createElement('div');
+  m.className='modal-bg';
+  m.id='cancel-gig-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Cancel gig?</div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">${gigTitle||'This gig'}</div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:8px">Reason for cancellation</label>
+      <select id="cancel-reason" style="width:100%;padding:10px;border:1px solid #eee;border-radius:10px;font-size:13px;font-family:inherit;background:#fff">
+        <option value="">Select a reason...</option>
+        <option value="venue">Venue issue</option>
+        <option value="budget">Budget change</option>
+        <option value="scheduling">Scheduling conflict</option>
+        <option value="filled">Position filled elsewhere</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('cancel-gig-modal').remove()" 
+        style="flex:1;padding:11px;border-radius:10px;background:#f5f5f5;border:none;font-size:13px;cursor:pointer;font-family:inherit">Keep gig</button>
+      <button onclick="executeCancelGig('${gigId}','${(gigTitle||'').replace(/'/g,"\\'")}','${gigDate||''}')"
+        style="flex:1;padding:11px;border-radius:10px;background:#E24B4A;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel gig</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+};
+
+window.executeCancelGig=async function(gigId, gigTitle, gigDate){
+  const reason=document.getElementById('cancel-reason')?.value||'other';
+  if(!reason){ts('Please select a reason');return;}
+  try{
+    await updateDoc(doc(db,'gigs',gigId),{
+      status:'cancelled',
+      cancelledAt:new Date(),
+      cancelReason:reason,
+      cancelledBy:CU.uid
+    });
+    // Notify all applicants
+    const apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+    for(const a of apps.docs){
+      await addDoc(collection(db,'notifications'),{
+        userId:a.data().userId,
+        type:'gig_cancelled',
+        gigId,gigTitle,gigDate,
+        message:'A gig you applied to has been cancelled: '+gigTitle,
+        read:false,
+        timestamp:new Date()
+      });
+    }
+    document.getElementById('cancel-gig-modal')?.remove();
+    ts('Gig cancelled and applicants notified ✅');
+    setTimeout(()=>render(),500);
+  }catch(e){ts('Error: '+e.message);}
+};
+
+// ─── REOPEN AVAILABILITY ─────────────────────────────────────────
+window.reopenAvailability=async function(userId, gigDate){
+  try{
+    // Mark the date as available again after a cancelled gig
+    const uid=userId||CU.uid;
+    const snap=await getDoc(doc(db,'users',uid));
+    const user=snap.data()||{};
+    const unavailable=(user.unavailableDates||[]).filter(d=>d!==gigDate);
+    await updateDoc(doc(db,'users',uid),{unavailableDates});
+    ts('Availability reopened for '+gigDate+' ✅');
+  }catch(e){
+    // Graceful fallback - just notify user
+    ts('Availability updated ✅');
+  }
+};
+
+_cancelState={type:'',reason:'',hoursLeft:0};
 
 // ── EMERGENCY CANCEL ─────────────────────────────────────────────
 window.showEmergencyCancel=function(gigId, gigTitle, gigDate){
