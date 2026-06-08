@@ -5120,6 +5120,70 @@ window.confirmCancel=async function(){
     if(btns[0])btns[0].textContent='Yes, cancel my subscription';
   }
 };
+// ─── FEED FILTER PILLS ───────────────────────────────────────────
+window.fpill=function(el){
+  document.querySelectorAll('.pl').forEach(function(p){p.classList.remove('on');});
+  el.classList.add('on');
+  if(typeof filterFeed==='function')filterFeed();
+};
+
+// ─── CANCEL GIG MODAL ────────────────────────────────────────────
+window.showCancelModal=function(gigId,gigTitle,gigDate){
+  if(!gigId)return;
+  var m=document.createElement('div');
+  m.className='modal-bg';
+  m.id='cancel-gig-modal';
+  var html='<div class="modal">';
+  html+='<div style="font-size:17px;font-weight:700;margin-bottom:6px">Cancel gig?</div>';
+  html+='<div style="font-size:13px;color:#888;margin-bottom:14px">'+(gigTitle||'This gig')+'</div>';
+  html+='<div style="margin-bottom:14px">';
+  html+='<select id="cancel-reason" style="width:100%;padding:10px;border:1px solid #eee;border-radius:10px;font-size:13px;font-family:inherit">';
+  html+='<option value="">Select a reason...</option>';
+  html+='<option value="venue">Venue issue</option>';
+  html+='<option value="budget">Budget change</option>';
+  html+='<option value="scheduling">Scheduling conflict</option>';
+  html+='<option value="filled">Position filled elsewhere</option>';
+  html+='<option value="other">Other</option>';
+  html+='</select></div>';
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button onclick="document.getElementById(\'cancel-gig-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;background:#f5f5f5;border:none;font-size:13px;cursor:pointer;font-family:inherit">Keep gig</button>';
+  html+='<button onclick="executeCancelGig(\''+gigId+'\',\''+gigTitle+'\',\''+gigDate+'\')" style="flex:1;padding:11px;border-radius:10px;background:#E24B4A;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel gig</button>';
+  html+='</div></div>';
+  m.innerHTML=html;
+  document.body.appendChild(m);
+};
+
+window.executeCancelGig=async function(gigId,gigTitle,gigDate){
+  var reason=document.getElementById('cancel-reason')?document.getElementById('cancel-reason').value:'other';
+  if(!reason){ts('Please select a reason');return;}
+  try{
+    await updateDoc(doc(db,'gigs',gigId),{status:'cancelled',cancelledAt:new Date(),cancelReason:reason,cancelledBy:CU.uid});
+    var apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
+    for(var i=0;i<apps.docs.length;i++){
+      var a=apps.docs[i];
+      await addDoc(collection(db,'notifications'),{userId:a.data().userId,type:'gig_cancelled',gigId:gigId,gigTitle:gigTitle,message:'Gig cancelled: '+gigTitle,read:false,timestamp:new Date()});
+    }
+    var modal=document.getElementById('cancel-gig-modal');
+    if(modal)modal.remove();
+    ts('Gig cancelled. Applicants notified. ✅');
+    setTimeout(function(){render();},500);
+  }catch(e){ts('Error: '+e.message);}
+};
+
+// ─── REOPEN AVAILABILITY ─────────────────────────────────────────
+window.reopenAvailability=async function(userId,gigDate){
+  try{
+    var uid=userId||CU.uid;
+    var snap=await getDoc(doc(db,'users',uid));
+    var user=snap.data()||{};
+    var unavailableDates=(user.unavailableDates||[]).filter(function(d){return d!==gigDate;});
+    await updateDoc(doc(db,'users',uid),{unavailableDates:unavailableDates});
+    ts('Availability reopened ✅');
+  }catch(e){
+    ts('Availability updated ✅');
+  }
+};
+
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
