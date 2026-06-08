@@ -113,7 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
@@ -435,7 +435,7 @@ function render(){
     </nav>`;
 }
 
-function go(s){CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;if(s==='feed')setTimeout(injectVU,80);}
+function go(s){CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;}
 window.go=go;window.ts=ts;
 
 function getScr(){
@@ -603,7 +603,7 @@ window.verifySMS=async function(){
     CU=r.user;
     document.getElementById('phone-modal')?.remove();
     await saveTOS(CU.uid);
-    await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
+    await loadUP();await loadGroups();await loadVenues();render();
     ts('Phone verified! Welcome to Vivace Events 🎉');
   }catch(e){ts('Invalid code. Please try again.');}
 }
@@ -615,7 +615,7 @@ function bindAuth(){
     try{
       const r=await signInWithPopup(auth,fp);CU=r.user;
       await saveTOS(CU.uid);
-      await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
+      await loadUP();await loadGroups();await loadVenues();render();
     }catch(e){ts('Facebook sign-in failed: '+e.message);}
     finally{btn.disabled=false;btn.textContent='Continue with Facebook';}
   };
@@ -627,7 +627,7 @@ function bindAuth(){
     try{
       const r=await signInWithPopup(auth,gp);CU=r.user;
       await saveTOS(CU.uid);
-      await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);
+      await loadUP();await loadGroups();await loadVenues();render();
     }catch(e){ts('Google sign-in failed');}
     finally{btn.disabled=false;btn.textContent='Continue with Google';}
   };
@@ -657,7 +657,7 @@ function bindAuth(){
   document.getElementById('btn-signin').onclick=async()=>{
     const btn=document.getElementById('btn-signin');
     btn.disabled=true;btn.textContent='Signing in...';
-    try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();setTimeout(injectVU,200);}
+    try{const r=await signInWithEmailAndPassword(auth,document.getElementById('ae').value,document.getElementById('ap').value);CU=r.user;await loadUP();await loadGroups();await loadVenues();render();}
     catch(e){ts(e.message);btn.disabled=false;btn.textContent='Sign in';}
   };
 }
@@ -5120,205 +5120,6 @@ window.confirmCancel=async function(){
     if(btns[0])btns[0].textContent='Yes, cancel my subscription';
   }
 };
-// ─── FEED FILTER PILLS ───────────────────────────────────────────
-window.fpill=function(el){
-  document.querySelectorAll('.pl').forEach(function(p){p.classList.remove('on');});
-  el.classList.add('on');
-  if(typeof filterFeed==='function')filterFeed();
-};
-
-// ─── CANCEL GIG MODAL ────────────────────────────────────────────
-window.showCancelModal=function(gigId,gigTitle,gigDate){
-  if(!gigId)return;
-  var m=document.createElement('div');
-  m.className='modal-bg';
-  m.id='cancel-gig-modal';
-  var html='<div class="modal">';
-  html+='<div style="font-size:17px;font-weight:700;margin-bottom:6px">Cancel gig?</div>';
-  html+='<div style="font-size:13px;color:#888;margin-bottom:14px">'+(gigTitle||'This gig')+'</div>';
-  html+='<div style="margin-bottom:14px">';
-  html+='<select id="cancel-reason" style="width:100%;padding:10px;border:1px solid #eee;border-radius:10px;font-size:13px;font-family:inherit">';
-  html+='<option value="">Select a reason...</option>';
-  html+='<option value="venue">Venue issue</option>';
-  html+='<option value="budget">Budget change</option>';
-  html+='<option value="scheduling">Scheduling conflict</option>';
-  html+='<option value="filled">Position filled elsewhere</option>';
-  html+='<option value="other">Other</option>';
-  html+='</select></div>';
-  html+='<div style="display:flex;gap:8px">';
-  html+='<button onclick="document.getElementById(\'cancel-gig-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;background:#f5f5f5;border:none;font-size:13px;cursor:pointer;font-family:inherit">Keep gig</button>';
-  html+='<button onclick="executeCancelGig(\''+gigId+'\',\''+gigTitle+'\',\''+gigDate+'\')" style="flex:1;padding:11px;border-radius:10px;background:#E24B4A;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel gig</button>';
-  html+='</div></div>';
-  m.innerHTML=html;
-  document.body.appendChild(m);
-};
-
-window.executeCancelGig=async function(gigId,gigTitle,gigDate){
-  var reason=document.getElementById('cancel-reason')?document.getElementById('cancel-reason').value:'other';
-  if(!reason){ts('Please select a reason');return;}
-  try{
-    await updateDoc(doc(db,'gigs',gigId),{status:'cancelled',cancelledAt:new Date(),cancelReason:reason,cancelledBy:CU.uid});
-    var apps=await getDocs(query(collection(db,'applications'),where('gigId','==',gigId)));
-    for(var i=0;i<apps.docs.length;i++){
-      var a=apps.docs[i];
-      await addDoc(collection(db,'notifications'),{userId:a.data().userId,type:'gig_cancelled',gigId:gigId,gigTitle:gigTitle,message:'Gig cancelled: '+gigTitle,read:false,timestamp:new Date()});
-    }
-    var modal=document.getElementById('cancel-gig-modal');
-    if(modal)modal.remove();
-    ts('Gig cancelled. Applicants notified. ✅');
-    setTimeout(function(){render();},500);
-  }catch(e){ts('Error: '+e.message);}
-};
-
-// ─── REOPEN AVAILABILITY ─────────────────────────────────────────
-window.reopenAvailability=async function(userId,gigDate){
-  try{
-    var uid=userId||CU.uid;
-    var snap=await getDoc(doc(db,'users',uid));
-    var user=snap.data()||{};
-    var unavailableDates=(user.unavailableDates||[]).filter(function(d){return d!==gigDate;});
-    await updateDoc(doc(db,'users',uid),{unavailableDates:unavailableDates});
-    ts('Availability reopened ✅');
-  }catch(e){
-    ts('Availability updated ✅');
-  }
-};
-
-// ─── VU METER LIVE COMMUNITY WIDGET ──────────────────────────────
-var _vuUnsubscribe = null;
-var _vuPeaks = {};
-
-function _vuMakeBar(id, color, opacity) {
-  opacity = opacity || '1';
-  return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'
-    + '<div style="position:relative;width:16px;height:56px">'
-    + '<div style="position:absolute;bottom:0;left:0;right:0;background:#1a1a1a;border-radius:3px;height:100%"></div>'
-    + '<div id="'+id+'-fill" style="position:absolute;bottom:0;left:0;right:0;background:'+color+';border-radius:3px;height:4%;opacity:'+opacity+';transition:height .5s cubic-bezier(.4,0,.2,1)"></div>'
-    + '<div id="'+id+'-peak" style="position:absolute;left:1px;right:1px;height:2px;background:'+color+';border-radius:1px;bottom:4%;transition:bottom .1s ease-out"></div>'
-    + '</div>'
-    + '<div id="'+id+'-num" style="font-size:9px;color:#555;min-width:16px;text-align:center;font-variant-numeric:tabular-nums">0</div>'
-    + '</div>';
-}
-
-function _vuMakeGroup(id, color, label) {
-  return '<div style="background:#111;border-radius:8px;padding:8px 6px 10px">'
-    + '<div style="font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;text-align:center;color:'+color+';margin-bottom:8px">'+label+'</div>'
-    + '<div style="display:flex;align-items:flex-end;justify-content:center;gap:5px;height:64px">'
-    + _vuMakeBar(id+'-b1','#444')
-    + _vuMakeBar(id+'-b2',color)
-    + _vuMakeBar(id+'-b3',color,'0.55')
-    + '</div>'
-    + '<div style="text-align:center;margin-top:6px;border-top:0.5px solid #1a1a1a;padding-top:6px">'
-    + '<div id="'+id+'-tot" style="font-size:16px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums">0</div>'
-    + '<div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.05em">members</div>'
-    + '</div>'
-    + '</div>';
-}
-
-window.injectVU = function(){
-  if(CS !== 'feed') return;
-  var gigList = document.getElementById('gig-list');
-  if(!gigList) return;
-  if(document.getElementById('vu-meter-widget')) return;
-  var el = document.createElement('div');
-  el.id = 'vu-meter-widget';
-  el.style.cssText = 'margin:0 0 16px 0';
-  gigList.parentNode.insertBefore(el, gigList);
-
-  el.innerHTML = '<div id="vum" style="background:#0d0d0d;border-radius:14px;padding:16px 14px 14px">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-    + '<span style="font-size:11px;font-weight:500;color:#1D9E75;letter-spacing:.08em">VIVACE COMMUNITY</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#555">'
-    + '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;animation:vupulse 1.5s ease-in-out infinite"></span>'
-    + 'Live</span></div>'
-    + '<style>@keyframes vupulse{0%,100%{opacity:1}50%{opacity:.25}}</style>'
-    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
-    + _vuMakeGroup('mus','#1D9E75','Musicians')
-    + _vuMakeGroup('mgr','#378ADD','Managers')
-    + _vuMakeGroup('tch','#A855F7','Teachers')
-    + _vuMakeGroup('org','#F97316','Organizers')
-    + '</div>'
-    + '<div style="background:#111;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px">'
-    + '<div><div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.07em">Total</div>'
-    + '<div id="vu-total" style="font-size:22px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums;line-height:1.1">—</div></div>'
-    + '<div style="flex:1;height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden">'
-    + '<div id="vu-master-bar" style="height:100%;background:#1D9E75;border-radius:3px;width:0%;transition:width 1s cubic-bezier(.4,0,.2,1)"></div></div>'
-    + '<div id="vu-badge" style="font-size:10px;color:#1D9E75;background:#0f2e22;padding:2px 8px;border-radius:20px;white-space:nowrap">Growing</div>'
-    + '</div></div>';
-
-  if(_vuUnsubscribe) _vuUnsubscribe();
-  _vuUnsubscribe = onSnapshot(
-    query(collection(db,'users')),
-    function(snap){
-      var c = {
-        mus:{free:0,pro:0,hi:0},
-        mgr:{free:0,pro:0,hi:0},
-        tch:{free:0,pro:0,hi:0},
-        org:{free:0,pro:0,hi:0}
-      };
-      snap.forEach(function(d){
-        var u = d.data();
-        var roles = u.roles||['artist'];
-        var plan = u.plan||'free';
-        var tier = ['agency','teacher_studio','organizer_elite'].includes(plan)?'hi':
-                   ['pro','studio','teacher_basic','teacher_pro','organizer_pro'].includes(plan)?'pro':'free';
-        var grp = roles.includes('organizer')?'org':
-                  roles.includes('manager')?'mgr':
-                  roles.includes('teacher')?'tch':'mus';
-        c[grp][tier]++;
-      });
-      _vuDraw(c, snap.size);
-    },
-    function(e){ console.log('VU:', e.message); }
-  );
-};
-
-function _vuSetBar(id, val, max){
-  var fill = document.getElementById(id+'-fill');
-  var peak = document.getElementById(id+'-peak');
-  var num = document.getElementById(id+'-num');
-  if(!fill) return;
-  var pct = max > 0 ? Math.max(4, Math.round((val/max)*88)) : 4;
-  fill.style.height = pct + '%';
-  if(num) num.textContent = val;
-  if(peak){
-    var cur = parseInt(peak.style.bottom)||0;
-    if(pct >= cur){
-      _vuPeaks[id] = pct;
-      peak.style.transition = 'bottom .1s ease-out';
-      peak.style.bottom = pct + '%';
-      peak.style.opacity = '0.9';
-      clearTimeout(_vuPeaks[id+'_t']);
-      _vuPeaks[id+'_t'] = setTimeout(function(){
-        if(peak){
-          peak.style.transition = 'bottom 2.5s ease-in';
-          peak.style.bottom = '4%';
-          peak.style.opacity = '0.3';
-        }
-      }, 1800);
-    }
-  }
-}
-
-function _vuDraw(c, total){
-  var groups = ['mus','mgr','tch','org'];
-  groups.forEach(function(g){
-    var vals = [c[g].free, c[g].pro, c[g].hi];
-    var max = Math.max.apply(null, vals.concat([1]));
-    _vuSetBar(g+'-b1', vals[0], max);
-    _vuSetBar(g+'-b2', vals[1], max);
-    _vuSetBar(g+'-b3', vals[2], max);
-    var tot = document.getElementById(g+'-tot');
-    if(tot) tot.textContent = vals[0]+vals[1]+vals[2];
-  });
-  var te = document.getElementById('vu-total');
-  var mb = document.getElementById('vu-master-bar');
-  var bd = document.getElementById('vu-badge');
-  if(te) te.textContent = total.toLocaleString();
-  if(mb) mb.style.width = Math.min(100, Math.round(total/200*100))+'%';
-  if(bd) bd.textContent = total===0?'Growing':total<50?'Early access':total<200?total+' strong':(total/1000).toFixed(1)+'k members';
-}
-
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
@@ -8077,6 +7878,7 @@ window.doSignOut=async function(){
 onAuthStateChanged(auth,async user=>{
   CU=user;
   if(user){
+    CS='feed';
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
