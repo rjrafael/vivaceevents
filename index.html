@@ -435,7 +435,7 @@ function render(){
       <button class="ni${CS==='discover'?' on':''}" onclick="go('discover')">${ic('search')}${t('find')}</button>
       <button class="ni" onclick="go('post')" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:4px 0;border:none;background:none;cursor:pointer"><div class="pc">${ic('plus')}</div></button>
       <button class="ni${CS==='manager'?' on':''}" onclick="go('manager')">${ic('mgr')}${t('manager')}</button>
-      ${isOrganizer()?`<button class="ni${CS==='organizer'?' on':''}" onclick="go('organizer')" style="padding:4px 2px"><span style="font-size:16px">🎪</span><span style="font-size:9px;display:block;margin-top:-1px">Events</span></button>`:``}
+      ${(UP&&UP.roles&&UP.roles.includes('organizer'))?`<button class="ni${CS==='organizer'?' on':''}" onclick="go('organizer')" style="padding:4px 2px"><span style="font-size:16px">🎪</span><span style="font-size:9px;display:block;margin-top:-1px">Events</span></button>`:``}
       <button class="ni${CS==='profile'?' on':''}" onclick="go('profile')">${ic('user')}${t('profile')}</button>
     </nav>`;
 }
@@ -5425,6 +5425,7 @@ function profileHTML(){
         ${roles.includes('manager')?'<span class="tag tp">Agent / Manager</span>':''}
         ${roles.includes('teacher')?'<span class="tag tb">Teacher</span>':''}
         ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
+        ${roles.includes('organizer')?'<span class="tag" style="background:#FEF3E8;color:#C2570A;border:1px solid #FDBA74">🎪 Organizer</span>':''}
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
@@ -6245,7 +6246,10 @@ window.toggleRole=async function(role){
   const roles=UP.roles||['artist'];const idx=roles.indexOf(role);
   if(idx>-1){if(roles.length===1){ts('You must keep at least one role');return;}roles.splice(idx,1);}
   else roles.push(role);
-  UP.roles=[...new Set(roles)];await saveUP();render();
+  UP.roles=[...new Set(roles)];
+  await saveUP();
+  await loadUP();
+  render();
   ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
 }
 
