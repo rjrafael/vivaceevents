@@ -5421,10 +5421,10 @@ function profileHTML(){
       </div>
       <div style="font-size:12px;color:#555;margin-bottom:6px;user-select:none" oncontextmenu="return false">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${roles.includes('artist')?'<span class="tag tg">Artist</span>':''}
-        ${roles.includes('manager')?'<span class="tag tp">Agent / Manager</span>':''}
-        ${roles.includes('teacher')?'<span class="tag tb">Teacher</span>':''}
-        ${roles.includes('student')?'<span class="tag ta">Student</span>':''}
+        ${roles.includes('artist')?'<span class="tag" style="background:#1D9E75;color:#fff;border:none">🎻 Artist</span>':''}
+        ${roles.includes('manager')?'<span class="tag" style="background:#378ADD;color:#fff;border:none">🎯 Agent / Manager</span>':''}
+        ${roles.includes('teacher')?'<span class="tag" style="background:#A855F7;color:#fff;border:none">👨‍🏫 Teacher</span>':''}
+        ${roles.includes('student')?'<span class="tag" style="background:#C9A84C;color:#fff;border:none">🎓 Student</span>':''}
         ${roles.includes('organizer')?'<span class="tag" style="background:#F97316;color:#fff;border:none">🎪 Organizer</span>':''}
       </div>
     </div>
