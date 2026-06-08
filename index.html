@@ -5246,6 +5246,54 @@ function _vuDraw(c, total){
   if(bd) bd.textContent = total===0?'Growing':total<50?'Early access':total<200?total+' strong':(total/1000).toFixed(1)+'k';
 }
 
+
+window.selectGiftNum=function(role,n){
+  var prefix=role==='artist'?'a':'m';
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('gift-'+prefix+'-'+i);
+    if(!el)return;
+    el.style.background=i===n?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)';
+    el.style.color=i===n?'#111':'rgba(255,255,255,.5)';
+  });
+  window._giftNum=window._giftNum||{};
+  window._giftNum[role]=n;
+};
+
+window.openGiftSheet=function(role){
+  window._giftRole=role;
+  var n=(window._giftNum&&window._giftNum[role])||1;
+  var colors={artist:'#1D9E75',manager:'#378ADD'};
+  var labels={artist:'🎻 Artist',manager:'🎯 Manager'};
+  var c=colors[role]||'#1D9E75';
+  var existing=document.getElementById('gift-sheet-modal');
+  if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='gift-sheet-modal';
+  m.style.cssText='position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;min-height:100vh;top:0';
+  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:22px 20px 32px;width:100%">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 18px"></div>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${c}22;color:${c};margin-bottom:8px">${labels[role]} · ${n} credit${n>1?'s':''}</span>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:3px">Send a gift</div>
+    <div style="font-size:12px;color:#999;margin-bottom:18px">New users only — they'll receive 3 bonus gigs, valid 90 days</div>
+    <input id="gift-email-inp" type="email" placeholder="friend@email.com" style="width:100%;padding:13px 15px;border-radius:12px;border:1.5px solid #ebebeb;background:#fafafa;color:#111;font-size:15px;font-family:inherit;outline:none;margin-bottom:14px;box-sizing:border-box"/>
+    <button onclick="submitGift()" style="width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,${c},${c}cc);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Send gift</button>
+    <button onclick="document.getElementById('gift-sheet-modal').remove()" style="width:100%;padding:10px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  setTimeout(function(){document.getElementById('gift-email-inp').focus();},80);
+};
+
+window.submitGift=async function(){
+  var email=document.getElementById('gift-email-inp').value.trim();
+  if(!email||!email.includes('@')){ts('Please enter a valid email');return;}
+  var role=window._giftRole||'artist';
+  var n=(window._giftNum&&window._giftNum[role])||1;
+  var ok=await sendGiftCredit(role,n,email);
+  if(ok){
+    document.getElementById('gift-sheet-modal').remove();
+  }
+};
+
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
@@ -5598,6 +5646,77 @@ function profileHTML(){
     </div>
     <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?(isTeacher()?'Upgrade to Teacher Pro — $19/mo':'Upgrade to Agent Pro — $19/mo'):'Manage subscription'}</button>
   </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">🎁 Gig gift credits</div>
+      <span style="font-size:10px;color:#aaa">resets ${new Date(new Date().getFullYear(),new Date().getMonth()+1,1).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+    </div>
+    <div style="background:#111;border-radius:16px;padding:16px">
+      <div style="font-size:11px;color:#555;margin-bottom:14px">${planLabels[plan]} · gift credits to grow your network</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        ${Array.from({length:Math.min(10,{free:10,pro:25,studio:50,agency:10}[plan]||10)}).map((_,i)=>{
+          const used=UP.gigPostCount||0;
+          const gifted=UP.giftsGiven||0;
+          const left=Math.max(0,(UP.gigPostCount||0)<=0?2:2);
+          if(i<3) return '<div style="width:34px;height:34px;border-radius:8px;background:#222"></div>';
+          if(i<5) return '<div style="width:34px;height:34px;border-radius:8px;background:#1D9E75"></div>';
+          if(i<7) return '<div style="width:34px;height:34px;border-radius:8px;background:#F97316"></div>';
+          return '';
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#555">
+          <div style="width:7px;height:7px;border-radius:50%;background:#333"></div>used
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#1D9E75">
+          <div style="width:7px;height:7px;border-radius:50%;background:#1D9E75"></div>available
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#F97316">
+          <div style="width:7px;height:7px;border-radius:50%;background:#F97316"></div>gifted
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="gift-role-btns">
+        ${roles.includes('artist')?`
+        <div>
+          <div style="background:linear-gradient(135deg,#1D9E75,#0F6E56);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">🎻</div>
+              <div>
+                <div style="font-size:14px;font-weight:700;color:#fff">Gift as Artist</div>
+                <div style="font-size:10px;color:rgba(255,255,255,.5)">Invite a musician</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px">
+              ${[1,2,3].map(n=>`<button onclick="selectGiftNum('artist',${n})" id="gift-a-${n}" style="width:34px;height:34px;border-radius:8px;background:${n===1?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)'};color:${n===1?'#111':'rgba(255,255,255,.5)'};border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">${n}</button>`).join('')}
+            </div>
+          </div>
+          <div style="text-align:right;padding:6px 2px 4px">
+            <button onclick="openGiftSheet('artist')" style="background:#1D9E75;color:#fff;border:none;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Send gift →</button>
+          </div>
+        </div>`:''}
+        ${roles.includes('manager')?`
+        <div>
+          <div style="background:linear-gradient(135deg,#378ADD,#185FA5);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">🎯</div>
+              <div>
+                <div style="font-size:14px;font-weight:700;color:#fff">Gift as Manager</div>
+                <div style="font-size:10px;color:rgba(255,255,255,.5)">Grow your roster</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px">
+              ${[1,2,3].map(n=>`<button onclick="selectGiftNum('manager',${n})" id="gift-m-${n}" style="width:34px;height:34px;border-radius:8px;background:${n===1?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)'};color:${n===1?'#111':'rgba(255,255,255,.5)'};border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">${n}</button>`).join('')}
+            </div>
+          </div>
+          <div style="text-align:right;padding:6px 2px 4px">
+            <button onclick="openGiftSheet('manager')" style="background:#378ADD;color:#fff;border:none;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Send gift →</button>
+          </div>
+        </div>`:''}
+      </div>
+      <div style="font-size:11px;color:#444;text-align:center;margin-top:12px;line-height:1.7">New users only · 3 bonus gigs · valid 90 days<br>When they post their first gig — you get one back</div>
+    </div>
+  </div>
+
   <div style="margin-bottom:18px">
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
