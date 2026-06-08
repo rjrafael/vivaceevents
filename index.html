@@ -5162,10 +5162,10 @@ window.initVU = function(){
       var u = d.data(), pl = u.plan||'free', roles = u.roles||['artist'];
       var tier = (pl==='agency'||pl==='teacher_studio'||pl==='organizer_elite') ? 'h'
                : (pl==='free') ? 'f' : 'p';
-      var grp = roles.includes('organizer') ? 'o'
-              : roles.includes('manager') ? 'mg'
-              : roles.includes('teacher') ? 't' : 'm';
-      c[grp][tier]++;
+      if(roles.includes('artist')||roles.length===0) c['m'][tier]++;
+      if(roles.includes('manager')) c['mg'][tier]++;
+      if(roles.includes('teacher')) c['t'][tier]++;
+      if(roles.includes('organizer')) c['o'][tier]++;
     });
     _vuDraw(c, snap.size);
   }, function(e){ console.log('VU:', e.message); });
