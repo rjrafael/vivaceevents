@@ -1455,7 +1455,7 @@ window.downloadContract=function(url,title){
 }
 
 // ─── UNIFIED CANCELLATION SYSTEM ────────────────────────────────
-let // ─── FEED FILTER PILLS ───────────────────────────────────────────
+// ─── FEED FILTER PILLS ───────────────────────────────────────────
 window.fpill=function(el){
   // Toggle active pill for feed filtering
   document.querySelectorAll('.pl').forEach(p=>p.classList.remove('on'));
@@ -1544,7 +1544,7 @@ window.reopenAvailability=async function(userId, gigDate){
     const uid=userId||CU.uid;
     const snap=await getDoc(doc(db,'users',uid));
     const user=snap.data()||{};
-    const unavailable=(user.unavailableDates||[]).filter(d=>d!==gigDate);
+    const unavailableDates=(user.unavailableDates||[]).filter(d=>d!==gigDate);
     await updateDoc(doc(db,'users',uid),{unavailableDates});
     ts('Availability reopened for '+gigDate+' ✅');
   }catch(e){
