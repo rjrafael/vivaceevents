@@ -4572,6 +4572,20 @@ window.selT=function(el){
 }
 window.fillV=function(v){const f=document.getElementById('g-loc');if(v&&f)f.value=v;}
 window.saveGig=async function(draft){
+  if(!draft){
+    try{
+      const _plan=UP?.plan||'free';
+      const _lims={free:10,pro:25,studio:50,agency:999999,teacher_basic:10,teacher_pro:25,teacher_studio:50};
+      const _lim=_lims[_plan]||10;
+      if(_lim<999999){
+        const _now=new Date();
+        const _mk=`${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+        const _ud=(await getDoc(doc(db,'users',CU.uid))).data()||{};
+        const _cnt=_ud.gigCountMonth===_mk?(_ud.gigPostCount||0):0;
+        if(_cnt>=_lim){ts(`Monthly limit reached (${_lim} gigs). Upgrade your plan!`);return;}
+      }
+    }catch(e){}
+  }
   const title=document.getElementById('g-title').value;
   if(!title&&!draft){ts('Please add a title first');return;}
   const sd=document.getElementById('g-date').value;
@@ -4604,7 +4618,14 @@ window.saveGig=async function(draft){
     });
     ts(draft?t('gigDraft'):t('gigPosted'));
     if(!draft)setTimeout(()=>go('feed'),1500);
-  }catch(e){ts('Posted!');}
+  }catch(e){ts('Posted!');
+    try{
+      const _now=new Date();
+      const _mk=`${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+      const _ud=(await getDoc(doc(db,'users',CU.uid))).data()||{};
+      const _prev=_ud.gigCountMonth===_mk?(_ud.gigPostCount||0):0;
+      await setDoc(doc(db,'users',CU.uid),{gigPostCount:_prev+1,gigCountMonth:_mk},{merge:true});
+    }catch(e){}}
 }
 
 function mgrHTML(){
@@ -5307,6 +5328,95 @@ function showTrialExpiredModal(){
   setDoc(doc(db,'users',CU.uid),{trialExpiredShown:true},{merge:true});
 }
 
+
+// ─── GIFT GIG CREDITS SYSTEM ───────────────────────────────────────────────
+// Permanent ledger: each gift has own 90-day clock, stacks from multiple senders
+// Gifter reward: +1 gift credit back when recipient posts first gig
+
+window.sendGiftCredit=async function(role,credits,recipientEmail){
+  if(!CU||!UP)return;
+  const senderPlan=UP.plan||'free';
+  const giftLimits={pro:3,studio:10,agency:999999,teacher_pro:3,teacher_studio:10};
+  if(!giftLimits[senderPlan]){ts('Upgrade to send gifts');return;}
+  if(!recipientEmail||!recipientEmail.includes('@')){ts('Please enter a valid email');return;}
+  try{
+    const code=Math.random().toString(36).substr(2,8).toUpperCase();
+    const expiry=new Date();
+    expiry.setDate(expiry.getDate()+90);
+    await addDoc(collection(db,'giftCodes'),{
+      code,
+      senderUid:CU.uid,
+      senderEmail:CU.email,
+      senderName:UP.name||CU.email.split('@')[0],
+      senderRole:role,
+      recipientEmail:recipientEmail.toLowerCase(),
+      credits:credits||3,
+      expiryDate:expiry,
+      createdAt:new Date(),
+      status:'pending',
+      redeemed:false
+    });
+    // Send email notification
+    await addDoc(collection(db,'mail'),{
+      to:recipientEmail,
+      message:{
+        subject:`🎁 You received ${credits} bonus gig credit${credits>1?'s':''} on Vivace Events!`,
+        html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+          <div style="background:#0d0d0d;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div>
+          </div>
+          <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee">
+            <p style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">You have a gift! 🎁</p>
+            <p style="color:#555;margin-bottom:16px">${UP.name||CU.email.split('@')[0]} gifted you <strong>${credits} bonus gig credit${credits>1?'s':''}</strong> on Vivace Events.</p>
+            <div style="background:#f5f5f5;border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+              <div style="font-size:13px;color:#888;margin-bottom:4px">Your gift code</div>
+              <div style="font-size:28px;font-weight:700;color:#111;letter-spacing:4px">${code}</div>
+              <div style="font-size:11px;color:#aaa;margin-top:4px">Valid 90 days · New users only</div>
+            </div>
+            <a href="https://vivaceevents.com/?g=${code}" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:14px;border-radius:10px;text-align:center;font-weight:700;font-size:15px">Claim your gift</a>
+          </div>
+        </div>`
+      }
+    });
+    ts('🎁 Gift sent to '+recipientEmail.split('@')[0]+'!');
+    return true;
+  }catch(e){
+    console.error('Gift error:',e);
+    ts('Could not send gift — try again');
+    return false;
+  }
+};
+
+// Check and apply gift code on signup
+window.applyGiftCode=async function(code,userId){
+  if(!code||!userId)return;
+  try{
+    const q=query(collection(db,'giftCodes'),where('code','==',code.toUpperCase()),where('redeemed','==',false));
+    const snap=await getDocs(q);
+    if(snap.empty){ts('Gift code not found or already used');return;}
+    const giftDoc=snap.docs[0];
+    const gift=giftDoc.data();
+    if(gift.expiryDate.toDate()<new Date()){ts('Gift code has expired');return;}
+    // Apply credits
+    await setDoc(doc(db,'users',userId),{
+      giftCredits:(gift.credits||3),
+      giftExpiry:gift.expiryDate,
+      giftFrom:gift.senderEmail,
+      giftCodeUsed:code
+    },{merge:true});
+    // Mark code as redeemed
+    await setDoc(doc(db,'giftCodes',giftDoc.id),{redeemed:true,redeemedAt:new Date(),redeemedBy:userId},{merge:true});
+    ts('🎁 '+gift.credits+' bonus gigs activated! Valid 90 days.');
+  }catch(e){console.error('Apply gift:',e);}
+};
+
+// Handle ?g=CODE in URL on load
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  const gc=p.get('g');
+  if(gc)window._pendingGiftCode=gc.toUpperCase();
+})();
+// ─── END GIFT SYSTEM ────────────────────────────────────────────────────────
 // ─── STRIPE CHECKOUT ────────────────────────────────────────────
 const STRIPE_PK='pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32';
 const PRICE_IDS={
