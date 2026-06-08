@@ -452,6 +452,7 @@ function getScr(){
   if(CS==='public-profile')return publicProfileHTML();
   if(CS==='recurring-gigs'){setTimeout(()=>loadRecurringGigs(),100);return recurringGigsHTML();}
   if(CS==='dmca')return dmcaHTML();
+  if(CS==='policy')return policyHTML();
   return feedHTML();
 }
 
@@ -736,7 +737,7 @@ async function loadGigs(){
             ${isMine&&filled?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                <button style="padding:6px 12px;border-radius:8px;background:#C9A84C;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600" onclick="showPayMusician('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${(g.confirmedApplicants||[])[0]||''}','${g.postedBy||''}','${g.userEmail||''}','${g.pay||''}')">💰 Pay</button>
+                <button style="padding:6px 12px;border-radius:8px;background:#C9A84C;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600" onclick="ts('Payment is handled directly between you and the musician — Vivace Events does not process payments between users.');return;void showPayMusician('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${(g.confirmedApplicants||[])[0]||''}','${g.postedBy||''}','${g.userEmail||''}','${g.pay||''}')">💰 Pay</button>
                 <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
                 <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
@@ -4987,7 +4988,7 @@ function billingHTML(){
     <div style="font-size:12px;color:#085041;font-weight:600">Your current plan</div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-top:2px">${{free:'Free',pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'}[plan]||'Free'}</div>
   </div>
-  <span class="tag tg">Active</span>
+  ${plan!=='free'?`<button onclick="cancelSubscription()" style="font-size:11px;color:#E24B4A;background:#FEF2F2;border:1px solid #FECACA;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit">Cancel plan</button>`:'<span class="tag tg">Free</span>'}
 </div>
 
 ${plan==='free'&&!UP.trialUsed?`
@@ -5062,10 +5063,63 @@ ${teacherPlans.map(p=>`
 <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
   14-day free trial for new users · $1/month for first 3 months · Cancel anytime · Secure payment via Stripe
 </div>
-<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com · <span onclick="go('dmca')" style="cursor:pointer;text-decoration:underline;color:#aaa">DMCA Policy</span></div>
+
+<div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-top:16px;font-size:12px;color:#555;line-height:1.7">
+  <div style="font-weight:600;color:#333;margin-bottom:8px">📋 Billing & Refund Policy</div>
+  <p style="margin-bottom:6px"><strong>Auto-renewal:</strong> Your subscription renews monthly until cancelled. You authorize recurring charges to your payment method.</p>
+  <p style="margin-bottom:6px"><strong>Cancellation:</strong> Cancel anytime using the "Cancel plan" button above. Access continues until end of billing period.</p>
+  <p style="margin-bottom:6px"><strong>No refunds:</strong> All fees are non-refundable. Exceptions only for verified billing errors — email support@vivaceevents.com within 30 days.</p>
+  <p style="margin-bottom:0"><strong>Your data:</strong> Profile, network and history kept forever — even on free plan. <span onclick="go('policy')" style="color:#1D9E75;cursor:pointer;text-decoration:underline">Read full policy →</span></p>
+</div>
+
+<div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb">© 2026 Virtual Studio Orchestra LLC · vivaceevents.com · <span onclick="go('dmca')" style="cursor:pointer;text-decoration:underline;color:#aaa">DMCA Policy</span> · <span onclick="go('policy')" style="cursor:pointer;text-decoration:underline;color:#aaa">Terms & Privacy</span></div>
 </div>
 </div>`;}
 
+// ─── CANCEL SUBSCRIPTION ─────────────────────────────────────────
+window.cancelSubscription=async function(){
+  const modal=document.createElement('div');
+  modal.id='cancel-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="background:#fff;border-radius:20px;padding:24px;max-width:380px;width:100%;font-family:inherit">
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Cancel subscription?</div>
+    <div style="font-size:13px;color:#555;margin-bottom:16px;line-height:1.6">Your subscription will stay active until the end of your billing period.<br><br>
+    <span style="color:#1D9E75;font-weight:600">✅ Your profile, network, contracts and history are kept forever. Resubscribe anytime.</span></div>
+    <div style="background:#f9f9f9;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:#888">💡 You can also downgrade to a lower plan instead of cancelling completely.</div>
+    <button onclick="confirmCancel()" style="width:100%;background:#E24B4A;color:#fff;border:none;padding:13px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px">Yes, cancel my subscription</button>
+    <button onclick="document.getElementById('cancel-modal').remove()" style="width:100%;background:#f5f5f5;color:#333;border:none;padding:13px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Keep my subscription</button>
+  </div>`;
+  document.body.appendChild(modal);
+};
+window.confirmCancel=async function(){
+  const modal=document.getElementById('cancel-modal');
+  const btns=modal?modal.querySelectorAll('button'):[];
+  btns.forEach(b=>{b.disabled=true;});
+  if(btns[0])btns[0].textContent='Cancelling...';
+  try{
+    await setDoc(doc(db,'users',CU.uid),{cancellationRequested:true,cancellationRequestedAt:new Date()},{merge:true});
+    await addDoc(collection(db,'mail'),{
+      to:CU.email,
+      message:{
+        subject:'Your Vivace Events subscription has been cancelled',
+        html:'<div style="font-family:sans-serif;max-width:500px;margin:0 auto"><h2 style="color:#1D9E75">Subscription Cancelled</h2><p>Hi '+(UP.name||'there')+',</p><p>Your Vivace Events subscription has been cancelled. You will retain full access until the end of your current billing period.</p><p style="background:#E1F5EE;padding:12px;border-radius:8px;color:#085041"><strong>✅ Your data is safe.</strong> Your profile, network, contracts, and history are kept forever. You can resubscribe anytime and everything will be waiting for you.</p><p>Questions? Email <a href="mailto:support@vivaceevents.com">support@vivaceevents.com</a></p><p>— The Vivace Events Team 🎶</p></div>'
+      }
+    });
+    if(modal)modal.remove();
+    ts('Subscription cancelled. Confirmation email sent. ✅');
+    setTimeout(()=>{
+      const msg=document.createElement('div');
+      msg.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1D9E75;color:#fff;padding:14px 20px;border-radius:14px;font-size:13px;font-weight:600;z-index:9998;max-width:320px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.15)';
+      msg.textContent='✅ Your data is safe forever. Come back anytime 🎶';
+      document.body.appendChild(msg);setTimeout(()=>msg.remove(),5000);
+    },1500);
+    await loadUP();render();
+  }catch(e){
+    ts('Error: '+e.message+'. Email support@vivaceevents.com');
+    btns.forEach(b=>{b.disabled=false;});
+    if(btns[0])btns[0].textContent='Yes, cancel my subscription';
+  }
+};
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
@@ -6175,6 +6229,79 @@ window.addEventListener('load',()=>{
 });
 
 // ─── DMCA PAGE ───────────────────────────────────────────────────
+function policyHTML(){
+  return `
+<div class="hdr"><div class="logo" style="font-size:15px">📋 Terms & Policies</div><div class="hdr-r" onclick="history.back()" style="font-size:13px;color:#1D9E75">Back</div></div>
+<div class="pad" style="max-width:600px;margin:0 auto">
+
+  <div style="background:#E1F5EE;border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;color:#085041;line-height:1.5">
+    This page contains the complete legal policies for Vivace Events, operated by Virtual Studio Orchestra LLC, Washington DC.
+    Last updated: June 2026.
+  </div>
+
+  <!-- TERMS OF SERVICE -->
+  <div style="margin-bottom:24px">
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:12px">1. Terms of Service</div>
+    <div style="font-size:13px;color:#444;line-height:1.7">
+      <p style="margin-bottom:10px"><strong>Platform only:</strong> Vivace Events and Virtual Studio Orchestra LLC provide a communication and networking platform only. We are not a party to any booking, agreement, contract, or transaction between users. We do not employ, represent, or manage any musician, agent, or manager on this platform.</p>
+      <p style="margin-bottom:10px"><strong>No financial liability:</strong> We are not liable for unpaid fees, bounced payments, payment disputes, financial losses, or any monetary disagreements between users. All payment arrangements are solely between the parties involved. Users are solely responsible for their own tax reporting obligations.</p>
+      <p style="margin-bottom:10px"><strong>Personal safety:</strong> Vivace Events does not verify the identity, credentials, criminal background, or intentions of any user. You are solely responsible for your personal safety when meeting other users or attending gigs.</p>
+      <p style="margin-bottom:10px"><strong>Instruments & property:</strong> We are not liable for any loss, theft, damage, or destruction of musical instruments, personal equipment, or any other property.</p>
+      <p style="margin-bottom:10px"><strong>Disputes:</strong> Any disputes between users must be resolved directly between the parties. Vivace Events does not mediate, arbitrate, or take sides in any dispute.</p>
+      <p><strong>Honest use:</strong> You agree to use this platform honestly and professionally. Misuse, fraud, or harmful behavior may result in immediate removal and may be reported to law enforcement.</p>
+    </div>
+  </div>
+
+  <!-- SUBSCRIPTION & BILLING -->
+  <div style="margin-bottom:24px">
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:12px">2. Subscription & Billing</div>
+    <div style="font-size:13px;color:#444;line-height:1.7">
+      <p style="margin-bottom:10px"><strong>Auto-renewal:</strong> Your subscription automatically renews each month until cancelled. You will be charged the applicable plan price on your renewal date. By subscribing, you authorize Vivace Events to charge your payment method on a recurring monthly basis.</p>
+      <p style="margin-bottom:10px"><strong>Cancellation:</strong> You may cancel your subscription at any time from your billing settings. Cancellation takes effect at the end of your current billing period. You will retain full access to your plan features until that date. After cancellation, your account reverts to the Free plan.</p>
+      <p style="margin-bottom:10px"><strong>Data on cancellation:</strong> All your data — profile, network, contracts, earnings history, and connections — remains safely stored and accessible forever, even on the free plan. You can resubscribe at any time and all features unlock instantly.</p>
+      <p style="margin-bottom:10px"><strong>Price changes:</strong> We will notify you by email at least 7 days before any price increase. You may cancel before the new price takes effect.</p>
+      <p><strong>Annual billing:</strong> Annual billing options will be made available in the future. Currently all plans are billed monthly.</p>
+    </div>
+  </div>
+
+  <!-- REFUND POLICY -->
+  <div style="margin-bottom:24px">
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:12px">3. Refund Policy</div>
+    <div style="font-size:13px;color:#444;line-height:1.7">
+      <p style="margin-bottom:10px"><strong>No refunds:</strong> All subscription fees are non-refundable. When you cancel, you retain access until the end of your current billing period. We do not offer prorated refunds for unused time.</p>
+      <p style="margin-bottom:10px"><strong>Billing errors:</strong> If you are charged incorrectly due to a technical error or duplicate charge, we will refund the erroneous charge promptly. Please contact support@vivaceevents.com within 30 days of the charge.</p>
+      <p style="margin-bottom:10px"><strong>Exceptions:</strong> Vivace Events reserves the right to issue credits or refunds at its sole discretion in exceptional circumstances.</p>
+      <p><strong>Chargebacks:</strong> If you initiate a chargeback without first contacting us, we reserve the right to suspend or terminate your account. Please always contact us first at support@vivaceevents.com.</p>
+    </div>
+  </div>
+
+  <!-- PRIVACY POLICY -->
+  <div style="margin-bottom:24px">
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:12px">4. Privacy Policy</div>
+    <div style="font-size:13px;color:#444;line-height:1.7">
+      <p style="margin-bottom:10px"><strong>Data we collect:</strong> Name, email address, profile information, instruments, availability, and usage data. Payment information is processed by Stripe — we never store your card details.</p>
+      <p style="margin-bottom:10px"><strong>How we use it:</strong> To provide platform services, send important account notifications, improve the platform, and connect musicians with opportunities.</p>
+      <p style="margin-bottom:10px"><strong>We never sell your data.</strong> Your personal information is never sold to third parties.</p>
+      <p style="margin-bottom:10px"><strong>Data retention:</strong> Your data is kept indefinitely while your account is active. If you delete your account, your data is removed from our systems within 30 days.</p>
+      <p style="margin-bottom:10px"><strong>Firebase / Google:</strong> Our platform uses Google Firebase for data storage and authentication. Data is stored on Google's secure servers.</p>
+      <p><strong>Contact:</strong> For privacy concerns, email support@vivaceevents.com</p>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:24px">
+    <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:8px">5. Contact & Support</div>
+    <div style="font-size:13px;color:#555;line-height:1.7">
+      <p>Virtual Studio Orchestra LLC</p>
+      <p>Washington, DC, United States</p>
+      <p>Email: <a href="mailto:support@vivaceevents.com" style="color:#1D9E75">support@vivaceevents.com</a></p>
+      <p style="margin-top:8px;font-size:12px;color:#888">These policies were last updated June 2026. We recommend you review them periodically. Continued use of the platform constitutes acceptance of any updates.</p>
+    </div>
+  </div>
+
+</div>
+`;}
+
 function dmcaHTML(){
   return `
 <div class="hdr">
