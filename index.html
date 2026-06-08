@@ -113,7 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
@@ -3519,7 +3519,7 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();},100);
+  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();initVU();},100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
@@ -3559,7 +3559,7 @@ function feedHTML(){
 </div>
 
 <div class="sh"><span class="st">${t('postedGigs')}</span><span class="sl" onclick="go('post')">${t('postNew')}</span></div>
-<div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
+<div id="vu-widget"></div><div id="gig-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>
 </div>`;}
 
 // Load real broadcast for feed
@@ -5120,6 +5120,105 @@ window.confirmCancel=async function(){
     if(btns[0])btns[0].textContent='Yes, cancel my subscription';
   }
 };
+// ─── LIVE COMMUNITY VU METER ─────────────────────────────────────
+var _vuUnsub = null;
+
+window.initVU = function(){
+  var el = document.getElementById('vu-widget');
+  if(!el || el.dataset.init) return;
+  el.dataset.init = '1';
+
+  el.innerHTML = '<div style="background:#0d0d0d;border-radius:14px;padding:16px 14px 14px;margin-bottom:16px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    + '<span style="font-size:11px;font-weight:500;color:#1D9E75;letter-spacing:.08em">VIVACE COMMUNITY</span>'
+    + '<span style="font-size:10px;color:#555;display:flex;align-items:center;gap:4px">'
+    + '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;animation:vup 1.5s ease-in-out infinite"></span>Live</span>'
+    + '</div>'
+    + '<style>@keyframes vup{0%,100%{opacity:1}50%{opacity:.2}}</style>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
+    + _vuGrp('vu-m','#1D9E75','Musicians')
+    + _vuGrp('vu-mg','#378ADD','Managers')
+    + _vuGrp('vu-t','#A855F7','Teachers')
+    + _vuGrp('vu-o','#F97316','Organizers')
+    + '</div>'
+    + '<div style="background:#111;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px">'
+    + '<div style="min-width:60px"><div style="font-size:9px;color:#444;letter-spacing:.06em;text-transform:uppercase">Total</div>'
+    + '<div id="vu-tot" style="font-size:22px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums">—</div></div>'
+    + '<div style="flex:1;height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden">'
+    + '<div id="vu-mbar" style="height:100%;background:#1D9E75;width:0%;border-radius:3px;transition:width 1s ease"></div></div>'
+    + '<div id="vu-badge" style="font-size:10px;color:#1D9E75;background:#0a2018;padding:2px 8px;border-radius:20px">Growing</div>'
+    + '</div></div>';
+
+  if(_vuUnsub) _vuUnsub();
+  _vuUnsub = onSnapshot(query(collection(db,'users')), function(snap){
+    var c = {m:{f:0,p:0,h:0}, mg:{f:0,p:0,h:0}, t:{f:0,p:0,h:0}, o:{f:0,p:0,h:0}};
+    snap.forEach(function(d){
+      var u = d.data(), pl = u.plan||'free', roles = u.roles||['artist'];
+      var tier = (pl==='agency'||pl==='teacher_studio'||pl==='organizer_elite') ? 'h'
+               : (pl==='free') ? 'f' : 'p';
+      var grp = roles.includes('organizer') ? 'o'
+              : roles.includes('manager') ? 'mg'
+              : roles.includes('teacher') ? 't' : 'm';
+      c[grp][tier]++;
+    });
+    _vuDraw(c, snap.size);
+  }, function(e){ console.log('VU:', e.message); });
+};
+
+function _vuGrp(id, color, label){
+  return '<div style="background:#111;border-radius:8px;padding:8px 6px 10px">'
+    + '<div style="font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;text-align:center;color:'+color+';margin-bottom:8px">'+label+'</div>'
+    + '<div style="display:flex;align-items:flex-end;justify-content:center;gap:5px">'
+    + _vuBar(id+'1','#333',56) + _vuBar(id+'2',color,56) + _vuBar(id+'3',color,56,0.55)
+    + '</div>'
+    + '<div style="text-align:center;margin-top:6px;border-top:0.5px solid #1a1a1a;padding-top:6px">'
+    + '<div id="'+id+'-tot" style="font-size:16px;font-weight:500;color:#fff;font-variant-numeric:tabular-nums">0</div>'
+    + '<div style="font-size:9px;color:#3a3a3a;text-transform:uppercase;letter-spacing:.05em">members</div>'
+    + '</div></div>';
+}
+
+function _vuBar(id, color, h, op){
+  op = op||1;
+  return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+    + '<div style="width:16px;height:'+h+'px;background:#1a1a1a;border-radius:3px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end">'
+    + '<div id="'+id+'" style="width:100%;height:4%;background:'+color+';border-radius:2px;opacity:'+op+';transition:height .5s cubic-bezier(.4,0,.2,1)"></div>'
+    + '</div>'
+    + '<div id="'+id+'-n" style="font-size:9px;color:#444;font-variant-numeric:tabular-nums;min-width:14px;text-align:center">0</div>'
+    + '</div>';
+}
+
+function _vuSet(id, val, max){
+  var el = document.getElementById(id);
+  var nl = document.getElementById(id+'-n');
+  if(!el) return;
+  var pct = max > 0 ? Math.max(4, Math.round(val/max*92)) : 4;
+  el.style.height = pct + '%';
+  if(nl) nl.textContent = val;
+}
+
+function _vuDraw(c, total){
+  var grps = [
+    {id:'vu-m', v:[c.m.f,c.m.p,c.m.h]},
+    {id:'vu-mg',v:[c.mg.f,c.mg.p,c.mg.h]},
+    {id:'vu-t', v:[c.t.f,c.t.p,c.t.h]},
+    {id:'vu-o', v:[c.o.f,c.o.p,c.o.h]}
+  ];
+  grps.forEach(function(g){
+    var mx = Math.max.apply(null, g.v.concat([1]));
+    _vuSet(g.id+'1', g.v[0], mx);
+    _vuSet(g.id+'2', g.v[1], mx);
+    _vuSet(g.id+'3', g.v[2], mx);
+    var t = document.getElementById(g.id+'-tot');
+    if(t) t.textContent = g.v[0]+g.v[1]+g.v[2];
+  });
+  var te = document.getElementById('vu-tot');
+  var mb = document.getElementById('vu-mbar');
+  var bd = document.getElementById('vu-badge');
+  if(te) te.textContent = total;
+  if(mb) mb.style.width = Math.min(100,Math.round(total/200*100))+'%';
+  if(bd) bd.textContent = total===0?'Growing':total<50?'Early access':total<200?total+' strong':(total/1000).toFixed(1)+'k';
+}
+
 window.selectPlan=async function(planId){
   if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
   if(planId===UP.plan){ts('This is your current plan');return;}
@@ -7882,7 +7981,7 @@ onAuthStateChanged(auth,async user=>{
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Check birthday and holidays after render
-    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();},1500);
+    setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();initRadioPlayer();},1500);
   } else {
     render();
   }
