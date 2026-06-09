@@ -841,7 +841,9 @@ window.showEditGig=async function(gigId){
       </div>
 
       <div style="margin-bottom:10px"><label class="flbl">Instruments needed</label>
-        <input class="finp" id="eg-inst" value="${g.instruments||''}"/></div>
+        <input class="finp" id="eg-inst" value="${g.instruments||''}"/>
+        <button type="button" onclick="openInstPicker('eg-inst')" style="margin-top:6px;padding:8px 14px;border-radius:20px;background:#EEF2FF;color:#3730A3;border:1px solid #6366F144;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🎵 Browse instruments</button>
+      </div>
 
       <div style="margin-bottom:10px"><label class="flbl">Dress code</label>
         <input class="finp" id="eg-dress" value="${g.dressCode||''}"/></div>
@@ -4032,11 +4034,18 @@ function discoverHTML(){
 <!-- Filter pills - instruments (scrollable) -->
 <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px;margin-left:-16px;margin-right:-16px;padding:0 16px">
   <div style="display:flex;gap:6px;width:max-content;padding-bottom:4px" id="inst-pills">
-    ${['All','Violin','Viola','Cello','Double Bass','Guitar','Bass Guitar','Piano','Keyboard','Harpsichord','Organ','Accordion',
-      'Trumpet','Trombone','French Horn','Tuba','Flute','Oboe','Clarinet','Bassoon','Saxophone',
-      'Drums','Percussion','Harp','Mandolin','Banjo','Ukulele',
-      'Voice — Soprano','Voice — Mezzo','Voice — Alto','Voice — Tenor','Voice — Baritone','Voice — Bass',
-      'Electronic / DJ','Synthesizer'].map((inst,i)=>`
+    ${['All','Violin','Viola','Cello','Double Bass','Harp',
+      'Guitar','Bass Guitar','Acoustic Guitar','Electric Guitar','Ukulele','Mandolin','Banjo',
+      'Piano','Keyboard','Synthesizer','Harpsichord','Organ','Accordion',
+      'Trumpet','Trombone','French Horn','Tuba',
+      'Flute','Oboe','Clarinet','Bassoon','Saxophone',
+      'Drums','Percussion','Timpani','Xylophone','Latin Percussion','Cajón',
+      'Recorder','Pan Flute','Bagpipes','Harmonica',
+      'Tar','Kamancheh','Saz','Duduk',
+      'Voice — Soprano','Voice — Mezzo','Voice — Alto','Voice — Tenor','Voice — Countertenor','Voice — Baritone','Voice — Bass',
+      'Rapper','Beatboxer',
+      'DJ','Turntablist','Producer'
+      ].map((inst,i)=>`
       <button onclick="selectPill(this,'inst')" data-filter="${inst==='All'?'':inst.toLowerCase()}"
         style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;border:1.5px solid ${i===0?'#1D9E75':'#e0e0e0'};background:${i===0?'#1D9E75':'#fff'};color:${i===0?'#fff':'#555'};transition:all .15s">
         ${inst}
@@ -4428,7 +4437,10 @@ function postHTML(){
   ${venues.length>0?`<select class="finp" id="g-vsel" onchange="fillV(this.value)" style="margin-bottom:6px"><option value="">— Select saved venue —</option>${vopts}</select>`:''}
   <input class="finp" id="g-loc" placeholder="Address or Remote"/>
 </div>
-<div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span><input class="finp" id="g-inst" placeholder="Violin, Voice, Dance…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,this.value,document.getElementById('g-skills-needed')?.value)"/></div>
+<div style="margin-bottom:12px"><span class="flbl">${t('instruments')}</span>
+  <input class="finp" id="g-inst" placeholder="Violin 1, Cello, Saxophone…" oninput="loadSmartSuggestions(document.getElementById('g-date')?.value,this.value,document.getElementById('g-skills-needed')?.value)"/>
+  <button type="button" onclick="openInstPicker('g-inst')" style="margin-top:6px;padding:8px 14px;border-radius:20px;background:#EEF2FF;color:#3730A3;border:1px solid #6366F144;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🎵 Browse instruments</button>
+</div>
 <div style="margin-bottom:12px">
   <span class="flbl">🎼 Ensemble format needed</span>
   <select class="finp" id="g-ensemble">
@@ -5016,6 +5028,74 @@ var VIVACE_INSTRUMENTS=[
   {group:'🎚️ Behind the Scenes',items:['Sound Engineer','Lighting Tech','Stage Manager','Roadie / Tech']},
   {group:'🎼 Other',items:['Conductor','Other']},
 ];
+
+// ─── Instrument Picker Modal (reusable for any text input) ───────
+window.openInstPicker=function(targetInputId){
+  const inputEl=document.getElementById(targetInputId);
+  if(!inputEl)return;
+  const current=(inputEl.value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  window._instPickerSelected=new Set(current);
+  window._instPickerTarget=targetInputId;
+  const m=document.createElement('div');m.className='modal-bg';m.id='ipmodal';
+  m.innerHTML=`<div class="modal" style="max-height:88vh;overflow-y:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:17px;font-weight:700;color:#111">🎵 Choose Instruments</div>
+      <button onclick="document.getElementById('ipmodal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:12px">Tap to add — tap again to remove</div>
+    <div id="ip-selected-bar" style="background:#f9f9f9;border-radius:10px;padding:10px;margin-bottom:14px;min-height:40px">
+      <div id="ip-selected-content" style="font-size:12px;color:#666"></div>
+    </div>
+    <div id="ip-groups"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:#fff;padding-top:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('ipmodal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="confirmInstPicker()">Done</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  renderInstPicker();
+};
+
+function renderInstPicker(){
+  const groupsEl=document.getElementById('ip-groups');
+  const selBar=document.getElementById('ip-selected-content');
+  if(!groupsEl||!selBar)return;
+  const sel=window._instPickerSelected||new Set();
+  // Render selected bar
+  if(sel.size===0){
+    selBar.innerHTML='<span style="color:#aaa;font-size:12px">No instruments selected yet</span>';
+  }else{
+    selBar.innerHTML=Array.from(sel).map(name=>`<span style="display:inline-block;background:#0C447C;color:#fff;border-radius:14px;padding:4px 10px;margin:2px;font-size:11px;font-weight:600">${name} <span onclick="toggleInstPick('${name.replace(/'/g,"\\'")}')" style="cursor:pointer;margin-left:4px;opacity:0.7">✕</span></span>`).join('');
+  }
+  // Render groups
+  groupsEl.innerHTML=VIVACE_INSTRUMENTS.map(grp=>`
+    <div style="font-size:11px;font-weight:700;color:#888;margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.6px">${grp.group}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${grp.items.map(i=>{
+        const on=sel.has(i);
+        return `<button onclick="toggleInstPick('${i.replace(/'/g,"\\'")}')"
+          style="padding:6px 12px;border-radius:20px;border:1.5px solid ${on?'#0C447C':'#e0e0e0'};background:${on?'#0C447C':'#fff'};color:${on?'#fff':'#555'};font-size:12px;cursor:pointer;font-family:inherit;font-weight:${on?600:400};transition:all 0.12s">${on?'✓ ':''}${i}</button>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+window.toggleInstPick=function(name){
+  const sel=window._instPickerSelected;
+  if(sel.has(name))sel.delete(name);else sel.add(name);
+  renderInstPicker();
+};
+
+window.confirmInstPicker=function(){
+  const targetId=window._instPickerTarget;
+  const inputEl=document.getElementById(targetId);
+  if(inputEl){
+    inputEl.value=Array.from(window._instPickerSelected).join(', ');
+    inputEl.dispatchEvent(new Event('input'));
+  }
+  document.getElementById('ipmodal')?.remove();
+  ts('✅ '+window._instPickerSelected.size+' instrument'+(window._instPickerSelected.size===1?'':'s')+' added');
+};
 
 async function loadRosterFolders(){
   try{
@@ -6990,7 +7070,8 @@ window.saveEnsembles=async function(){
 }
 
 // ─── INSTRUMENT EDITOR ───────────────────────────────────────────
-const INSTRUMENT_LIST=[
+// Legacy flat list — kept as alias for backward compat. Derived from VIVACE_INSTRUMENTS.
+const INSTRUMENT_LIST=(typeof VIVACE_INSTRUMENTS!=='undefined')?VIVACE_INSTRUMENTS.flatMap(g=>g.items):[
   'Violin','Viola','Cello','Double Bass','Guitar','Bass Guitar',
   'Piano','Keyboard','Harpsichord','Organ','Accordion',
   'Trumpet','Trombone','French Horn','Tuba','Flugelhorn',
@@ -7049,12 +7130,16 @@ window.showInstrumentEditor=function(){
         </div>`).join('')}
     </div>`:''}
     
-    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add instrument</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
-      ${INSTRUMENT_LIST.filter(i=>!current.find(c=>c.name===i)).map(i=>`
-        <button onclick="addInst('${i.replace(/'/g,"\\'")}'')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>
-      `).join('')}
-    </div>
+    <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:8px">Add instrument / role</div>
+    ${(typeof VIVACE_INSTRUMENTS!=='undefined'?VIVACE_INSTRUMENTS:[{group:'All',items:INSTRUMENT_LIST}]).map(grp=>{
+      const remaining=grp.items.filter(i=>!current.find(c=>c.name===i));
+      if(remaining.length===0)return '';
+      return `<div style="font-size:10px;font-weight:700;color:#888;margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.6px">${grp.group}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+        ${remaining.map(i=>`<button onclick="addInst('${i.replace(/'/g,"\\'")}')" style="padding:6px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;color:#555;font-size:12px;cursor:pointer;font-family:inherit">+ ${i}</button>`).join('')}
+      </div>`;
+    }).join('')}
+    <div style="margin-top:16px"></div>
     <button class="bt" style="width:100%;padding:13px" onclick="saveInstruments()">Save instruments</button>
   </div>`;
   document.getElementById('app').appendChild(m);
