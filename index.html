@@ -765,7 +765,6 @@ async function loadGigs(){
             ${isMine&&filled?`
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="bt" style="font-size:11px;padding:6px 12px;background:#0C447C" onclick="showContractGenerator('${gid}')">📄 Contract</button>
-                <button style="padding:6px 12px;border-radius:8px;background:#C9A84C;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600" onclick="ts('Payment is handled directly between you and the musician — Vivace Events does not process payments between users.');return;void showPayMusician('${gid}','${(g.title||'').replace(/'/g,"\\'")}','${(g.confirmedApplicants||[])[0]||''}','${g.postedBy||''}','${g.userEmail||''}','${g.pay||''}')">💰 Pay</button>
                 <button style="padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit" onclick="openGigChat('${gid}','${(g.title||'').replace(/'/g,"\\'")}')">💬 Chat</button>
                 <button onclick="addToGoogleCalendar('${(g.title||'').replace(/'/g,"\\'")}','${g.date||''}','${g.time||''}','${(g.location||'').replace(/'/g,"\\'")}','')" style="padding:6px 10px;border-radius:8px;background:#E6F1FB;border:1px solid #378ADD;color:#0C447C;font-size:11px;cursor:pointer;font-family:inherit">📅 Calendar</button>
                 ${g.carpoolEnabled?`<button onclick="showCarpoolModal('${gid}','${(g.title||'').replace(/'/g,"\\'")}'')" style="padding:6px 10px;border-radius:8px;background:#E1F5EE;border:1px solid #5DCAA5;color:#085041;font-size:11px;cursor:pointer;font-family:inherit">🚗 Carpool</button>`:''}
@@ -4652,6 +4651,40 @@ window.saveGig=async function(draft){
       status:'open',postedBy:CU.email,userId:CU.uid,draft,lang,timestamp:new Date()
     });
     ts(draft?t('gigDraft'):t('gigPosted'));
+    // ─── GIFTER REWARD: +1 credit back when gift recipient posts their FIRST real gig ───
+    if(!draft){
+      try{
+        const userSnap=await getDoc(doc(db,'users',CU.uid));
+        const userData=userSnap.data()||{};
+        if(userData.giftFrom&&!userData.gifterRewardTriggered){
+          // This user was gifted credits — find the gifter and reward them
+          const gifterSnap=await getDocs(query(collection(db,'users'),where('email','==',userData.giftFrom)));
+          if(!gifterSnap.empty){
+            const gifterDoc=gifterSnap.docs[0];
+            const gifterData=gifterDoc.data();
+            const newPool=(gifterData.bonusGiftCredits||0)+1;
+            await setDoc(doc(db,'users',gifterDoc.id),{bonusGiftCredits:newPool,lastGifterReward:new Date()},{merge:true});
+            // Notify the gifter
+            await addDoc(collection(db,'notifications'),{
+              toEmail:userData.giftFrom,
+              type:'gifter_reward',
+              message:`🎁 +1 bonus gift credit! ${CU.email.split('@')[0]} (who you gifted) just posted their first gig.`,
+              read:false,timestamp:new Date()
+            });
+            await addDoc(collection(db,'mail'),{
+              to:userData.giftFrom,
+              message:{
+                subject:'🎁 You earned +1 bonus gift credit on Vivace Events',
+                html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto"><div style="background:#0d0d0d;padding:20px;border-radius:12px 12px 0 0;text-align:center"><div style="font-size:22px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div></div><div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee"><p style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">+1 bonus gift credit 🎁</p><p style="color:#555">${CU.email.split('@')[0]} — who you previously gifted credits to — just posted their first gig on Vivace.</p><p style="color:#555;margin-bottom:16px">As a thank you, we've added <strong>1 bonus gift credit</strong> to your account, on top of your monthly allowance.</p><a href="https://vivaceevents.com/?tab=billing" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:14px;border-radius:10px;text-align:center;font-weight:700;font-size:15px">Use your bonus credit</a></div></div>`
+              }
+            });
+          }
+          // Mark as triggered so it only fires once per recipient
+          await setDoc(doc(db,'users',CU.uid),{gifterRewardTriggered:true,firstGigPostedAt:new Date()},{merge:true});
+        }
+      }catch(e){console.error('gifter reward error:',e);}
+    }
+    // ─── END GIFTER REWARD ─────────────────────────────────────────────────────────
     if(!draft)setTimeout(()=>go('feed'),1500);
   }catch(e){ts('Posted!');
     try{
@@ -5863,8 +5896,10 @@ window.openGiftSheet=function(role){
   window._giftRole=role;
   var n=parseInt((window._giftNum&&window._giftNum[role])||1);
   console.log('openGiftSheet role='+role+' n='+n+' _giftNum='+JSON.stringify(window._giftNum));
-  var c=role==='manager'?'#378ADD':'#1D9E75';
-  var label=role==='manager'?'Manager':'Artist';
+  var roleColors={artist:'#1D9E75',manager:'#378ADD',teacher:'#7C3AED',organizer:'#F97316'};
+  var roleLabels={artist:'Artist',manager:'Manager',teacher:'Teacher',organizer:'Organizer'};
+  var c=roleColors[role]||'#1D9E75';
+  var label=roleLabels[role]||'Artist';
   var ex=document.getElementById('gift-sheet-modal');
   if(ex)ex.remove();
   var m=document.createElement('div');
@@ -5952,7 +5987,7 @@ window.injectGiftSection=function(){
   }
 
   if(roles.indexOf('manager')>=0){
-    html+='<div style="margin-bottom:4px">';
+    html+='<div style="margin-bottom:8px">';
     html+='<div style="background:linear-gradient(135deg,#378ADD,#185FA5);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">';
     html+='<div style="display:flex;align-items:center;gap:10px">';
     html+='<div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">&#127919;</div>';
@@ -5965,6 +6000,40 @@ window.injectGiftSection=function(){
     html+='</div></div>';
     html+='<div style="text-align:right;padding:5px 0 2px">';
     html+='<button id="gift-send-manager" onclick="openGiftSheet(\'manager\')" style="background:#378ADD;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">Send gift →</button>';
+    html+='</div></div>';
+  }
+
+  if(roles.indexOf('teacher')>=0){
+    html+='<div style="margin-bottom:8px">';
+    html+='<div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    html+='<div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">&#127891;</div>';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#fff">Gift as Teacher</div>';
+    html+='<div style="font-size:10px;color:rgba(255,255,255,.6)">Invite a student or colleague</div></div></div>';
+    html+='<div style="display:flex;gap:4px">';
+    html+='<button id="gt1" onclick="selG(this,null,\'teacher\',1)" style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.9);color:#111;border:none;font-size:15px;font-weight:700;cursor:pointer">1</button>';
+    html+='<button id="gt2" onclick="selG(this,null,\'teacher\',2)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">2</button>';
+    html+='<button id="gt3" onclick="selG(this,null,\'teacher\',3)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">3</button>';
+    html+='</div></div>';
+    html+='<div style="text-align:right;padding:5px 0 2px">';
+    html+='<button id="gift-send-teacher" onclick="openGiftSheet(\'teacher\')" style="background:#7C3AED;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">Send gift →</button>';
+    html+='</div></div>';
+  }
+
+  if(roles.indexOf('organizer')>=0){
+    html+='<div style="margin-bottom:4px">';
+    html+='<div style="background:linear-gradient(135deg,#F97316,#C2410C);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    html+='<div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">&#127914;</div>';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#fff">Gift as Organizer</div>';
+    html+='<div style="font-size:10px;color:rgba(255,255,255,.6)">Bring on an event partner</div></div></div>';
+    html+='<div style="display:flex;gap:4px">';
+    html+='<button id="go1" onclick="selG(this,null,\'organizer\',1)" style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.9);color:#111;border:none;font-size:15px;font-weight:700;cursor:pointer">1</button>';
+    html+='<button id="go2" onclick="selG(this,null,\'organizer\',2)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">2</button>';
+    html+='<button id="go3" onclick="selG(this,null,\'organizer\',3)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">3</button>';
+    html+='</div></div>';
+    html+='<div style="text-align:right;padding:5px 0 2px">';
+    html+='<button id="gift-send-organizer" onclick="openGiftSheet(\'organizer\')" style="background:#F97316;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">Send gift →</button>';
     html+='</div></div>';
   }
 
