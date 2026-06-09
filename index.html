@@ -5046,6 +5046,7 @@ function renderRosterFolders(){
 }
 
 window.showCreateFolder=function(){
+  window._selectedFolderType='custom';
   const m=document.createElement('div');m.className='modal-bg';m.id='cfmodal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">🗂️ New Roster Folder</div>
@@ -5078,23 +5079,31 @@ window.selFolderType=function(typeId,el){
   el.style.borderColor=ft.color;el.style.background=ft.bg;
 };
 
+window.selFolderType=function(typeId,el){
+  window._selectedFolderType=typeId;
+  document.querySelectorAll('#cfmodal [data-ftype]').forEach(b=>{
+    b.style.borderColor='#eee';b.style.background='#fff';
+  });
+  const ft=FOLDER_TYPES.find(x=>x.id===typeId);
+  el.style.borderColor=ft.color;el.style.background=ft.bg;
+};
+
 window.createFolder=async function(){
   const name=document.getElementById('cfn').value.trim();
   if(!name){ts('Please enter a folder name');return;}
-  const sel=document.querySelector('#cfmodal [data-ftype]');
-  const activeEl=Array.from(document.querySelectorAll('#cfmodal [data-ftype]')).find(b=>{
-    const ft=FOLDER_TYPES.find(x=>x.id===b.dataset.ftype);
-    return b.style.background===ft.bg;
-  });
-  const type=(activeEl||sel)?.dataset.ftype||'custom';
+  const type=window._selectedFolderType||'custom';
   try{
     const ref=await addDoc(collection(db,'rosterFolders'),{
       managerId:CU.uid,managerEmail:CU.email,name,type,memberCount:0,order:rosterFolders.length,created:new Date()
     });
-    rosterFolders.push({id:ref.id,name,type,memberCount:0,order:rosterFolders.length});
     document.getElementById('cfmodal')?.remove();
-    renderRosterFolders();ts('Folder "'+name+'" created! 🗂️');
-  }catch(e){ts('Folder created!');}
+    await loadRosterFolders();
+    renderRosterFolders();
+    ts('Folder "'+name+'" created! 🗂️');
+  }catch(e){
+    console.error('createFolder failed:',e);
+    ts('❌ Save failed: '+(e.message||e.code||'check Firestore rules'));
+  }
 };
 
 window.delFolder=async function(id){
@@ -5215,7 +5224,7 @@ window.addMusicianToFolder=async function(fid){
     document.getElementById('fdmodal')?.remove();
     openFolder(fid);
     renderRosterFolders();
-  }catch(e){ts('Added to queue!');}
+  }catch(e){console.error('add musician failed:',e);ts('❌ '+(e.message||e.code||'check Firestore rules'));}
 };
 
 window.removeFromFolder=async function(fid,memberId){

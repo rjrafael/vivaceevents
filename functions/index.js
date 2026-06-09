@@ -3,7 +3,7 @@ const {defineSecret} = require('firebase-functions/params');
 const stripeSecret = defineSecret('STRIPE_SECRET');
 const auddSecret = defineSecret('AUDD_API_KEY');
 
-const ORIGINS = ['https://vivaceevents.com','https://www.vivaceevents.com'];
+const ORIGINS = ['https://vivaceevents.com','https://www.vivaceevents.com','https://vivaceevents-1a8ff.web.app','https://vivaceevents-1a8ff.firebaseapp.com'];
 const PLATFORM_FEE = 0.05;
 
 function setCORS(req, res) {
@@ -200,3 +200,133 @@ exports.getConnectStatus = functions.https.onRequest({secrets:[stripeSecret]}, a
     res.status(500).json({error:e.message});
   }
 });
+
+// ─── $1 Verification Charge ──────────────────────────────────────────────────
+exports.chargeVerification = functions.https.onRequest({secrets:[stripeSecret]}, async (req, res) => {
+  const stripe = require('stripe')(stripeSecret.value());
+  setCORS(req, res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  const { paymentMethodId, email, name, uid } = req.body;
+  if (!paymentMethodId || !email) { res.status(400).json({ error: 'Missing required fields' }); return; }
+  try {
+    // Create Stripe customer with card on file
+    const customer = await stripe.customers.create({
+      email: email,
+      name: name || email,
+      payment_method: paymentMethodId,
+      invoice_settings: { default_payment_method: paymentMethodId }
+    });
+    // Charge $1 one-time
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 100,
+      currency: 'usd',
+      customer: customer.id,
+      payment_method: paymentMethodId,
+      confirm: true,
+      description: 'Vivace Events — one-time account verification',
+      metadata: { uid: uid || '', type: 'verification' },
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' }
+    });
+    if (paymentIntent.status === 'succeeded') {
+      res.json({ success: true, customerId: customer.id });
+    } else {
+      res.status(400).json({ error: 'Payment not completed' });
+    }
+  } catch (e) {
+    console.error('chargeVerification error:', e.message);
+    res.status(400).json({ error: e.message || 'Payment failed' });
+  }
+});
+// ─── END Verification Charge ─────────────────────────────────────────────────
+
+// ─── Create Subscription ──────────────────────────────────────────────────────
+exports.createSubscription = functions.https.onRequest({secrets:[stripeSecret]}, async (req, res) => {
+  const stripe = require('stripe')(stripeSecret.value());
+  setCORS(req, res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  const { uid, planId, priceId, customerId } = req.body;
+  if (!uid || !priceId) { res.status(400).json({ error: 'Missing fields' }); return; }
+  try {
+    let custId = customerId;
+    // Create customer if not exists
+    if (!custId) {
+      const admin = require('firebase-admin');
+      if (!admin.apps.length) admin.initializeApp();
+      const userDoc = await admin.firestore().collection('users').doc(uid).get();
+      const userData = userDoc.data() || {};
+      const customer = await stripe.customers.create({
+        email: userData.email || '',
+        name: userData.name || '',
+        metadata: { uid }
+      });
+      custId = customer.id;
+      await admin.firestore().collection('users').doc(uid).update({ stripeCustomerId: custId });
+    }
+    // Cancel any existing subscription first
+    const existingSubs = await stripe.subscriptions.list({ customer: custId, status: 'active', limit: 1 });
+    for (const sub of existingSubs.data) {
+      await stripe.subscriptions.cancel(sub.id);
+    }
+    // Create new subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: custId,
+      items: [{ price: priceId }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+    });
+    if (subscription.status === 'active' || subscription.status === 'trialing') {
+      res.json({ success: true, subscriptionId: subscription.id });
+    } else {
+      // Need payment confirmation
+      const pi = subscription.latest_invoice?.payment_intent;
+      if (pi && pi.status === 'requires_payment_method') {
+        res.json({ success: false, error: 'No payment method. Please verify account first.' });
+      } else {
+        res.json({ success: true, subscriptionId: subscription.id });
+      }
+    }
+  } catch (e) {
+    console.error('createSubscription:', e.message);
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ─── Change Subscription (Downgrade at period end) ────────────────────────────
+exports.changeSubscription = functions.https.onRequest({secrets:[stripeSecret]}, async (req, res) => {
+  const stripe = require('stripe')(stripeSecret.value());
+  setCORS(req, res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  const { uid, planId, priceId, subscriptionId, atPeriodEnd } = req.body;
+  if (!subscriptionId || !priceId) { res.status(400).json({ error: 'Missing fields' }); return; }
+  try {
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    const itemId = sub.items.data[0]?.id;
+    await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: false,
+      proration_behavior: atPeriodEnd ? 'none' : 'create_prorations',
+      items: [{ id: itemId, price: priceId }],
+    });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('changeSubscription:', e.message);
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ─── Cancel Subscription ──────────────────────────────────────────────────────
+exports.cancelSubscription = functions.https.onRequest({secrets:[stripeSecret]}, async (req, res) => {
+  const stripe = require('stripe')(stripeSecret.value());
+  setCORS(req, res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  const { uid, subscriptionId } = req.body;
+  if (!subscriptionId) { res.status(400).json({ error: 'Missing subscriptionId' }); return; }
+  try {
+    await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('cancelSubscription:', e.message);
+    res.status(400).json({ error: e.message });
+  }
+});
+// ─── END Subscription Functions ───────────────────────────────────────────────
