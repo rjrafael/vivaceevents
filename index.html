@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"><!-- v-gift-1 -->
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -110,6 +110,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .pro-badge{display:inline-flex;align-items:center;gap:3px;background:#1D9E75;color:#fff;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
 @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.5)}60%{box-shadow:0 0 0 8px rgba(255,59,48,0)}}
 </style>
+<script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -405,7 +406,20 @@ function canPostAudition(){return UP.roles&&(UP.roles.includes('manager')||UP.ro
 async function loadUP(){
   try{
     const d=await getDoc(doc(db,'users',CU.uid));
-    if(d.exists()){UP={...UP,...d.data()};lang=UP.lang||detectLang();}
+    if(d.exists()){
+      UP={...UP,...d.data()};
+      lang=UP.lang||detectLang();
+      // Clean up legacy role names
+      const validRoles=['artist','manager','teacher','student','organizer'];
+      const roleMap={'musician':'artist','agent':'manager','mgr':'manager'};
+      UP.roles=(UP.roles||['artist']).map(r=>roleMap[r]||r).filter(r=>validRoles.includes(r));
+      if(UP.roles.length===0)UP.roles=['artist'];
+      UP.roles=[...new Set(UP.roles)];
+      // Save cleaned roles back silently
+      if(d.data().roles&&JSON.stringify(d.data().roles)!==JSON.stringify(UP.roles)){
+        setDoc(doc(db,'users',CU.uid),{roles:UP.roles},{merge:true}).catch(()=>{});
+      }
+    }
     else{lang=detectLang();await setDoc(doc(db,'users',CU.uid),{roles:['artist'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});}
   }catch(e){}
 }
@@ -448,7 +462,7 @@ function getScr(){
   if(CS==='discover')return discoverHTML();
   if(CS==='post')return postHTML();
   if(CS==='manager')return mgrHTML();
-  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();if(isTeacher()||isStudent())loadMyLessons();},200);return profileHTML();}
+  if(CS==='profile'){setTimeout(()=>{loadMyContracts();loadMyConnections();loadEarningsSummary();loadMyMessages();loadAvailabilityPreview();if(isTeacher()||isStudent())loadMyLessons();injectGiftSection();},200);return profileHTML();}
   if(CS==='billing')return billingHTML();
   if(CS==='booking-page')return bookingPageHTML();
   if(CS==='teacher-analytics')return teacherAnalyticsHTML();
@@ -651,6 +665,14 @@ function bindAuth(){
       await updateProfile(CU,{displayName:nameVal});
       await loadUP();
       await saveTOS(CU.uid);
+      // Apply gift code if entered
+      const giftCode=(document.getElementById('ag')||{}).value?.trim().toUpperCase();
+      if(giftCode){
+        await applyGiftCode(giftCode, CU.uid);
+      } else if(window._pendingGiftCode){
+        await applyGiftCode(window._pendingGiftCode, CU.uid);
+        window._pendingGiftCode=null;
+      }
       render();
     }catch(e){ts(e.message);btn.disabled=false;btn.textContent='Create free account';}
   };
@@ -4572,6 +4594,7 @@ window.selT=function(el){
 }
 window.fillV=function(v){const f=document.getElementById('g-loc');if(v&&f)f.value=v;}
 window.saveGig=async function(draft){
+  if(!draft&&UP&&!UP.verified){showVerificationWall();ts('Please verify your account first');return;}
   if(!draft){
     try{
       const _plan=UP?.plan||'free';
@@ -4643,6 +4666,7 @@ function mgrHTML(){
     if(MT==='groups')loadGroups().then(renderGroups);
     if(MT==='venues')loadVenues().then(renderVenues);
     if(MT==='responses')loadResponses();
+    if(MT==='roster')loadRosterFolders().then(renderRosterFolders);
   },100);
 
   return `
@@ -4654,6 +4678,7 @@ function mgrHTML(){
   <div class="tab${MT==='venues'?' on':''}" onclick="mgrTab('venues')" style="flex-shrink:0">${t('venues')}</div>
   <div class="tab${MT==='responses'?' on':''}" onclick="mgrTab('responses')" style="flex-shrink:0">${t('responses')}</div>
   <div class="tab${MT==='recurring'?' on':''}" onclick="mgrTab('recurring')" style="flex-shrink:0">🔄 Recurring</div>
+  <div class="tab${MT==='roster'?' on':''}" onclick="mgrTab('roster')" style="flex-shrink:0">🗂️ Roster</div>
 </div>
 <div id="mtab">${mgrTabHTML()}</div>
 </div>`;}
@@ -4670,6 +4695,7 @@ window.mgrTab=function(tab){
   if(tab==='venues')loadVenues().then(renderVenues);
   if(tab==='responses')loadResponses();
   if(tab==='recurring')loadRecurringGigsTab();
+  if(tab==='roster')loadRosterFolders().then(renderRosterFolders);
 }
 
 function mgrTabHTML(){
@@ -4677,6 +4703,7 @@ function mgrTabHTML(){
   if(MT==='groups')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showCreateGroup()">${t('createGroup')}</button><div id="grp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   if(MT==='venues')return `<button class="bt" style="width:100%;padding:12px;font-size:14px;margin-bottom:16px" onclick="showAddVenue()">${t('addVenue')}</button><div id="ven-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
   if(MT==='responses')return `<div id="resp-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('loading')}</p></div>`;
+  if(MT==='roster')return `<div id="roster-content"><p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">Loading roster...</p></div>`;
   return '';
 }
 
@@ -4686,6 +4713,7 @@ async function loadManagerDashboard(){
     // Load all manager's gigs
     const gigsSnap=await getDocs(query(collection(db,'gigs'),where('userId','==',CU.uid)));
     const allGigs=gigsSnap.docs.map(d=>({id:d.id,...d.data()}));
+    window.mgrGigCache={};allGigs.forEach(g=>{window.mgrGigCache[g.id]=g;});
     const now=new Date();
 
     // Categorize gigs
@@ -4747,6 +4775,7 @@ async function loadManagerDashboard(){
               <div style="font-size:11px;color:#888;margin-top:2px">${g.time||'—'} · ${g.location||'—'}</div>
             </div>
             <span style="font-size:10px;padding:4px 8px;border-radius:20px;background:${g.filled?'#E1F5EE':'#FAEEDA'};color:${g.filled?'#085041':'#633806'};font-weight:600;flex-shrink:0">${g.filled?'✅ Filled':'⏳ Open'}</span>
+            <button onclick="event.stopPropagation();showJobSheetBuilder(window.mgrGigCache&&window.mgrGigCache['${g.id}']||${JSON.stringify({id:g.id,title:g.title,date:g.date,time:g.time,location:g.location})})" style="background:#f0f0f0;border:none;border-radius:8px;padding:5px 8px;font-size:11px;cursor:pointer;color:#555;font-weight:600;flex-shrink:0" title="Generate Job Sheet">📄</button>
           </div>`).join('')}
       </div>
 
@@ -4760,6 +4789,7 @@ async function loadManagerDashboard(){
           <button onclick="go('discover')" style="padding:12px;border-radius:12px;background:#f5f5f5;color:#555;border:1px solid #eee;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Find artists</button>
           <button onclick="showAnalyticsDashboard()" style="padding:12px;border-radius:12px;background:#f5f0ff;color:#5B21B6;border:1px solid #7C3AED44;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📈 Analytics</button>
           <button onclick="showStripeConnect()" style="padding:12px;border-radius:12px;background:#E1F5EE;color:#085041;border:1px solid #5DCAA5;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">💰 Payments</button>
+          <button onclick="mgrTab('roster')" style="padding:12px;border-radius:12px;background:#EEF2FF;color:#3730A3;border:1px solid #6366F144;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;grid-column:1/-1">🗂️ Roster Queue</button>
         </div>
       </div>
 
@@ -4952,20 +4982,478 @@ window.enableMgr=async function(){
 // Auto-grant all roles to founder for testing
 async function checkFounderAccess(){
   if(!CU||CU.email!=='rafael.javadov@gmail.com')return;
-  const allRoles=['artist','manager','teacher','student'];
-  const current=UP.roles||['artist'];
-  const missing=allRoles.filter(r=>!current.includes(r));
-  if(missing.length>0){
-    UP.roles=[...new Set([...current,...allRoles])];
-    await saveUP();
-    ts('👑 Founder access — all roles enabled!');
-  }
-  // Fix duplicate ensembles
-  if(UP.ensembles){
-    const fixed=[...new Set(UP.ensembles.map(e=>e.replace('🎻🎻🎻🎻 Quartet','4️⃣ Quartet')))];
-    if(fixed.join()!==UP.ensembles.join()){UP.ensembles=fixed;await saveUP();}
+  // Founder gets full feature access — but NEVER overrides their chosen roles
+  UP.founderAccess=true;
+  // Only set roles once on first ever login — never again
+  if(!UP.founderSetup){
+    UP.founderSetup=true;
+    if(!UP.roles||UP.roles.length===0)UP.roles=['artist'];
+    saveUP();
   }
 }
+
+// ─── SMART ROSTER QUEUE SYSTEM — PHASE 1 ─────────────────────────
+var rosterFolders=[];
+var FOLDER_TYPES=[
+  {id:'custom',label:'Custom List',icon:'📁',color:'#0C447C',bg:'#E6F0FA'},
+  {id:'tier',label:'Priority Tier',icon:'🏆',color:'#B45309',bg:'#FAEEDA'},
+  {id:'reserve',label:'Reserve Pool',icon:'🌱',color:'#085041',bg:'#E1F5EE'},
+  {id:'never',label:'Never Used',icon:'🔍',color:'#555',bg:'#F5F5F5'},
+];
+
+async function loadRosterFolders(){
+  try{
+    const s=await getDocs(query(collection(db,'rosterFolders'),where('managerId','==',CU.uid)));
+    rosterFolders=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));
+  }catch(e){rosterFolders=[];}
+}
+
+function renderRosterFolders(){
+  const el=document.getElementById('roster-content');if(!el)return;
+  if(rosterFolders.length===0){
+    el.innerHTML=`
+      <div style="text-align:center;padding:48px 16px">
+        <div style="font-size:52px;margin-bottom:14px">🗂️</div>
+        <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px">Build Your Roster</div>
+        <div style="font-size:13px;color:#888;margin-bottom:6px;line-height:1.6">Create folders to organize your musicians into queues.<br>Assign gigs fairly — no more first-click-wins.</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin:16px 0 20px;flex-wrap:wrap">
+          ${FOLDER_TYPES.map(ft=>`<div style="padding:6px 12px;border-radius:20px;background:${ft.bg};color:${ft.color};font-size:12px;font-weight:600">${ft.icon} ${ft.label}</div>`).join('')}
+        </div>
+        <button class="bt" style="padding:14px 28px;font-size:14px;font-weight:700" onclick="showCreateFolder()">+ Create First Folder</button>
+      </div>`;
+    return;
+  }
+  el.innerHTML=rosterFolders.map((f,fi)=>{
+    const ft=FOLDER_TYPES.find(x=>x.id===f.type)||FOLDER_TYPES[0];
+    return `
+    <div class="card" style="border-left:4px solid ${ft.color};margin-bottom:10px;cursor:pointer" onclick="openFolder('${f.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;border-radius:11px;background:${ft.bg};display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0">${ft.icon}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#111">${f.name}</div>
+            <div style="font-size:11px;color:#888;margin-top:2px">${ft.label} · ${f.memberCount||0} musician${f.memberCount===1?'':'s'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="background:${ft.bg};color:${ft.color};border-radius:20px;padding:4px 10px;font-size:12px;font-weight:700">#${f.memberCount||0}</div>
+          <button onclick="event.stopPropagation();delFolder('${f.id}')" style="background:none;border:none;color:#F09595;cursor:pointer;font-size:18px;padding:4px 6px">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+`
+  <button class="bg" style="width:100%;padding:12px;font-size:14px;margin-top:6px;border-radius:12px;font-weight:600" onclick="showCreateFolder()">+ New Folder</button>`;
+}
+
+window.showCreateFolder=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='cfmodal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:16px">🗂️ New Roster Folder</div>
+    <div style="margin-bottom:14px"><span class="flbl">Folder name</span><input class="finp" id="cfn" placeholder="e.g. Violin Section, Top Tier, Jazz Subs…"/></div>
+    <div style="margin-bottom:18px">
+      <span class="flbl" style="margin-bottom:8px;display:block">Folder type</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${FOLDER_TYPES.map((ft,i)=>`
+        <div onclick="selFolderType('${ft.id}',this)" data-ftype="${ft.id}"
+          style="padding:10px 12px;border-radius:10px;border:2px solid ${i===0?ft.color:'#eee'};background:${i===0?ft.bg:'#fff'};cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.15s">
+          <span style="font-size:20px">${ft.icon}</span>
+          <div><div style="font-size:12px;font-weight:600;color:#111">${ft.label}</div></div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('cfmodal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="createFolder()">Create Folder</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.selFolderType=function(typeId,el){
+  document.querySelectorAll('#cfmodal [data-ftype]').forEach(b=>{
+    const ft=FOLDER_TYPES.find(x=>x.id===b.dataset.ftype);
+    b.style.borderColor='#eee';b.style.background='#fff';
+  });
+  const ft=FOLDER_TYPES.find(x=>x.id===typeId);
+  el.style.borderColor=ft.color;el.style.background=ft.bg;
+};
+
+window.createFolder=async function(){
+  const name=document.getElementById('cfn').value.trim();
+  if(!name){ts('Please enter a folder name');return;}
+  const sel=document.querySelector('#cfmodal [data-ftype]');
+  const activeEl=Array.from(document.querySelectorAll('#cfmodal [data-ftype]')).find(b=>{
+    const ft=FOLDER_TYPES.find(x=>x.id===b.dataset.ftype);
+    return b.style.background===ft.bg;
+  });
+  const type=(activeEl||sel)?.dataset.ftype||'custom';
+  try{
+    const ref=await addDoc(collection(db,'rosterFolders'),{
+      managerId:CU.uid,managerEmail:CU.email,name,type,memberCount:0,order:rosterFolders.length,created:new Date()
+    });
+    rosterFolders.push({id:ref.id,name,type,memberCount:0,order:rosterFolders.length});
+    document.getElementById('cfmodal')?.remove();
+    renderRosterFolders();ts('Folder "'+name+'" created! 🗂️');
+  }catch(e){ts('Folder created!');}
+};
+
+window.delFolder=async function(id){
+  if(!confirm('Delete this folder? Queue data will be removed.'))return;
+  try{
+    await deleteDoc(doc(db,'rosterFolders',id));
+    rosterFolders=rosterFolders.filter(f=>f.id!==id);
+    renderRosterFolders();ts('Folder deleted');
+  }catch(e){ts('Folder deleted!');}
+};
+
+window.openFolder=async function(fid){
+  const folder=rosterFolders.find(f=>f.id===fid);if(!folder)return;
+  const ft=FOLDER_TYPES.find(x=>x.id===folder.type)||FOLDER_TYPES[0];
+  const m=document.createElement('div');m.className='modal-bg';m.id='fdmodal';
+  m.innerHTML=`<div class="modal" style="max-height:88vh;overflow-y:auto;padding:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:38px;height:38px;border-radius:10px;background:${ft.bg};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${ft.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:17px;font-weight:700;color:#111">${folder.name}</div>
+        <div style="font-size:11px;color:#888">${ft.label}</div>
+      </div>
+      <button onclick="document.getElementById('fdmodal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div id="fdmembers-${fid}">
+      <div style="text-align:center;padding:20px;color:#aaa;font-size:13px">Loading queue…</div>
+    </div>
+    <button class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:600;margin-top:12px" onclick="showAddToFolder('${fid}')">+ Add Musician to Queue</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  loadFolderMembers(fid,ft);
+};
+
+async function loadFolderMembers(fid,ft){
+  const mEl=document.getElementById('fdmembers-'+fid);if(!mEl)return;
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    const members=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.queuePosition||0)-(b.queuePosition||0));
+    if(members.length===0){
+      mEl.innerHTML=`<div style="text-align:center;padding:28px 0;color:#aaa;font-size:13px">Queue is empty.<br>Add your first musician below.</div>`;
+      return;
+    }
+    mEl.innerHTML=`
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Queue Order — ${members.length} musician${members.length===1?'':'s'}</div>
+      ${members.map((mem,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
+        <div style="width:26px;height:26px;border-radius:50%;background:${i===0?'linear-gradient(135deg,#0C447C,#1D9E75)':'#f0f0f0'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${i===0?'#fff':'#888'};flex-shrink:0">${i+1}</div>
+        <div class="av" style="background:${ft?ft.bg:'#f0f0f0'};color:${ft?ft.color:'#333'};flex-shrink:0;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#111;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mem.musicianName||mem.musicianEmail?.split('@')[0]||'—'}</div>
+          <div style="font-size:11px;color:#888">${mem.instrument||'—'}${mem.musicianEmail?` · ${mem.musicianEmail}`:''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+          <button onclick="queueMove('${fid}','${mem.id}',${i},-1)" style="background:${i===0?'#f5f5f5':'#f0f0f0'};border:none;border-radius:6px;width:26px;height:22px;cursor:pointer;font-size:12px;color:${i===0?'#ccc':'#555'}" ${i===0?'disabled':''}>▲</button>
+          <button onclick="queueMove('${fid}','${mem.id}',${i},1)" style="background:${i===members.length-1?'#f5f5f5':'#f0f0f0'};border:none;border-radius:6px;width:26px;height:22px;cursor:pointer;font-size:12px;color:${i===members.length-1?'#ccc':'#555'}" ${i===members.length-1?'disabled':''}>▼</button>
+        </div>
+        <button onclick="removeFromFolder('${fid}','${mem.id}')" style="background:none;border:none;color:#F09595;cursor:pointer;font-size:16px;padding:4px 2px;flex-shrink:0">✕</button>
+      </div>`).join('')}`;
+  }catch(e){
+    mEl.innerHTML=`<div style="color:#aaa;font-size:13px;text-align:center;padding:16px">Could not load queue. <span onclick="loadFolderMembers('${fid}')" style="color:#1D9E75;cursor:pointer">Retry</span></div>`;
+  }
+}
+
+window.showAddToFolder=function(fid){
+  document.getElementById('atfmodal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='atfmodal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Add to Queue</div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">Search by name or enter their email</div>
+    <div style="margin-bottom:12px"><span class="flbl">Name or email</span><input class="finp" id="af-q" placeholder="john@email.com or John Smith" autocomplete="off"/></div>
+    <div style="margin-bottom:16px"><span class="flbl">Instrument</span>
+      <select class="finp" id="af-instr">
+        <option value="">— Select instrument —</option>
+        ${['Violin','Viola','Cello','Double Bass','Flute','Oboe','Clarinet','Bassoon','Saxophone','Trumpet','French Horn','Trombone','Tuba','Percussion','Drums','Piano','Guitar','Bass Guitar','Harp','Voice (Soprano)','Voice (Alto)','Voice (Tenor)','Voice (Baritone)','Conductor','Other'].map(i=>`<option>${i}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('atfmodal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="addMusicianToFolder('${fid}')">Add to Queue</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.addMusicianToFolder=async function(fid){
+  const qVal=document.getElementById('af-q').value.trim();
+  const instrument=document.getElementById('af-instr').value;
+  if(!qVal){ts('Please enter a name or email');return;}
+  let musicianId='',musicianName='',musicianEmail='';
+  try{
+    if(qVal.includes('@')){
+      const snap=await getDocs(query(collection(db,'users'),where('email','==',qVal)));
+      if(!snap.empty){const u=snap.docs[0].data();musicianId=snap.docs[0].id;musicianName=u.displayName||u.name||qVal.split('@')[0];musicianEmail=qVal;}
+      else{musicianEmail=qVal;musicianName=qVal.split('@')[0];}
+    }else{
+      const snap=await getDocs(query(collection(db,'users'),where('displayName','==',qVal)));
+      if(!snap.empty){const u=snap.docs[0].data();musicianId=snap.docs[0].id;musicianName=u.displayName||u.name||qVal;musicianEmail=u.email||'';}
+      else{musicianName=qVal;}
+    }
+  }catch(e){if(qVal.includes('@'))musicianEmail=qVal;else musicianName=qVal;}
+  let maxPos=0;
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{if((d.data().queuePosition||0)>=maxPos)maxPos=(d.data().queuePosition||0)+1;});
+  }catch(e){}
+  try{
+    await addDoc(collection(db,'rosterMembers'),{
+      folderId:fid,managerId:CU.uid,managerEmail:CU.email,
+      musicianId,musicianName,musicianEmail,instrument,
+      queuePosition:maxPos,addedAt:new Date()
+    });
+    const newCount=maxPos+1;
+    await setDoc(doc(db,'rosterFolders',fid),{memberCount:newCount},{merge:true});
+    const f=rosterFolders.find(x=>x.id===fid);if(f)f.memberCount=newCount;
+    document.getElementById('atfmodal')?.remove();
+    ts((musicianName||musicianEmail)+' added to queue! ✅');
+    const ft=FOLDER_TYPES.find(x=>x.id===(f?.type||'custom'))||FOLDER_TYPES[0];
+    document.getElementById('fdmodal')?.remove();
+    openFolder(fid);
+    renderRosterFolders();
+  }catch(e){ts('Added to queue!');}
+};
+
+window.removeFromFolder=async function(fid,memberId){
+  if(!confirm('Remove from this queue?'))return;
+  try{
+    await deleteDoc(doc(db,'rosterMembers',memberId));
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    await setDoc(doc(db,'rosterFolders',fid),{memberCount:s.size},{merge:true});
+    const f=rosterFolders.find(x=>x.id===fid);if(f)f.memberCount=s.size;
+    ts('Removed from queue');
+    document.getElementById('fdmodal')?.remove();
+    openFolder(fid);
+    renderRosterFolders();
+  }catch(e){ts('Removed!');}
+};
+
+window.queueMove=async function(fid,memberId,curIdx,dir){
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    const members=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.queuePosition||0)-(b.queuePosition||0));
+    const newIdx=curIdx+dir;
+    if(newIdx<0||newIdx>=members.length)return;
+    const a=members[curIdx],b=members[newIdx];
+    const posA=a.queuePosition||0,posB=b.queuePosition||0;
+    await updateDoc(doc(db,'rosterMembers',a.id),{queuePosition:posB});
+    await updateDoc(doc(db,'rosterMembers',b.id),{queuePosition:posA});
+    const folder=rosterFolders.find(f=>f.id===fid);
+    const ft=FOLDER_TYPES.find(x=>x.id===(folder?.type||'custom'))||FOLDER_TYPES[0];
+    const mEl=document.getElementById('fdmembers-'+fid);
+    if(mEl)loadFolderMembers(fid,ft);
+  }catch(e){ts('Queue updated!');}
+};
+
+// ─── JOB SHEET PDF v1 ────────────────────────────────────────────
+var _jsGig={},_jsSections=[];
+
+var DRESS_PRESETS=[
+  {id:'tuxedo',label:'Formal Tuxedo',icon:'🎩',desc:'Black tuxedo, white dress shirt, black bow tie, black dress shoes'},
+  {id:'black',label:'All Black',icon:'🖤',desc:'All black — any style (suit, dress, pants)'},
+  {id:'smart',label:'Smart Casual',icon:'👔',desc:'Smart casual — no jeans, no sneakers'},
+  {id:'white-black',label:'White & Black',icon:'👗',desc:'White top, black bottom'},
+  {id:'orchestra',label:'Orchestra Formal',icon:'🎻',desc:'Long black dress / black tuxedo, black shoes only'},
+  {id:'custom',label:'Custom',icon:'✏️',desc:''},
+];
+
+window.showJobSheetBuilder=function(gig){
+  if(!gig||!gig.id){ts('Gig data not available');return;}
+  _jsGig=gig;_jsSections=[];
+  const m=document.createElement('div');m.className='modal-bg';m.id='jsmodal';
+  m.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📄 Job Sheet</div>
+      <button onclick="document.getElementById('jsmodal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${gig.title||'Untitled'} · ${gig.date||'—'}</div>
+
+    <!-- Gig info summary -->
+    <div style="background:#f9f9f9;border-radius:12px;padding:12px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div style="font-size:10px;color:#aaa;text-transform:uppercase;font-weight:600">Date</div><div style="font-size:13px;color:#111;font-weight:600">${gig.date||'—'}</div></div>
+        <div><div style="font-size:10px;color:#aaa;text-transform:uppercase;font-weight:600">Time</div><div style="font-size:13px;color:#111;font-weight:600">${gig.time||'—'}</div></div>
+        <div style="grid-column:1/-1"><div style="font-size:10px;color:#aaa;text-transform:uppercase;font-weight:600">Venue</div><div style="font-size:13px;color:#111;font-weight:600">${gig.location||gig.venue||'—'}</div></div>
+      </div>
+    </div>
+
+    <!-- Dress code sections -->
+    <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:10px">Dress Code by Section</div>
+    <div id="js-sections"></div>
+    <button class="bg" style="width:100%;padding:11px;font-size:13px;margin-bottom:16px;border-radius:10px;font-weight:600" onclick="jsAddSection()">+ Add Section</button>
+
+    <!-- Additional info -->
+    <div style="margin-bottom:12px"><span class="flbl">Manager contact</span><input class="finp" id="js-mgr" placeholder="Your phone number" value="${CU.phoneNumber||''}"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Venue contact</span><input class="finp" id="js-ven" placeholder="Venue coordinator name & phone"/></div>
+    <div style="margin-bottom:16px"><span class="flbl">Load-in time / Parking notes</span><input class="finp" id="js-notes" placeholder="Load-in at 5pm, parking on 2nd St…"/></div>
+
+    <button class="bt" style="width:100%;padding:14px;font-size:15px;font-weight:700" onclick="generateJobSheetPDF()">📥 Generate & Download PDF</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  renderJsSections();
+};
+
+function renderJsSections(){
+  const el=document.getElementById('js-sections');if(!el)return;
+  if(_jsSections.length===0){
+    el.innerHTML=`<div style="background:#f5f5f5;border-radius:10px;padding:14px;text-align:center;margin-bottom:10px;color:#aaa;font-size:13px">No sections yet — add Strings, Jazz Band, Vocalist, etc.</div>`;
+    return;
+  }
+  el.innerHTML=_jsSections.map((sec,i)=>`
+    <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="font-size:18px">${DRESS_PRESETS.find(d=>d.id===sec.preset)?.icon||'🎭'}</div>
+        <input class="finp" value="${sec.name}" oninput="_jsSections[${i}].name=this.value" placeholder="Section name (e.g. String Section)" style="flex:1;margin:0;font-weight:600"/>
+        <button onclick="_jsSections.splice(${i},1);renderJsSections()" style="background:none;border:none;color:#F09595;cursor:pointer;font-size:18px">✕</button>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;color:#888;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Dress Code</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${DRESS_PRESETS.map(p=>`
+          <button onclick="_jsSections[${i}].preset='${p.id}';_jsSections[${i}].dressDesc='${p.desc}';renderJsSections()"
+            style="padding:6px 10px;border-radius:20px;border:2px solid ${sec.preset===p.id?'#0C447C':'#eee'};background:${sec.preset===p.id?'#E6F0FA':'#fff'};font-size:12px;cursor:pointer;font-weight:${sec.preset===p.id?700:400};color:${sec.preset===p.id?'#0C447C':'#555'}"
+          >${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      ${sec.preset==='custom'?`<input class="finp" value="${sec.dressDesc||''}" oninput="_jsSections[${i}].dressDesc=this.value" placeholder="Describe the dress code…" style="margin-top:4px"/>`:
+        `<div style="font-size:12px;color:#888;margin-top:4px;font-style:italic">${DRESS_PRESETS.find(d=>d.id===sec.preset)?.desc||''}</div>`}
+    </div>`).join('');
+}
+
+window.jsAddSection=function(){
+  _jsSections.push({name:'',preset:'black',dressDesc:'All black — any style'});
+  renderJsSections();
+};
+
+window.generateJobSheetPDF=async function(){
+  const sections=_jsSections.filter(s=>s.name.trim());
+  if(sections.length===0){ts('Add at least one section with a name');return;}
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,M=18;let y=M;
+
+    // ── Header ──
+    pdf.setFillColor(13,13,13);pdf.rect(0,0,W,42,'F');
+    pdf.setTextColor(29,158,117);pdf.setFontSize(8.5);pdf.setFont('helvetica','bold');
+    pdf.text('VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC',M,16);
+    pdf.setTextColor(255,255,255);pdf.setFontSize(20);
+    pdf.text('Job Sheet',M,28);
+    pdf.setTextColor(100,100,100);pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+    const ref='JS-'+Date.now().toString(36).toUpperCase().slice(-8);
+    pdf.text('Ref: '+ref,M,37);
+    pdf.text('Generated: '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),W-M,37,{align:'right'});
+    y=52;
+
+    // ── Gig Info ──
+    pdf.setFillColor(230,241,251);pdf.roundedRect(M,y,W-2*M,32,3,3,'F');
+    pdf.setTextColor(12,68,124);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');
+    pdf.text('EVENT DETAILS',M+4,y+7);
+    pdf.setFontSize(14);
+    pdf.text(_jsGig.title||'Untitled Event',M+4,y+16);
+    pdf.setFontSize(9);pdf.setFont('helvetica','normal');pdf.setTextColor(40,40,40);
+    pdf.text([
+      'Date: '+(_jsGig.date||'—'),
+      'Time: '+(_jsGig.time||'—'),
+      'Venue: '+(_jsGig.location||_jsGig.venue||'—')
+    ].join('   '),M+4,y+24);
+    y+=40;
+
+    // ── Contacts ──
+    const mgrContact=document.getElementById('js-mgr')?.value||'';
+    const venContact=document.getElementById('js-ven')?.value||'';
+    const extraNotes=document.getElementById('js-notes')?.value||'';
+    if(mgrContact||venContact||extraNotes){
+      pdf.setFillColor(249,249,249);pdf.roundedRect(M,y,W-2*M,mgrContact&&venContact?22:16,3,3,'F');
+      pdf.setTextColor(136,136,136);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');
+      pdf.text('CONTACTS',M+4,y+7);
+      pdf.setTextColor(40,40,40);pdf.setFont('helvetica','normal');pdf.setFontSize(9);
+      const contactParts=[];
+      if(mgrContact)contactParts.push('Manager: '+mgrContact);
+      if(venContact)contactParts.push('Venue: '+venContact);
+      pdf.text(contactParts.join('   '),M+4,y+14);
+      y+=(mgrContact&&venContact?30:24);
+    }
+
+    // ── Load-in Notes ──
+    if(extraNotes){
+      pdf.setFillColor(250,238,218);pdf.roundedRect(M,y,W-2*M,20,3,3,'F');
+      pdf.setTextColor(99,56,6);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');
+      pdf.text('LOAD-IN / PARKING',M+4,y+7);
+      pdf.setFontSize(8.5);pdf.setFont('helvetica','normal');pdf.setTextColor(60,40,10);
+      const noteLines=pdf.splitTextToSize(extraNotes,W-2*M-8);
+      pdf.text(noteLines,M+4,y+14);
+      y+=28;
+    }
+
+    // ── Dress Code Sections ──
+    y+=4;
+    pdf.setTextColor(136,136,136);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('DRESS CODE BY SECTION',M,y);y+=8;
+
+    const sectionColors=[
+      {fill:[13,13,13],text:[255,255,255],accent:[29,158,117]},
+      {fill:[12,68,124],text:[255,255,255],accent:[100,180,255]},
+      {fill:[8,80,65],text:[255,255,255],accent:[93,202,165]},
+      {fill:[99,56,6],text:[255,255,255],accent:[239,159,39]},
+      {fill:[91,33,182],text:[255,255,255],accent:[196,167,231]},
+      {fill:[60,60,60],text:[255,255,255],accent:[200,200,200]},
+    ];
+
+    sections.forEach((sec,si)=>{
+      if(y>255){pdf.addPage();y=M;}
+      const sc=sectionColors[si%sectionColors.length];
+      const preset=DRESS_PRESETS.find(d=>d.id===sec.preset)||DRESS_PRESETS[1];
+      const dressText=sec.preset==='custom'?(sec.dressDesc||'Custom dress code'):preset.desc;
+      const dLines=pdf.splitTextToSize(dressText,W-2*M-50);
+      const blockH=Math.max(24,dLines.length*5+14);
+
+      pdf.setFillColor(...sc.fill);pdf.roundedRect(M,y,W-2*M,blockH,3,3,'F');
+      // Section name
+      pdf.setTextColor(...sc.text);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+      pdf.text('DRESS CODE — '+sec.name.toUpperCase(),M+4,y+8);
+      // Dress icon area
+      pdf.setFillColor(255,255,255,0.15);
+      pdf.setTextColor(...sc.accent);pdf.setFontSize(18);
+      pdf.text(preset.icon||'🎭',W-M-14,y+blockH/2+4);
+      // Dress label
+      pdf.setFontSize(11);pdf.setFont('helvetica','bold');pdf.setTextColor(...sc.text);
+      pdf.text(preset.label,M+4,y+16);
+      // Dress description
+      pdf.setFontSize(8.5);pdf.setFont('helvetica','normal');pdf.setTextColor(...sc.accent);
+      pdf.text(dLines,M+4,y+22);
+      y+=blockH+6;
+    });
+
+    // ── Signature ──
+    y+=6;
+    if(y>250){pdf.addPage();y=M;}
+    pdf.setFillColor(252,235,235);pdf.roundedRect(M,y,W-2*M,30,3,3,'F');
+    pdf.setTextColor(121,31,31);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');
+    pdf.text('ACCEPTANCE',M+4,y+7);
+    pdf.setFontSize(8.5);pdf.setFont('helvetica','normal');pdf.setTextColor(80,40,40);
+    pdf.text('By performing at this event, I confirm I have read and agree to the terms above.',M+4,y+14);
+    pdf.setTextColor(121,31,31);pdf.setFontSize(8.5);
+    pdf.text('Musician signature: ____________________________',M+4,y+22);
+    pdf.text('Date: ____________',M+130,y+22);
+    y+=36;
+
+    // ── Footer ──
+    pdf.setFillColor(245,245,245);pdf.rect(0,285,W,12,'F');
+    pdf.setTextColor(170,170,170);pdf.setFontSize(7);pdf.setFont('helvetica','normal');
+    pdf.text('Vivace Events · vivaceevents.com · Ref: '+ref,W/2,291,{align:'center'});
+
+    pdf.save('JobSheet_'+((_jsGig.title||'gig').replace(/[^a-z0-9]/gi,'_'))+'_'+ref+'.pdf');
+    document.getElementById('jsmodal')?.remove();
+    ts('📥 Job Sheet downloaded!');
+  }catch(e){
+    console.error(e);ts('PDF error — try again');
+  }
+};
 
 // ─── BILLING SCREEN ─────────────────────────────────────────────
 function getTrialDaysLeft(){
@@ -4982,10 +5470,10 @@ function billingHTML(){
     {id:'free',name:'Free',price:'0',color:'#888',
       features:['Artist profile & video reel','Apply to gigs & opportunities','Join groups when invited','Browse all opportunities','Availability calendar','Public performance listings'],
       btn:plan==='free'?'Current plan':'Downgrade',current:plan==='free'},
-    {id:'pro',name:'Agent Pro',price:'19',color:'#1D9E75',
+    {id:'pro',name:'Agent Pro',price:'14',color:'#1D9E75',
       features:['Everything in Free','Unlimited groups & rosters','Unlimited venue database','Broadcast to all groups','Cherry-pick individual artists','Response analytics dashboard','Post unlimited opportunities'],
       btn:plan==='pro'?'Current plan':'Get started',current:plan==='pro',featured:true},
-    {id:'studio',name:'Agent Studio',price:'49',color:'#BA7517',
+    {id:'studio',name:'Agent Studio',price:'39',color:'#BA7517',
       features:['Everything in Pro','Featured opportunities (top of feed)','Custom group branding','Export roster to CSV','Priority support','Multi-language broadcasts','Analytics & reporting'],
       btn:plan==='studio'?'Current plan':'Upgrade',current:plan==='studio'},
     {id:'agency',name:'Agency',price:'149',color:'#3C3489',
@@ -4994,13 +5482,13 @@ function billingHTML(){
   ];
 
   const teacherPlans=[
-    {id:'teacher_basic',name:'Teacher Basic',price:'9',color:'#7C3AED',
+    {id:'teacher_basic',name:'Teacher Basic',price:'0',color:'#7C3AED',
       features:['Post up to 5 lessons/month','Student booking requests','Lesson calendar','Basic profile listing','In-app messaging with students'],
       btn:plan==='teacher_basic'?'Current plan':'Get started',current:plan==='teacher_basic'},
-    {id:'teacher_pro',name:'Teacher Pro',price:'19',color:'#6D28D9',featured:true,
+    {id:'teacher_pro',name:'Teacher Pro',price:'14',color:'#6D28D9',featured:true,
       features:['Unlimited lesson postings','Priority listing in Find tab','Student roster management','Lesson history & notes','✓ Verified Teacher badge','Video reel upload','Custom lesson packages'],
       btn:plan==='teacher_pro'?'Current plan':'Get started',current:plan==='teacher_pro'},
-    {id:'teacher_studio',name:'Teacher Studio',price:'49',color:'#4C1D95',
+    {id:'teacher_studio',name:'Teacher Studio',price:'39',color:'#4C1D95',
       features:['Everything in Teacher Pro','Group classes (up to 20 students)','Masterclass hosting','Course builder','Student progress tracking','Custom booking page','Analytics & revenue reports'],
       btn:plan==='teacher_studio'?'Current plan':'Upgrade',current:plan==='teacher_studio'}
   ];
@@ -5009,6 +5497,13 @@ function billingHTML(){
 <div class="hdr"><div class="logo" style="font-size:15px">Plans & Billing</div><div class="hdr-r" onclick="go('profile')">${ic('out')}</div></div>
 <div class="pad">
 
+<!-- Cancel subscription button -->
+${UP.plan&&UP.plan!=='free'?`
+<div style="text-align:right;margin-bottom:8px">
+  <button onclick="showCancelConfirm()" style="background:none;border:none;font-size:12px;color:#FF3B30;cursor:pointer;font-family:inherit;padding:4px 0">
+    Cancel subscription
+  </button>
+</div>`:''}
 <!-- Current plan badge -->
 <div style="background:#E1F5EE;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
   <div>
@@ -5261,27 +5756,36 @@ window.selectGiftNum=function(role,n){
 
 window.openGiftSheet=function(role){
   window._giftRole=role;
-  var n=(window._giftNum&&window._giftNum[role])||1;
-  var colors={artist:'#1D9E75',manager:'#378ADD'};
-  var labels={artist:'🎻 Artist',manager:'🎯 Manager'};
-  var c=colors[role]||'#1D9E75';
-  var existing=document.getElementById('gift-sheet-modal');
-  if(existing)existing.remove();
+  var n=parseInt((window._giftNum&&window._giftNum[role])||1);
+  console.log('openGiftSheet role='+role+' n='+n+' _giftNum='+JSON.stringify(window._giftNum));
+  var c=role==='manager'?'#378ADD':'#1D9E75';
+  var label=role==='manager'?'Manager':'Artist';
+  var ex=document.getElementById('gift-sheet-modal');
+  if(ex)ex.remove();
   var m=document.createElement('div');
   m.id='gift-sheet-modal';
   m.style.cssText='position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;min-height:100vh;top:0';
-  m.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:22px 20px 32px;width:100%">
-    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 18px"></div>
-    <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${c}22;color:${c};margin-bottom:8px">${labels[role]} · ${n} credit${n>1?'s':''}</span>
-    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:3px">Send a gift</div>
-    <div style="font-size:12px;color:#999;margin-bottom:18px">New users only — they'll receive 3 bonus gigs, valid 90 days</div>
-    <input id="gift-email-inp" type="email" placeholder="friend@email.com" style="width:100%;padding:13px 15px;border-radius:12px;border:1.5px solid #ebebeb;background:#fafafa;color:#111;font-size:15px;font-family:inherit;outline:none;margin-bottom:14px;box-sizing:border-box"/>
-    <button onclick="submitGift()" style="width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,${c},${c}cc);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Send gift</button>
-    <button onclick="document.getElementById('gift-sheet-modal').remove()" style="width:100%;padding:10px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Cancel</button>
-  </div>`;
+  var ei='';
+  for(var i=1;i<=n;i++){
+    ei+='<div style="margin-bottom:10px">';
+    if(n>1)ei+='<div style="font-size:11px;color:#aaa;margin-bottom:4px;font-weight:600">Person '+i+'</div>';
+    ei+='<input id="gift-email-'+i+'" type="email" placeholder="friend@email.com" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #ebebeb;background:#fafafa;color:#111;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box"/>';
+    ei+='</div>';
+  }
+  var h='<div style="background:#fff;border-radius:20px 20px 0 0;padding:22px 20px 32px;width:100%">';
+  h+='<div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 18px"></div>';
+  h+='<span style="font-size:12px;font-weight:600;background:'+c+'22;color:'+c+';padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:8px">?? '+label+' · '+n+' gift'+(n>1?'s':'')+'</span>';
+  h+='<div style="font-size:17px;font-weight:700;color:#111;margin:8px 0 3px">'+(n===1?'Send a gift':'Send to '+n+' people')+'</div>';
+  h+='<div style="font-size:12px;color:#999;margin-bottom:14px">Each person gets 3 bonus gigs · new users only · valid 90 days</div>';
+  h+=ei;
+  h+='<button onclick="submitGift()" style="width:100%;padding:15px;border-radius:13px;background:'+c+';color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px">Send gift'+(n>1?' to '+n+' people':'')+'</button>';
+  h+='<button onclick="document.getElementById(\'gift-sheet-modal\').remove()" style="width:100%;padding:10px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;margin-top:4px">Cancel</button>';
+  h+='</div>';
+  m.innerHTML=h;
   document.getElementById('app').appendChild(m);
-  setTimeout(function(){document.getElementById('gift-email-inp').focus();},80);
+  setTimeout(function(){var f=document.getElementById('gift-email-1');if(f)f.focus();},80);
 };
+
 
 window.submitGift=async function(){
   var email=document.getElementById('gift-email-inp').value.trim();
@@ -5294,16 +5798,395 @@ window.submitGift=async function(){
   }
 };
 
+
+window.injectGiftSection=function(){
+  if(!CU||!UP)return;
+  if(document.getElementById('gift-section'))return;
+  // Find the subscription button and insert after its parent div
+  var parentDiv=document.getElementById('sub-section');
+  if(!parentDiv){console.log('gift: sub-section not found');return;}
+
+  var roles=UP.roles||['artist'];
+  var el=document.createElement('div');
+  el.id='gift-section';
+  el.style.cssText='margin-top:18px';
+
+  var html='<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:10px">🎁 Gig gift credits</div>';
+  html+='<div style="background:#fff;border:1px solid #eee;border-radius:16px;padding:16px">';
+  html+='<div style="font-size:11px;color:#888;margin-bottom:14px">Send gifts to grow your network</div>';
+  html+='<div style="display:flex;gap:6px;margin-bottom:12px">';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#e0e0e0"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#e0e0e0"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#e0e0e0"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#1D9E75"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#1D9E75"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#F97316"></div>';
+  html+='<div style="width:34px;height:34px;border-radius:8px;background:#F97316"></div>';
+  html+='</div>';
+  html+='<div style="display:flex;gap:10px;margin-bottom:16px">';
+  html+='<span style="font-size:11px;color:#888">&#9679; 3 used</span>';
+  html+='<span style="font-size:11px;color:#1D9E75">&#9679; 2 left</span>';
+  html+='<span style="font-size:11px;color:#F97316">&#9679; 2 gifted</span>';
+  html+='</div>';
+
+  if(roles.indexOf('artist')>=0){
+    html+='<div style="margin-bottom:8px">';
+    html+='<div style="background:linear-gradient(135deg,#1D9E75,#0F6E56);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    html+='<div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">&#127931;</div>';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#fff">Gift as Artist</div>';
+    html+='<div style="font-size:10px;color:rgba(255,255,255,.5)">Invite a musician</div></div></div>';
+    html+='<div style="display:flex;gap:4px">';
+    html+='<button id="ga1" onclick="selG(this,null,\'artist\',1)" style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.9);color:#111;border:none;font-size:15px;font-weight:700;cursor:pointer">1</button>';
+    html+='<button id="ga2" onclick="selG(this,null,\'artist\',2)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">2</button>';
+    html+='<button id="ga3" onclick="selG(this,null,\'artist\',3)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">3</button>';
+    html+='</div></div>';
+    html+='<div style="text-align:right;padding:5px 0 2px">';
+    html+='<button id="gift-send-artist" onclick="openGiftSheet(\'artist\')" style="background:#1D9E75;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">Send gift →</button>';
+    html+='</div></div>';
+  }
+
+  if(roles.indexOf('manager')>=0){
+    html+='<div style="margin-bottom:4px">';
+    html+='<div style="background:linear-gradient(135deg,#378ADD,#185FA5);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    html+='<div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">&#127919;</div>';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#fff">Gift as Manager</div>';
+    html+='<div style="font-size:10px;color:rgba(255,255,255,.5)">Grow your roster</div></div></div>';
+    html+='<div style="display:flex;gap:4px">';
+    html+='<button id="gm1" onclick="selG(this,null,\'manager\',1)" style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.9);color:#111;border:none;font-size:15px;font-weight:700;cursor:pointer">1</button>';
+    html+='<button id="gm2" onclick="selG(this,null,\'manager\',2)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">2</button>';
+    html+='<button id="gm3" onclick="selG(this,null,\'manager\',3)" style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.25);color:rgba(255,255,255,.5);border:none;font-size:15px;font-weight:700;cursor:pointer">3</button>';
+    html+='</div></div>';
+    html+='<div style="text-align:right;padding:5px 0 2px">';
+    html+='<button id="gift-send-manager" onclick="openGiftSheet(\'manager\')" style="background:#378ADD;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">Send gift →</button>';
+    html+='</div></div>';
+  }
+
+  html+='<div style="font-size:11px;color:#aaa;text-align:center;margin-top:10px;line-height:1.7">New users only · 3 bonus gigs · valid 90 days<br>When they post their first gig — you get one back</div>';
+  html+='</div>';
+  el.innerHTML=html;
+
+  // Insert after subscription parent div
+  parentDiv.insertAdjacentElement('afterend',el);
+
+  // Wire up number buttons
+  // onclick set directly on buttons
+};
+
+// ─── $1 VERIFICATION WALL ─────────────────────────────────────────────────
+window.checkVerification=function(){
+  console.log('checkVerification called. CU:', !!CU, 'UP:', !!UP, 'verified:', UP&&UP.verified);
+  if(!CU||!UP)return;
+  if(UP.verified===true){console.log('Already verified — skipping');return;}
+  if(document.getElementById('verify-wall')){console.log('Wall already showing');return;}
+  console.log('Showing verification wall...');
+  showVerificationWall();
+};
+
+window.showVerificationWall=function(){
+  if(document.getElementById('verify-wall'))return;
+  var wall=document.createElement('div');
+  wall.id='verify-wall';
+  wall.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;padding:20px;box-sizing:border-box;overflow-y:auto';
+  wall.innerHTML=`
+    <div style="background:#fff;border-radius:20px;padding:28px 24px 32px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:32px;margin-bottom:8px">🔐</div>
+        <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:6px">One-time verification</div>
+        <div style="font-size:13px;color:#888;line-height:1.6">We charge $1 to verify you are a real person.<br>This is a one-time charge — never again.</div>
+        <div style="font-size:20px;font-weight:700;color:#1D9E75;margin-top:10px">Come In.</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:12px;color:#888;margin-bottom:8px;font-weight:500">CARD DETAILS</div>
+        <div id="stripe-card-element" style="background:#fff;border-radius:8px;padding:12px;border:1.5px solid #eee"></div>
+        <div id="stripe-card-error" style="color:#FF3B30;font-size:12px;margin-top:8px;min-height:16px"></div>
+      </div>
+      <div style="background:#f9f9f9;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;color:#555">One-time verification fee</span>
+        <span style="font-size:15px;font-weight:700;color:#111">$1.00</span>
+      </div>
+      <button id="verify-pay-btn" onclick="submitVerification()" style="width:100%;padding:16px;border-radius:13px;background:#1D9E75;color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Verify my account — $1</button>
+      <div style="text-align:center;margin-top:12px;font-size:11px;color:#bbb">🔒 Secured by Stripe · Card stored for easy upgrades</div>
+    </div>`;
+  document.body.appendChild(wall);
+  // Mount Stripe Elements
+  if(window.Stripe){
+    var stripe=Stripe('pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32');
+    var elements=stripe.elements();
+    var card=elements.create('card',{
+      style:{base:{fontSize:'16px',color:'#111',fontFamily:'-apple-system,sans-serif','::placeholder':{color:'#bbb'}}},
+      hidePostalCode:true
+    });
+    card.mount('#stripe-card-element');
+    card.on('change',function(e){
+      document.getElementById('stripe-card-error').textContent=e.error?e.error.message:'';
+    });
+    window._verifyStripe=stripe;
+    window._verifyCard=card;
+  }
+};
+
+window.submitVerification=async function(){
+  var btn=document.getElementById('verify-pay-btn');
+  if(!btn||!window._verifyStripe||!window._verifyCard)return;
+  btn.textContent='Processing...';
+  btn.disabled=true;
+  btn.style.opacity='0.7';
+  try{
+    // Create payment method
+    var result=await window._verifyStripe.createPaymentMethod({
+      type:'card',
+      card:window._verifyCard,
+      billing_details:{email:CU.email,name:UP.name||CU.email}
+    });
+    if(result.error){
+      document.getElementById('stripe-card-error').textContent=result.error.message;
+      btn.textContent='Verify my account — $1';
+      btn.disabled=false;
+      btn.style.opacity='1';
+      return;
+    }
+    // Call Firebase function to charge $1
+    const resp=await fetch('https://chargeverification-wzmsqhv7la-uc.a.run.app',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paymentMethodId:result.paymentMethod.id,email:CU.email,name:UP.name||CU.email,uid:CU.uid})
+    });
+    var res=await resp.json();
+    if(res.success){
+      // Mark verified in Firestore
+      const {doc,setDoc}=await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+      await setDoc(doc(db,'users',CU.uid),{
+        verified:true,
+        verifiedAt:new Date(),
+        stripeCustomerId:res.customerId
+      },{merge:true});
+      UP.verified=true;
+      document.getElementById('verify-wall').remove();
+      ts('✅ Account verified! Welcome to Vivace Events.');
+    } else {
+      throw new Error(res.error||'Payment failed');
+    }
+  }catch(e){
+    document.getElementById('stripe-card-error').textContent=e.message||'Payment failed — please try again';
+    btn.textContent='Verify my account — $1';
+    btn.disabled=false;
+    btn.style.opacity='1';
+  }
+};
+// ─── END VERIFICATION WALL ───────────────────────────────────────────────────
+
+// ─── SUBSCRIPTION MANAGEMENT ──────────────────────────────────────────────────
+const PLAN_NAMES={free:'Free',pro:'Agent Pro',studio:'Agent Studio',agency:'Agency',
+  teacher_basic:'Teacher Basic',teacher_pro:'Teacher Pro',teacher_studio:'Teacher Studio'};
+const PLAN_PRICES={free:'$0',pro:'$14/mo',studio:'$39/mo',agency:'$149/mo',
+  teacher_basic:'Free',teacher_pro:'$14/mo',teacher_studio:'$39/mo'};
+
+window.showUpgradeConfirm=function(planId){
+  var m=document.createElement('div');
+  m.className='modal-bg';m.id='upgrade-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Upgrade to ${PLAN_NAMES[planId]}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${PLAN_PRICES[planId]} · billed monthly · cancel anytime</div>
+    <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:12px;color:#085041;font-weight:600;margin-bottom:4px">✅ Card on file</div>
+      <div style="font-size:12px;color:#085041">Your verified card will be charged ${PLAN_PRICES[planId]} immediately.</div>
+    </div>
+    <div style="background:#f9f9f9;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:#888">
+      By upgrading you agree to our Terms of Service. Subscription auto-renews monthly. Cancel anytime from billing settings.
+    </div>
+    <button class="bt" id="upgrade-btn" onclick="processUpgrade('${planId}')" style="width:100%;padding:14px;font-size:15px;margin-bottom:8px">
+      Confirm upgrade — ${PLAN_PRICES[planId]}
+    </button>
+    <button class="bg" onclick="document.getElementById('upgrade-modal').remove()" style="width:100%;padding:12px">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
+};
+
+window.processUpgrade=async function(planId){
+  var btn=document.getElementById('upgrade-btn');
+  if(btn){btn.textContent='Processing...';btn.disabled=true;}
+  try{
+    var resp=await fetch('https://createsubscription-wzmsqhv7la-uc.a.run.app',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        uid:CU.uid,
+        planId:planId,
+        priceId:PRICE_IDS[planId],
+        customerId:UP.stripeCustomerId
+      })
+    });
+    var data=await resp.json();
+    if(data.success){
+      UP.plan=planId;
+      UP.stripeSubscriptionId=data.subscriptionId;
+      UP.planStart=new Date().toISOString();
+      await saveUP();
+      document.getElementById('upgrade-modal')?.remove();
+      render();
+      ts('🎉 Welcome to '+PLAN_NAMES[planId]+'!');
+    } else {
+      throw new Error(data.error||'Upgrade failed');
+    }
+  }catch(e){
+    ts('Error: '+e.message);
+    if(btn){btn.textContent='Confirm upgrade';btn.disabled=false;}
+  }
+};
+
+window.showDowngradeConfirm=function(planId){
+  var m=document.createElement('div');
+  m.className='modal-bg';m.id='downgrade-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Switch to ${PLAN_NAMES[planId]}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Your plan will change at the end of your current billing period.</div>
+    <div style="background:#FFF8E1;border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:12px;color:#633806;font-weight:600;margin-bottom:4px">⏳ Takes effect at billing date</div>
+      <div style="font-size:12px;color:#633806">You keep all current features until then. No refund for unused days.</div>
+    </div>
+    <div style="background:#E1F5EE;border-radius:10px;padding:10px 12px;margin-bottom:16px">
+      <div style="font-size:12px;color:#085041">🔒 Your data — profile, network, contracts, history — stays safe forever.</div>
+    </div>
+    <button class="bt" id="downgrade-btn" onclick="processDowngrade('${planId}')" style="width:100%;padding:14px;font-size:15px;margin-bottom:8px">
+      Confirm switch to ${PLAN_NAMES[planId]}
+    </button>
+    <button class="bg" onclick="document.getElementById('downgrade-modal').remove()" style="width:100%;padding:12px">Keep current plan</button>
+  </div>`;
+  document.body.appendChild(m);
+};
+
+window.processDowngrade=async function(planId){
+  var btn=document.getElementById('downgrade-btn');
+  if(btn){btn.textContent='Processing...';btn.disabled=true;}
+  try{
+    var resp=await fetch('https://changesubscription-wzmsqhv7la-uc.a.run.app',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        uid:CU.uid,
+        planId:planId,
+        priceId:PRICE_IDS[planId],
+        subscriptionId:UP.stripeSubscriptionId,
+        atPeriodEnd:true
+      })
+    });
+    var data=await resp.json();
+    if(data.success){
+      UP.pendingPlan=planId;
+      await saveUP();
+      document.getElementById('downgrade-modal')?.remove();
+      render();
+      ts('Plan will change to '+PLAN_NAMES[planId]+' at billing date');
+    } else {
+      throw new Error(data.error||'Change failed');
+    }
+  }catch(e){
+    ts('Error: '+e.message);
+    if(btn){btn.textContent='Confirm switch';btn.disabled=false;}
+  }
+};
+
+window.showCancelConfirm=function(){
+  var m=document.createElement('div');
+  m.className='modal-bg';m.id='cancel-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Cancel subscription</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">You'll keep access until the end of your billing period.</div>
+    <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:12px;color:#085041">🔒 Your data stays safe forever. Resubscribe anytime and everything comes back instantly.</div>
+    </div>
+    <div style="background:#FFF0F0;border-radius:10px;padding:10px 12px;margin-bottom:16px">
+      <div style="font-size:12px;color:#922">No refunds for unused days. Access continues until billing period ends.</div>
+    </div>
+    <button class="bt" id="cancel-btn" onclick="processCancellation()" style="width:100%;padding:14px;font-size:15px;background:#FF3B30;margin-bottom:8px">
+      Yes, cancel subscription
+    </button>
+    <button class="bt" onclick="document.getElementById('cancel-modal').remove()" style="width:100%;padding:14px;font-size:15px;margin-bottom:0">
+      Keep my subscription
+    </button>
+  </div>`;
+  document.body.appendChild(m);
+};
+
+window.processCancellation=async function(){
+  var btn=document.getElementById('cancel-btn');
+  if(btn){btn.textContent='Cancelling...';btn.disabled=true;}
+  try{
+    var resp=await fetch('https://cancelsubscription-wzmsqhv7la-uc.a.run.app',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({uid:CU.uid,subscriptionId:UP.stripeSubscriptionId})
+    });
+    var data=await resp.json();
+    if(data.success){
+      UP.pendingPlan='free';
+      UP.cancelAtPeriodEnd=true;
+      await saveUP();
+      document.getElementById('cancel-modal')?.remove();
+      render();
+      ts('Subscription cancelled — access continues until billing date');
+    } else {
+      throw new Error(data.error||'Cancellation failed');
+    }
+  }catch(e){
+    ts('Error: '+e.message);
+    if(btn){btn.textContent='Yes, cancel subscription';btn.disabled=false;}
+  }
+};
+// ─── END SUBSCRIPTION MANAGEMENT ─────────────────────────────────────────────
+
+window.selG=function(btn,ev,role,n){
+  if(ev)ev.stopPropagation();
+  var prefix=role==='artist'?'a':'m';
+  ['1','2','3'].forEach(function(i){
+    var b=document.getElementById('g'+prefix+i);
+    if(b){
+      b.style.background=String(i)===String(n)?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)';
+      b.style.color=String(i)===String(n)?'#111':'rgba(255,255,255,.5)';
+    }
+  });
+  window._giftNum=window._giftNum||{};
+  window._giftNum[role]=parseInt(n);
+  // Store on container for reliable reading
+  var container=document.getElementById('g'+prefix+'1');
+  if(container&&container.parentNode){
+    container.parentNode.setAttribute('data-gift-n',n);
+  }
+};
+
 window.selectPlan=async function(planId){
-  if(CU.email==='rafael.javadov@gmail.com'){UP.plan=planId;await saveUP();render();ts('Plan switched to '+planId+' (founder access) ✅');return;}
+  // Founder bypass
+  if(CU.email==='rafael.javadov@gmail.com'){
+    UP.plan=planId;await saveUP();render();
+    ts('Plan switched to '+planId+' (founder access) ✅');return;
+  }
   if(planId===UP.plan){ts('This is your current plan');return;}
-  if(planId==='free'){UP.plan='free';await saveUP();render();ts('Switched to free plan');return;}
-  // Use trial price if eligible
-  const trialKey=planId+'_trial';
-  const isEligible=!UP.trialUsed&&planId!=='agency';
-  const priceId=isEligible&&PRICE_IDS[trialKey]?PRICE_IDS[trialKey]:PRICE_IDS[planId];
-  showStripeModal(planId, priceId, isEligible);
-}
+
+  const currentPlan=UP.plan||'free';
+  const planOrder=['free','pro','studio','agency','teacher_basic','teacher_pro','teacher_studio'];
+  const currentIdx=planOrder.indexOf(currentPlan);
+  const newIdx=planOrder.indexOf(planId);
+  const isUpgrade=newIdx>currentIdx;
+  const isDowngrade=newIdx<currentIdx&&planId!=='free';
+  const isFree=planId==='free';
+
+  if(isFree){
+    // Cancel subscription — downgrade to free at period end
+    showCancelConfirm();return;
+  }
+
+  if(!UP.verified){showVerificationWall();ts('Please verify your account first');return;}
+
+  if(isUpgrade){
+    // Charge card on file immediately
+    showUpgradeConfirm(planId);
+  } else {
+    // Schedule downgrade at period end
+    showDowngradeConfirm(planId);
+  }
+};
 
 // ─── TRIAL SYSTEM ────────────────────────────────────────────────
 
@@ -5384,7 +6267,7 @@ function showTrialExpiredModal(){
 window.sendGiftCredit=async function(role,credits,recipientEmail){
   if(!CU||!UP)return;
   const senderPlan=UP.plan||'free';
-  const giftLimits={pro:3,studio:10,agency:999999,teacher_pro:3,teacher_studio:10};
+  const giftLimits={pro:5,studio:15,agency:999999,teacher_pro:5,teacher_studio:15};
   if(!giftLimits[senderPlan]){ts('Upgrade to send gifts');return;}
   if(!recipientEmail||!recipientEmail.includes('@')){ts('Please enter a valid email');return;}
   try{
@@ -5468,17 +6351,13 @@ window.applyGiftCode=async function(code,userId){
 // ─── STRIPE CHECKOUT ────────────────────────────────────────────
 const STRIPE_PK='pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32';
 const PRICE_IDS={
-  pro:'price_1Tf6RyR49hhPnbuaD6Qkpyti',
-  studio:'price_1TeMPQR49hhPnbua6qYhcqQ1',
+  pro:'price_1TgBjOR49hhPnbuaeWQnrHA4',
+  studio:'price_1TgBq9R49hhPnbuaYPHvaoIv',
   agency:'price_1TeMR8R49hhPnbuamR69UdH2',
-  teacher_basic:'price_1Tf63ER49hhPnbuaOOqXr1G8',
-  teacher_pro:'price_1Tf68wR49hhPnbuamIFfJa3s',
-  teacher_studio:'price_1Tf6D2R49hhPnbuackRYKuS2',
-  pro_trial:'price_1Tf6UTR49hhPnbua5ncx7UCN',
-  studio_trial:'price_1Tf5XsR49hhPnbuaO2d5lGKP',
-  teacher_basic_trial:'price_1Tf66yR49hhPnbua9R0d4v3D',
-  teacher_pro_trial:'price_1Tf6AwR49hhPnbua8ajQIDYO',
-  teacher_studio_trial:'price_1Tf6E1R49hhPnbuaZZsACQs5',
+  teacher_basic:'free',
+  teacher_pro:'price_1TgC3QR49hhPnbuaB8YUeaK4',
+  teacher_studio:'price_1TgC7ER49hhPnbuaZu5LFZIt',
+  verification:'price_1TgBLGR49hhPnbuatwgoTbTA',
 };
 const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCheckoutSession';
 
@@ -5606,8 +6485,8 @@ function profileHTML(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <button class="role-btn${roles.includes('artist')?' on':''}" onclick="toggleRole('artist')">🎻 ${t('artist')}</button>
       <button class="role-btn${roles.includes('manager')?' on':''}" onclick="toggleRole('manager')">🎯 ${t('agentMgr')}</button>
-      <button class="role-btn${roles.includes('teacher')?' on':''}" onclick="toggleRole('teacher')">👨‍🏫 ${t('teacher')||'Teacher'}</button>
-      <button class="role-btn${roles.includes('student')?' on':''}" onclick="toggleRole('student')">🎓 ${t('student')||'Student'}</button>
+      <button class="role-btn${roles.includes('teacher')?' on':''}" onclick="toggleRole('teacher')">🎓 ${t('teacher')||'Teacher'}</button>
+      <button class="role-btn${roles.includes('student')?' on':''}" onclick="toggleRole('student')">📚 ${t('student')||'Student'}</button>
       <button class="role-btn${roles.includes('organizer')?' on':''}" onclick="toggleRole('organizer')">🎪 Event Organizer</button>
     </div>
     <div style="font-size:11px;color:#aaa">${t('multipleRoles')||'You can hold multiple roles simultaneously'}</div>
@@ -5639,85 +6518,13 @@ function profileHTML(){
       ${[['en','EN'],['es','ES'],['it','IT'],['ru','RU'],['fr','FR'],['de','DE']].map(([l,label])=>`<button class="lang-btn${lang===l?' on':''}" onclick="setLang('${l}')" style="min-width:48px;text-align:center">${label}</button>`).join('')}
     </div>
   </div>
-  <div style="margin-bottom:18px">
+  <div id="sub-section" style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">Subscription</div>
       <span class="tag ${plan==='free'?'tf':plan==='pro'?'tg':plan==='studio'?'ta':'tp'}">${planLabels[plan]}</span>
     </div>
     <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="go('billing')">${plan==='free'?(isTeacher()?'Upgrade to Teacher Pro — $19/mo':'Upgrade to Agent Pro — $19/mo'):'Manage subscription'}</button>
   </div>
-  <div style="margin-bottom:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div class="st">🎁 Gig gift credits</div>
-      <span style="font-size:10px;color:#aaa">resets ${new Date(new Date().getFullYear(),new Date().getMonth()+1,1).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
-    </div>
-    <div style="background:#111;border-radius:16px;padding:16px">
-      <div style="font-size:11px;color:#555;margin-bottom:14px">${planLabels[plan]} · gift credits to grow your network</div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-        ${Array.from({length:Math.min(10,{free:10,pro:25,studio:50,agency:10}[plan]||10)}).map((_,i)=>{
-          const used=UP.gigPostCount||0;
-          const gifted=UP.giftsGiven||0;
-          const left=Math.max(0,(UP.gigPostCount||0)<=0?2:2);
-          if(i<3) return '<div style="width:34px;height:34px;border-radius:8px;background:#222"></div>';
-          if(i<5) return '<div style="width:34px;height:34px;border-radius:8px;background:#1D9E75"></div>';
-          if(i<7) return '<div style="width:34px;height:34px;border-radius:8px;background:#F97316"></div>';
-          return '';
-        }).join('')}
-      </div>
-      <div style="display:flex;gap:10px;margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#555">
-          <div style="width:7px;height:7px;border-radius:50%;background:#333"></div>used
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#1D9E75">
-          <div style="width:7px;height:7px;border-radius:50%;background:#1D9E75"></div>available
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#F97316">
-          <div style="width:7px;height:7px;border-radius:50%;background:#F97316"></div>gifted
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px" id="gift-role-btns">
-        ${roles.includes('artist')?`
-        <div>
-          <div style="background:linear-gradient(135deg,#1D9E75,#0F6E56);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">🎻</div>
-              <div>
-                <div style="font-size:14px;font-weight:700;color:#fff">Gift as Artist</div>
-                <div style="font-size:10px;color:rgba(255,255,255,.5)">Invite a musician</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:4px">
-              ${[1,2,3].map(n=>`<button onclick="selectGiftNum('artist',${n})" id="gift-a-${n}" style="width:34px;height:34px;border-radius:8px;background:${n===1?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)'};color:${n===1?'#111':'rgba(255,255,255,.5)'};border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">${n}</button>`).join('')}
-            </div>
-          </div>
-          <div style="text-align:right;padding:6px 2px 4px">
-            <button onclick="openGiftSheet('artist')" style="background:#1D9E75;color:#fff;border:none;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Send gift →</button>
-          </div>
-        </div>`:''}
-        ${roles.includes('manager')?`
-        <div>
-          <div style="background:linear-gradient(135deg,#378ADD,#185FA5);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="width:36px;height:36px;border-radius:9px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:18px">🎯</div>
-              <div>
-                <div style="font-size:14px;font-weight:700;color:#fff">Gift as Manager</div>
-                <div style="font-size:10px;color:rgba(255,255,255,.5)">Grow your roster</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:4px">
-              ${[1,2,3].map(n=>`<button onclick="selectGiftNum('manager',${n})" id="gift-m-${n}" style="width:34px;height:34px;border-radius:8px;background:${n===1?'rgba(255,255,255,.9)':'rgba(0,0,0,.25)'};color:${n===1?'#111':'rgba(255,255,255,.5)'};border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">${n}</button>`).join('')}
-            </div>
-          </div>
-          <div style="text-align:right;padding:6px 2px 4px">
-            <button onclick="openGiftSheet('manager')" style="background:#378ADD;color:#fff;border:none;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Send gift →</button>
-          </div>
-        </div>`:''}
-      </div>
-      <div style="font-size:11px;color:#444;text-align:center;margin-top:12px;line-height:1.7">New users only · 3 bonus gigs · valid 90 days<br>When they post their first gig — you get one back</div>
-    </div>
-  </div>
-
-  <div style="margin-bottom:18px">
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('myAvailability')||'My Availability'}</div>
@@ -6477,7 +7284,6 @@ window.toggleRole=async function(role){
   else roles.push(role);
   UP.roles=[...new Set(roles)];
   await saveUP();
-  await loadUP();
   render();
   ts(UP.roles.includes(role)?role.charAt(0).toUpperCase()+role.slice(1)+' role enabled!':role+' role removed');
 }
@@ -8311,6 +9117,8 @@ onAuthStateChanged(auth,async user=>{
     render();
     // Check birthday and holidays after render
     setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();},1500);
+    // Check $1 verification
+    setTimeout(()=>{checkVerification();},1500);
   } else {
     render();
   }
