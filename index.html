@@ -5001,6 +5001,22 @@ var FOLDER_TYPES=[
   {id:'never',label:'Never Used',icon:'🔍',color:'#555',bg:'#F5F5F5'},
 ];
 
+// Master instrument list — grouped for the dropdown
+var VIVACE_INSTRUMENTS=[
+  {group:'🎻 Strings (Orchestral)',items:['Violin Solo','Violin 1','Violin 2','Violin 3','Viola','Cello','Double Bass','Harp']},
+  {group:'🎷 Woodwinds',items:['Flute 1','Flute 2','Flute 3','Oboe 1','Oboe 2','Oboe 3','Clarinet 1','Clarinet 2','Clarinet 3','Bassoon 1','Bassoon 2','Bassoon 3','Saxophone 1','Saxophone 2','Saxophone 3']},
+  {group:'🎺 Brass',items:['Trumpet 1','Trumpet 2','Trumpet 3','French Horn 1','French Horn 2','French Horn 3','Trombone 1','Trombone 2','Trombone 3','Tuba 1','Tuba 2','Tuba 3']},
+  {group:'🥁 Percussion',items:['Percussion 1','Percussion 2','Percussion 3','Drums 1','Drums 2','Drums 3','Timpani','Xylophone','Tambourine / Hand Percussion','Latin Percussion (Congas / Bongos)','Cajón']},
+  {group:'🎹 Keyboards',items:['Piano','Keyboard','Synthesizer','MIDI Controller','Harpsichord']},
+  {group:'🎸 Guitars',items:['Guitar Solo','Guitar Lead','Guitar Rhythm','Bass Guitar','Acoustic Guitar','Electric Guitar','Steel / Pedal Guitar','Ukulele','Mandolin','Banjo']},
+  {group:'🪈 Folk / World Winds',items:['Recorder','Pan Flute','Bagpipes','Harmonica']},
+  {group:'🌍 World / Traditional',items:['Tar / Setar','Kamancheh','Saz','Duduk']},
+  {group:'🎤 Voice',items:['Voice (Soprano)','Voice (Mezzo-Soprano)','Voice (Alto)','Voice (Tenor)','Voice (Countertenor)','Voice (Baritone)','Voice (Bass)','Rapper / MC','Beatboxer']},
+  {group:'🎧 DJ / Electronic',items:['DJ','Turntablist','DJ + Producer / Beatmaker']},
+  {group:'🎚️ Behind the Scenes',items:['Sound Engineer','Lighting Tech','Stage Manager','Roadie / Tech']},
+  {group:'🎼 Other',items:['Conductor','Other']},
+];
+
 async function loadRosterFolders(){
   try{
     const s=await getDocs(query(collection(db,'rosterFolders'),where('managerId','==',CU.uid)));
@@ -5174,10 +5190,10 @@ window.showAddToFolder=function(fid){
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Add to Queue</div>
     <div style="font-size:13px;color:#888;margin-bottom:14px">Search by name or enter their email</div>
     <div style="margin-bottom:12px"><span class="flbl">Name or email</span><input class="finp" id="af-q" placeholder="john@email.com or John Smith" autocomplete="off"/></div>
-    <div style="margin-bottom:16px"><span class="flbl">Instrument</span>
+    <div style="margin-bottom:16px"><span class="flbl">Instrument / Role</span>
       <select class="finp" id="af-instr">
-        <option value="">— Select instrument —</option>
-        ${['Violin','Viola','Cello','Double Bass','Flute','Oboe','Clarinet','Bassoon','Saxophone','Trumpet','French Horn','Trombone','Tuba','Percussion','Drums','Piano','Guitar','Bass Guitar','Harp','Voice (Soprano)','Voice (Alto)','Voice (Tenor)','Voice (Baritone)','Conductor','Other'].map(i=>`<option>${i}</option>`).join('')}
+        <option value="">— Select instrument / role —</option>
+        ${VIVACE_INSTRUMENTS.map(g=>`<optgroup label="${g.group}">${g.items.map(i=>`<option>${i}</option>`).join('')}</optgroup>`).join('')}
       </select>
     </div>
     <div style="display:flex;gap:8px">
