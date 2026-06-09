@@ -5555,8 +5555,14 @@ function renderStage(){
     }
     html+=`</div></div>`;
   });
-  // conductor
-  html+=`<div style="text-align:center;margin-top:6px"><span style="display:inline-block;background:#0d0d0d;color:#FFD86B;font-size:10px;font-weight:600;padding:5px 16px;border-radius:14px">Conductor / Director</span></div>`;
+  // conductor — tap to set name
+  const cn=(cfg&&cfg.conductor)?cfg.conductor:'';
+  html+=`<div style="text-align:center;margin-top:6px">
+    <button onclick="setStageConductor()" style="display:inline-flex;align-items:center;gap:6px;background:#0d0d0d;border:1px solid ${cn?'#C9A84C':'#3a2c08'};color:#FFD86B;font-size:11px;font-weight:600;padding:6px 14px;border-radius:14px;cursor:pointer;font-family:inherit">
+      <span style="font-size:13px;line-height:1">${cn?'🎼':'＋'}</span>
+      <span>${cn?cn:'Add Conductor / Director'}</span>
+    </button>
+  </div>`;
   html+='</div>';
 
   // bench
@@ -5779,6 +5785,40 @@ window.unseatMember=async function(mid){
   document.getElementById('stage-sheet')?.remove();
   try{await updateDoc(doc(db,'rosterMembers',mid),{seatSection:'',seatSlot:-1});}catch(e){}
   await reloadWheelMembers();setWheelView('stage');
+};
+
+window.setStageConductor=function(){
+  const cur=(_wheel.stageConfig&&_wheel.stageConfig.conductor)?_wheel.stageConfig.conductor:'';
+  const myName=(UP&&(UP.name||UP.displayName))||(CU&&CU.displayName)||(CU&&CU.email?CU.email.split('@')[0]:'');
+  document.getElementById('cond-sheet')?.remove();
+  const s=document.createElement('div');s.id='cond-sheet';
+  s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  s.onclick=function(e){if(e.target===s)s.remove();};
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">🎼 Conductor / Director</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">Who's leading this ensemble?</div>
+    <div style="margin-bottom:12px"><span class="flbl">Name</span><input class="finp" id="cond-name" placeholder="e.g. Maestro Smith" value="${cur.replace(/"/g,'&quot;')}" autocomplete="off"/></div>
+    ${myName?`<button onclick="document.getElementById('cond-name').value='${myName.replace(/'/g,"\\'")}'" style="width:100%;padding:11px;border:1px dashed #1D9E75;border-radius:10px;background:#E1F5EE;color:#0F6E56;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px">Use my name — ${myName}</button>`:''}
+    <div style="display:flex;gap:8px">
+      ${cur?`<button onclick="saveStageConductor('')" style="flex:1;padding:13px;border:1px solid #F09595;border-radius:11px;background:#fff;color:#D14343;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Remove</button>`:`<button onclick="document.getElementById('cond-sheet').remove()" style="flex:1;padding:13px;border:1px solid #ddd;border-radius:11px;background:#fff;color:#888;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>`}
+      <button onclick="saveStageConductor(document.getElementById('cond-name').value)" style="flex:2;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#1D9E75,#0F6E56);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+  setTimeout(()=>document.getElementById('cond-name')?.focus(),60);
+};
+
+window.saveStageConductor=async function(name){
+  const clean=(name||'').trim();
+  if(!_wheel.stageConfig)_wheel.stageConfig={sections:[]};
+  _wheel.stageConfig.conductor=clean;
+  try{
+    await setDoc(doc(db,'rosterFolders',_wheel.fid),{stageConfig:_wheel.stageConfig},{merge:true});
+    ts(clean?'Conductor set: '+clean:'Conductor removed');
+  }catch(e){console.error(e);ts('Saved');}
+  document.getElementById('cond-sheet')?.remove();
+  renderStage();
 };
 
 window.showAddToFolder=function(fid){
