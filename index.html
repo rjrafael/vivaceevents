@@ -6313,7 +6313,8 @@ window.processCancellation=async function(){
 
 window.selG=function(btn,ev,role,n){
   if(ev)ev.stopPropagation();
-  var prefix=role==='artist'?'a':'m';
+  var prefixMap={artist:'a',manager:'m',teacher:'t',organizer:'o'};
+  var prefix=prefixMap[role]||'a';
   ['1','2','3'].forEach(function(i){
     var b=document.getElementById('g'+prefix+i);
     if(b){
