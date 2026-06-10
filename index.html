@@ -136,7 +136,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div id="app"></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile, verifyBeforeUpdateEmail, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
@@ -3558,6 +3558,162 @@ window.saveNewName=async function(){
   render();
   ts('✅ Name updated!');
 }
+
+// ─── EDITABLE EMAIL — Facebook-proof email change flow ──────────
+// Rules: username stays permanent, email = changeable login method.
+// Sensitive: requires re-auth + verification + handles Google/Phone users + notify managers option.
+window.showEditEmail=function(){
+  // Detect sign-in method — Google/Phone users can't change email here
+  const providers=(CU&&CU.providerData)||[];
+  const isGoogle=providers.some(p=>p.providerId==='google.com');
+  const isFacebook=providers.some(p=>p.providerId==='facebook.com');
+  const isPhone=providers.some(p=>p.providerId==='phone');
+  const isPassword=providers.some(p=>p.providerId==='password');
+
+  const m=document.createElement('div');m.className='modal-bg';m.id='edit-email-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:11000;display:flex;align-items:center;justify-content:center;padding:18px';
+
+  // Special case — social/phone users can't change here
+  if((isGoogle||isFacebook||isPhone)&&!isPassword){
+    const which=isGoogle?'Google':(isFacebook?'Facebook':'phone number');
+    m.innerHTML=`<div class="modal" style="max-width:420px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:17px;font-weight:700;color:#111">📧 Change login email</div>
+        <button onclick="document.getElementById('edit-email-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+      </div>
+      <div style="background:#FFF7E6;border:1px solid #F4D27A;border-radius:11px;padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;color:#7a5a14;line-height:1.5">You signed in with <strong>${which}</strong>. Your login email is managed by ${which} and can't be changed here.</div>
+      </div>
+      <div style="font-size:12px;color:#666;margin-bottom:14px;line-height:1.6">
+        Don't worry — your Vivace identity is <strong>permanent</strong>:
+        <br>• Your @username (<strong>@${UP.username||'yours'}</strong>) never changes
+        <br>• All your gigs, messages, and connections stay attached to you
+        <br>• If you ever lose access, your username + payment record verify you
+      </div>
+      <button class="bt" style="width:100%;padding:13px;font-size:14px" onclick="document.getElementById('edit-email-modal').remove()">Got it</button>
+    </div>`;
+    document.getElementById('app').appendChild(m);
+    return;
+  }
+
+  // Standard email/password flow — full edit available
+  m.innerHTML=`<div class="modal" style="max-width:440px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📧 Change login email</div>
+      <button onclick="document.getElementById('edit-email-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Your @username and account stay the same — only the login email changes.</div>
+
+    <div style="background:#FFF7E6;border:1px solid #F4D27A;border-radius:11px;padding:13px;margin-bottom:16px">
+      <div style="font-size:12px;color:#7a5a14;font-weight:700;margin-bottom:6px">⚠️ Before you change</div>
+      <ul style="font-size:11px;color:#7a5a14;margin:0;padding-left:18px;line-height:1.6">
+        <li>You'll receive a verification link at the NEW email — you must click it within 1 hour</li>
+        <li>Until you click the link, you keep logging in with the old email</li>
+        <li>Your password stays the same</li>
+        <li>People who saved your old email outside Vivace may need to be told</li>
+      </ul>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <span class="flbl">Current email</span>
+      <input class="finp" value="${CU.email||''}" disabled style="background:#f5f5f5;color:#888"/>
+    </div>
+    <div style="margin-bottom:12px">
+      <span class="flbl">New login email</span>
+      <input class="finp" id="ee-new" type="email" placeholder="new@example.com" autocomplete="email"/>
+    </div>
+    <div style="margin-bottom:14px">
+      <span class="flbl">Confirm your current password</span>
+      <input class="finp" id="ee-pw" type="password" placeholder="Your current password" autocomplete="current-password"/>
+      <div style="font-size:10px;color:#aaa;margin-top:4px">Required for security — confirms it's really you</div>
+    </div>
+
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid #B7E0D2;border-radius:11px;background:#F7FBF9;cursor:pointer;margin-bottom:18px">
+      <input type="checkbox" id="ee-notify" checked style="width:18px;height:18px;accent-color:#1D9E75;margin-top:1px"/>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#111">📣 Notify my managers &amp; connections</div>
+        <div style="font-size:11px;color:#666;margin-top:2px">Recommended. Send a one-line heads-up to people you've worked with on Vivace.</div>
+      </div>
+    </label>
+
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('edit-email-modal').remove()">Cancel</button>
+      <button class="bt" id="ee-save" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveNewEmail()">Send verification link</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  setTimeout(()=>document.getElementById('ee-new')?.focus(),100);
+};
+
+window.saveNewEmail=async function(){
+  const newEmail=(document.getElementById('ee-new')?.value||'').trim().toLowerCase();
+  const password=document.getElementById('ee-pw')?.value||'';
+  const notify=!!document.getElementById('ee-notify')?.checked;
+  if(!newEmail||!newEmail.includes('@')||!newEmail.includes('.')){ts('Please enter a valid email address');return;}
+  if(newEmail===CU.email?.toLowerCase()){ts('That\'s your current email');return;}
+  if(!password){ts('Please enter your current password');return;}
+  const btn=document.getElementById('ee-save');if(btn){btn.disabled=true;btn.textContent='Verifying…';}
+  try{
+    // Step 1: re-auth — Firebase requires recent sign-in for email changes
+    const cred=EmailAuthProvider.credential(CU.email,password);
+    await reauthenticateWithCredential(CU,cred);
+    // Step 2: send the verification email to the NEW address
+    // The user must click the link in that email to complete the change.
+    // Firebase will swap auth.currentUser.email automatically after they click.
+    await verifyBeforeUpdateEmail(CU,newEmail);
+    // Step 3: store the old email in previousEmails (for dedup matching across changes)
+    const prev=(UP&&UP.previousEmails)||[];
+    if(CU.email&&!prev.includes(CU.email))prev.push(CU.email);
+    await setDoc(doc(db,'users_private',CU.uid),{
+      previousEmails:prev,
+      emailChangeRequestedAt:new Date(),
+      emailChangeRequestedTo:newEmail,
+      emailChangeNotifyManagers:notify,
+    },{merge:true});
+    if(UP){UP.previousEmails=prev;}
+    // Step 4: if notify checked, queue notifications for managers/connections (best effort)
+    if(notify){
+      try{
+        // find all managers/teachers the user has connections with via gigs/applications/contracts
+        const connectedManagers=new Set();
+        const apps=await getDocs(query(collection(db,'applications'),where('userId','==',CU.uid)));
+        for(const a of apps.docs){const d=a.data();if(d.managerId)connectedManagers.add(d.managerId);}
+        // queue an in-platform notification to each (NOT email — they may not want it)
+        const myName=(UP&&UP.name)||CU.displayName||'A connection';
+        const handle=(UP&&UP.username)?'@'+UP.username:'';
+        for(const mid of connectedManagers){
+          await addDoc(collection(db,'notifications'),{
+            toUserId:mid,
+            type:'email_update',
+            message:`${myName}${handle?' ('+handle+')':''} is updating their login email to ${newEmail}. Their @username and Vivace identity haven't changed.`,
+            timestamp:new Date(),
+            read:false,
+          });
+        }
+      }catch(notifyErr){console.log('notify managers (non-blocking):',notifyErr);}
+    }
+    document.getElementById('edit-email-modal')?.remove();
+    // Final success modal with clear next steps
+    const s=document.createElement('div');s.className='modal-bg';s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:11001;display:flex;align-items:center;justify-content:center;padding:18px';
+    s.innerHTML=`<div class="modal" style="max-width:400px;text-align:center">
+      <div style="font-size:42px;margin-bottom:8px">📬</div>
+      <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Verification link sent!</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;margin-bottom:16px">We sent a verification link to <strong>${newEmail}</strong>.<br><br>Open that inbox and click the link within 1 hour. Until then, keep logging in with your current email (<strong>${CU.email}</strong>).</div>
+      <button class="bt" style="width:100%;padding:13px" onclick="this.parentElement.parentElement.remove()">Got it</button>
+    </div>`;
+    document.getElementById('app').appendChild(s);
+  }catch(e){
+    console.error('email change error:',e);
+    let msg='Could not update email';
+    if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential')msg='Wrong password — please try again';
+    else if(e.code==='auth/email-already-in-use')msg='That email is already used by another account';
+    else if(e.code==='auth/invalid-email')msg='Please enter a valid email address';
+    else if(e.code==='auth/requires-recent-login')msg='Please sign out and sign in again, then try once more';
+    else if(e.code==='auth/too-many-requests')msg='Too many attempts. Wait a few minutes and try again.';
+    ts(msg);
+    if(btn){btn.disabled=false;btn.textContent='Send verification link';}
+  }
+};
 
 // ─── PWA INSTALL PROMPT ──────────────────────────────────────────
 let _pwaPrompt=null;
@@ -8123,7 +8279,10 @@ function profileHTML(){
         ${UP.featured?`<span class="featured-badge">⭐ Featured</span>`:''}
         ${plan!=='free'?`<span class="pro-badge">${planLabels[plan]}</span>`:''}
       </div>
-      <div style="font-size:12px;color:#aaa;margin-bottom:6px">${CU.email}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="font-size:12px;color:#aaa">${CU.email}</span>
+        <button onclick="showEditEmail()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:11px;padding:0" title="Change login email">✏️</button>
+      </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('artist')?'<span class="tag" style="background:#1D9E75;color:#fff;border:none">🎻 Artist</span>':''}
         ${roles.includes('manager')?'<span class="tag" style="background:#378ADD;color:#fff;border:none">🎯 Agent / Manager</span>':''}
