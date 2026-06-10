@@ -438,8 +438,16 @@ function canPostAudition(){return UP.roles&&(UP.roles.includes('manager')||UP.ro
 async function loadUP(){
   try{
     const d=await getDoc(doc(db,'users',CU.uid));
+    // Try to read private data (only the owner can — Firestore rules enforce this)
+    let priv={};
+    try{
+      const pd=await getDoc(doc(db,'users_private',CU.uid));
+      if(pd.exists())priv=pd.data();
+    }catch(e){}
     if(d.exists()){
-      UP={...UP,...d.data()};
+      UP={...UP,...d.data(),...priv};
+      // CU.email is always source of truth for login email
+      UP.email=CU.email;
       lang=UP.lang||detectLang();
       // Clean up legacy role names
       const validRoles=['artist','manager','teacher','student','organizer'];
@@ -451,12 +459,38 @@ async function loadUP(){
       if(d.data().roles&&JSON.stringify(d.data().roles)!==JSON.stringify(UP.roles)){
         setDoc(doc(db,'users',CU.uid),{roles:UP.roles},{merge:true}).catch(()=>{});
       }
+      // ─── SECURITY MIGRATION ─── one-time per user, silent
+      // Move sensitive fields out of the public users doc into the locked users_private doc.
+      const pub=d.data();
+      const needsMigration=pub.email||pub.phone||pub.hasWhatsApp!==undefined||pub.pushTokens||pub.stripeCustomerId||pub.pushEnabled!==undefined||pub.muteGroupMessages!==undefined;
+      if(needsMigration){
+        try{
+          const privPayload={};
+          if(pub.email)privPayload.email=pub.email;
+          if(pub.phone)privPayload.phone=pub.phone;
+          if(pub.hasWhatsApp!==undefined)privPayload.hasWhatsApp=pub.hasWhatsApp;
+          if(pub.pushTokens)privPayload.pushTokens=pub.pushTokens;
+          if(pub.pushEnabled!==undefined)privPayload.pushEnabled=pub.pushEnabled;
+          if(pub.muteGroupMessages!==undefined)privPayload.muteGroupMessages=pub.muteGroupMessages;
+          if(pub.stripeCustomerId)privPayload.stripeCustomerId=pub.stripeCustomerId;
+          await setDoc(doc(db,'users_private',CU.uid),privPayload,{merge:true});
+          // Overwrite public doc with ONLY safe fields (strips sensitive fields)
+          const safeFields=['name','displayName','username','photoURL','roles','plan','lang','created','verified','verifiedAt','verifiedReason','featured','founderAccess','instruments','genres','primaryInstrument','reelURL','spotifyUrl','appleMusicUrl','bio','availableDates','documentationPending','cancellations','referralCode','giftCreditsAvailable','signedInFirstTime','tosAcceptedAt','language','radio'];
+          const cleanPub={};
+          safeFields.forEach(k=>{if(pub[k]!==undefined)cleanPub[k]=pub[k];});
+          await setDoc(doc(db,'users',CU.uid),cleanPub);
+          console.log('🔒 Security migration complete');
+        }catch(mig){console.log('migration will retry next login:',mig);}
+      }
     }
     else{
       lang=detectLang();
-      await setDoc(doc(db,'users',CU.uid),{roles:['artist'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});
+      // Create public doc with safe fields only
+      await setDoc(doc(db,'users',CU.uid),{roles:['artist'],name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});
+      // Create private doc (locked — only the owner can read)
+      await setDoc(doc(db,'users_private',CU.uid),{email:CU.email});
       UP.email=CU.email;UP.name=CU.displayName||CU.email.split('@')[0];UP.plan='free';UP.roles=['artist'];
-      // brand-new user → send a warm welcome email (username comes after they claim it)
+      // brand-new user → send a warm welcome email
       sendWelcomeEmail();
     }
   }catch(e){}
@@ -472,7 +506,21 @@ function detectLang(){
   return 'en';
 }
 
-async function saveUP(){try{await setDoc(doc(db,'users',CU.uid),{...UP,email:CU.email},{merge:true});}catch(e){}}
+async function saveUP(){
+  try{
+    // Split into public (safe to expose) and private (sensitive)
+    const privateKeys=['email','phone','hasWhatsApp','pushTokens','pushEnabled','muteGroupMessages','stripeCustomerId'];
+    const pub={};const priv={};
+    for(const k in UP){
+      if(privateKeys.includes(k))priv[k]=UP[k];
+      else pub[k]=UP[k];
+    }
+    await setDoc(doc(db,'users',CU.uid),pub,{merge:true});
+    if(Object.keys(priv).length>0){
+      await setDoc(doc(db,'users_private',CU.uid),priv,{merge:true});
+    }
+  }catch(e){}
+}
 
 // ─── WELCOME EMAIL ───────────────────────────────────────────────
 async function sendWelcomeEmail(){
@@ -710,37 +758,39 @@ function authHTML(){return `
     <div style="text-align:center;margin-top:4px"><span style="font-size:13px;color:#1D9E75;cursor:pointer" id="btn-forgot">Forgot password?</span></div>
   </div>
 
-  <!-- Terms of Service -->
+  <!-- Terms of Service — single checkbox, scrollable disclosure -->
   <div style="width:100%;margin-top:20px;background:#f9f9f9;border-radius:14px;padding:16px">
     <div style="font-size:13px;font-weight:700;color:#111;margin-bottom:4px;display:flex;align-items:center;gap:6px">
-      <span>📋</span> Platform Terms & Conditions
+      <span>📋</span> Platform Terms &amp; Conditions
     </div>
-    <div style="font-size:11px;color:#888;margin-bottom:14px">Please read carefully and check each box before continuing</div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px">New accounts must accept these terms once. (Existing users won't see this again unless terms change.)</div>
 
-    ${[
-      ['tos1','🏛️ Platform only — Vivace Events and Virtual Studio Orchestra LLC provide a communication and networking platform only. We are not a party to any booking, agreement, contract, or transaction between users. We do not employ, represent, or manage any musician, agent, or manager on this platform.'],
-      ['tos2','💰 No financial liability — We are not liable for unpaid fees, bounced payments, payment disputes, financial losses, or any monetary disagreements between users. All payment arrangements are solely between the parties involved. Users are solely responsible for their own tax reporting obligations.'],
-      ['tos3','⚠️ Personal safety — Vivace Events does not verify the identity, credentials, criminal background, or intentions of any user. You are solely responsible for your personal safety when meeting other users or attending gigs. We are not liable for any injury, harm, loss, or criminal activity that occurs between users or at gig locations.'],
-      ['tos4','🎻 Instruments & property — We are not liable for any loss, theft, damage, or destruction of musical instruments, personal equipment, or any other property before, during, or after any gig arranged through this platform.'],
-      ['tos5','🔌 No resources provided — We do not provide instruments, sound equipment, lighting, electricity, staging, transportation, or any physical resources. We do not guarantee safe, suitable, legal, or adequate working conditions at any venue or gig location.'],
-      ['tos6','🏛️ Venue & conditions — We are not responsible for the physical condition, safety, accessibility, or suitability of any venue. Managers are solely responsible for ensuring venues comply with all applicable laws, safety codes, and regulations.'],
-      ['tos7','⚖️ No criminal liability — We are not liable for any criminal, negligent, fraudulent, or harmful acts committed by any user on or off this platform. We cooperate fully with law enforcement authorities when legally required.'],
-      ['tos8','🤝 Relationship disclaimer — We are not responsible for the professional, personal, or legal relationships between managers and their clients, musicians and their agents, or any other parties connected through this platform.'],
-      ['tos9','📋 Disputes — Any disputes between users must be resolved directly between the parties. Vivace Events does not mediate, arbitrate, adjudicate, or take sides in any dispute between users.'],
-      ['tos10','✅ Honest use — I agree to use this platform honestly and professionally. I will not post false information, fake gig listings, or deceptive content. I understand that misuse, fraud, or harmful behavior may result in immediate removal and may be reported to law enforcement.'],
-    ].map(([id,text])=>`
-      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer;padding:8px;border-radius:8px;background:#fff;border:1px solid #eee">
-        <input type="checkbox" id="${id}" onchange="checkTOS()" style="width:18px;height:18px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
-        <span style="font-size:11px;color:#444;line-height:1.6">${text}</span>
-      </label>`).join('')}
-    
-    <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px;font-size:11px;color:#085041;line-height:1.6">
-      🔒 By creating an account or signing in, you confirm that you have read, understood, and agree to all terms above. These terms are recorded with your account timestamp for legal compliance.<br><br>
+    <div style="max-height:220px;overflow-y:auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:11px;color:#444;line-height:1.6">
+      ${[
+        '🏛️ <strong>Platform only</strong> — Vivace Events and Virtual Studio Orchestra LLC provide a communication and networking platform only. We are not a party to any booking, agreement, contract, or transaction between users. We do not employ, represent, or manage any musician, agent, or manager on this platform.',
+        '💰 <strong>No financial liability</strong> — We are not liable for unpaid fees, bounced payments, payment disputes, financial losses, or any monetary disagreements between users. All payment arrangements are solely between the parties involved. Users are solely responsible for their own tax reporting obligations.',
+        '⚠️ <strong>Personal safety</strong> — Vivace Events does not verify the identity, credentials, criminal background, or intentions of any user. You are solely responsible for your personal safety when meeting other users or attending gigs. We are not liable for any injury, harm, loss, or criminal activity that occurs between users or at gig locations.',
+        '🎻 <strong>Instruments &amp; property</strong> — We are not liable for any loss, theft, damage, or destruction of musical instruments, personal equipment, or any other property before, during, or after any gig arranged through this platform.',
+        '🔌 <strong>No resources provided</strong> — We do not provide instruments, sound equipment, lighting, electricity, staging, transportation, or any physical resources. We do not guarantee safe, suitable, legal, or adequate working conditions at any venue or gig location.',
+        '🏛️ <strong>Venue &amp; conditions</strong> — We are not responsible for the physical condition, safety, accessibility, or suitability of any venue. Managers are solely responsible for ensuring venues comply with all applicable laws, safety codes, and regulations.',
+        '⚖️ <strong>No criminal liability</strong> — We are not liable for any criminal, negligent, fraudulent, or harmful acts committed by any user on or off this platform. We cooperate fully with law enforcement authorities when legally required.',
+        '🤝 <strong>Relationship disclaimer</strong> — We are not responsible for the professional, personal, or legal relationships between managers and their clients, musicians and their agents, or any other parties connected through this platform.',
+        '📋 <strong>Disputes</strong> — Any disputes between users must be resolved directly between the parties. Vivace Events does not mediate, arbitrate, adjudicate, or take sides in any dispute between users.',
+        '✅ <strong>Honest use</strong> — I agree to use this platform honestly and professionally. I will not post false information, fake gig listings, or deceptive content. I understand that misuse, fraud, or harmful behavior may result in immediate removal and may be reported to law enforcement.',
+      ].map((t,i)=>`<div style="margin-bottom:10px"><strong style="color:#1D9E75">${i+1}.</strong> ${t}</div>`).join('')}
+    </div>
+
+    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:11px 12px;border-radius:10px;background:#fff;border:1.5px solid #1D9E75">
+      <input type="checkbox" id="tos-agree" onchange="checkTOS()" style="width:20px;height:20px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
+      <span style="font-size:12px;color:#111;line-height:1.5"><strong>I have read and agree to all 10 Platform Terms above.</strong> Your acceptance is recorded with a timestamp and version for legal compliance.</span>
+    </label>
+
+    <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px;font-size:10px;color:#085041;line-height:1.6">
       <strong>Vivace Events · Virtual Studio Orchestra LLC</strong><br>
-      Last updated: June 2026 · Version 1.0<br>
+      Terms version 1.0 · Last updated: June 2026<br>
       Contact: rafael.javadov@gmail.com · vivaceevents.com
     </div>
-    
+
     <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">
       © ${new Date().getFullYear()} Virtual Studio Orchestra LLC · All rights reserved
     </div>
@@ -751,13 +801,16 @@ function authHTML(){return `
   </div>
 </div>`;}
 
+// Current Terms of Service version. Bump this when you materially change terms.
+const TOS_VERSION='1';
+
 window.checkTOS=function(){
-  const ids=['tos1','tos2','tos3','tos4','tos5','tos6','tos7','tos8','tos9','tos10'];
-  const allChecked=ids.every(id=>{const el=document.getElementById(id);return el&&el.checked;});
+  const cb=document.getElementById('tos-agree');
+  const accepted=cb&&cb.checked;
   const btns=['btn-signup','btn-google','btn-facebook','btn-phone'];
   btns.forEach(bid=>{
     const btn=document.getElementById(bid);
-    if(btn){btn.style.opacity=allChecked?'1':'0.4';btn.style.pointerEvents=allChecked?'auto':'none';}
+    if(btn){btn.style.opacity=accepted?'1':'0.4';btn.style.pointerEvents=accepted?'auto':'none';}
   });
 }
 function showPhoneModal(){
@@ -860,9 +913,8 @@ function bindAuth(){
     finally{btn.disabled=false;btn.textContent='Continue with Google';}
   };
   document.getElementById('btn-signup').onclick=async()=>{
-    const ids=['tos1','tos2','tos3','tos4','tos5','tos6','tos7','tos8','tos9','tos10'];
-    const allChecked=ids.every(id=>{const el=document.getElementById(id);return el&&el.checked;});
-    if(!allChecked){ts('Please read and accept all platform terms first');return;}
+    const cb=document.getElementById('tos-agree');
+    if(!cb||!cb.checked){ts('Please read and accept the Platform Terms first');return;}
     const nameVal=(document.getElementById('an')||{}).value?.trim()||'';
     if(!nameVal){ts('Please enter your full name');return;}
     const btn=document.getElementById('btn-signup');
@@ -901,12 +953,13 @@ function bindAuth(){
 async function saveTOS(uid){
   try{
     const snap=await getDoc(doc(db,'users',uid));
-    if(!snap.exists()||!snap.data().tosAccepted){
+    const existing=snap.exists()?snap.data():{};
+    // Save (or update) acceptance with current version + timestamp
+    if(!existing.tosAccepted||existing.tosVersion!==TOS_VERSION){
       await setDoc(doc(db,'users',uid),{
         tosAccepted:true,
         tosAcceptedAt:new Date(),
-        tosVersion:'1.0',
-        tosIp:'recorded'
+        tosVersion:TOS_VERSION
       },{merge:true});
     }
   }catch(e){}
@@ -2129,12 +2182,11 @@ window.enablePushNotifications=async function(silent){
     const reg=await registerServiceWorker();
     const token=await getToken(fbMessaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg||undefined});
     if(token&&CU){
-      // save token to user doc (array of tokens for multi-device)
-      const uref=doc(db,'users',CU.uid);
+      // save token to PRIVATE user doc (only owner reads)
       let tokens=(UP&&UP.pushTokens)||[];
       if(!tokens.includes(token)){tokens.push(token);}
-      await setDoc(uref,{pushTokens:tokens,pushEnabled:true},{merge:true});
-      if(UP)UP.pushTokens=tokens;
+      await setDoc(doc(db,'users_private',CU.uid),{pushTokens:tokens,pushEnabled:true},{merge:true});
+      if(UP){UP.pushTokens=tokens;UP.pushEnabled=true;}
       if(!silent)ts('🔔 Notifications on! You\'ll get alerts even when the app is closed.');
       return true;
     }
@@ -2159,7 +2211,7 @@ window.toggleMuteGroup=async function(){
   if(!CU)return;
   const newVal=!(UP&&UP.muteGroupMessages);
   try{
-    await setDoc(doc(db,'users',CU.uid),{muteGroupMessages:newVal},{merge:true});
+    await setDoc(doc(db,'users_private',CU.uid),{muteGroupMessages:newVal},{merge:true});
     if(UP)UP.muteGroupMessages=newVal;
     ts(newVal?'🔕 Group messages muted (emergencies still alert you)':'🔔 Group messages unmuted');
   }catch(e){console.error(e);}
@@ -8647,7 +8699,7 @@ window.saveContact=async function(){
   UP.phone=phone;
   UP.hasWhatsApp=hasWA;
   try{
-    await setDoc(doc(db,'users',CU.uid),{phone:phone,hasWhatsApp:hasWA},{merge:true});
+    await setDoc(doc(db,'users_private',CU.uid),{phone:phone,hasWhatsApp:hasWA},{merge:true});
     ts('Contact saved 📞');
   }catch(e){console.error(e);ts('Saved');}
   document.getElementById('contact-modal')?.remove();
@@ -8860,14 +8912,14 @@ window.loadSmartSuggestions=async function(date, neededInstruments, neededSkills
       <div style="font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:8px;letter-spacing:.05em">✨ SMART SUGGESTIONS — ${suggestions.length} available</div>
       ${suggestions.slice(0,5).map(u=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:${priorityColors[u.priority]||'#f5f5f5'};margin-bottom:6px">
-          <div class="av" style="width:38px;height:38px;font-size:13px;background:#B5D4F4;color:#0C447C;flex-shrink:0">${(u.name||u.email||'?').substring(0,2).toUpperCase()}</div>
+          <div class="av" style="width:38px;height:38px;font-size:13px;background:#B5D4F4;color:#0C447C;flex-shrink:0">${(u.name||u.username||'?').substring(0,2).toUpperCase()}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:#111">${u.name||u.email?.split('@')[0]||'Artist'}</div>
+            <div style="font-size:13px;font-weight:600;color:#111">${u.name||(u.username?'@'+u.username:'Artist')}</div>
             <div style="font-size:11px;color:#666">${u.primaryInst}${u.avg>0?' · ⭐ '+u.avg:''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <span style="font-size:10px;font-weight:600;color:#555">${priorityLabels[u.priority]||'⚪'}</span>
-            <button onclick="inviteToGig('${u.id}','${(u.name||u.email||'').replace(/'/g,"\\'")}','${u.email||''}')" 
+            <button onclick="inviteToGig('${u.id}','${(u.name||u.username||'').replace(/'/g,"\\'")}','')" 
               style="font-size:11px;padding:4px 10px;border-radius:8px;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:inherit;font-weight:600">
               Invite
             </button>
@@ -8999,7 +9051,7 @@ async function loadPublicProfile(uid){
     const snap=await getDoc(doc(db,'users',uid));
     if(!snap.exists()){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Profile not found</div>`;return;}
     const u=snap.data();
-    const name=u.name||u.email?.split('@')[0]||'Musician';
+    const name=u.name||u.displayName||(u.username?'@'+u.username:'Musician');
     const ini=name.substring(0,2).toUpperCase();
     const colors=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#712B13']];
     const [bg,tc]=colors[Math.abs(name.charCodeAt(0))%colors.length];
@@ -9039,7 +9091,7 @@ async function loadPublicProfile(uid){
     ${u.appleMusicUrl?`<div class="card" style="margin-bottom:12px"><div style="font-size:12px;color:#aaa;margin-bottom:8px">🍎 Listen on Apple Music</div>${generateAppleMusicEmbed(u.appleMusicUrl)}</div>`:''}
     <div style="background:#f9f9f9;border-radius:12px;padding:16px;text-align:center;margin-bottom:12px">
       <div style="font-size:13px;color:#888;margin-bottom:12px">🔒 Contact info is protected by the Trust Network</div>
-      ${CU?`<button class="bt" style="width:100%;padding:12px" onclick="sendConnectionRequest('${uid}','${name}','${u.email||''}')">🔗 Request Connection</button>`:`<button class="bt" style="width:100%;padding:12px" onclick="go('feed')">Sign in to Connect</button>`}
+      ${CU?`<button class="bt" style="width:100%;padding:12px" onclick="sendConnectionRequest('${uid}','${name}','')">🔗 Request Connection</button>`:`<button class="bt" style="width:100%;padding:12px" onclick="go('feed')">Sign in to Connect</button>`}
     </div>`;
   }catch(e){document.getElementById('public-profile-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load profile</div>`;}
 }
