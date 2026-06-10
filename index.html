@@ -5503,37 +5503,70 @@ async function loadFolderMembers(fid,ft){await reloadWheelMembers();}
 // ─── STAGE / SEATING CHART — Phase 2 ─────────────────────────────
 var STAGE_COLORS=['#1D9E75','#E0609F','#9B6FE0','#3B8EE0','#E8993A','#E0506A','#2BB8A0','#C9A84C','#5B8DEF','#D4794A','#16B8A6','#EC6F9B'];
 
+var STAGE_THEMES={
+  vivace:{label:'🌿 Vivace',bg:'#06231c',card:'#0b3327',border:'#154538',text:'#f3efe2',sub:'#6f9286',accent:'#5DCAA5',gold:'#FFD86B',bench:'#0f1f2b',benchBorder:'#243447',empty:'#0a2d24',emptyBorder:'#2f5e4e',emptyText:'#4c8270'},
+  neon:{label:'🌙 Neon',bg:'#070b16',card:'#0f1729',border:'#22304d',text:'#f0f0f8',sub:'#7a8499',accent:'#6ee7d4',gold:'#FFE08A',bench:'#111a2e',benchBorder:'#243447',empty:'#0c1322',emptyBorder:'#2a3b5a',emptyText:'#4a6080'},
+  warm:{label:'☀️ Warm',bg:'#1c130a',card:'#2a1c0e',border:'#4a3420',text:'#F0D9A8',sub:'#b89968',accent:'#FFD56A',gold:'#FFD56A',bench:'#2a1c0e',benchBorder:'#4a3420',empty:'#1c130a',emptyBorder:'#5a4020',emptyText:'#8a7050'}
+};
+
 var STAGE_TEMPLATES={
-  choir:{label:'Choir',sections:[{name:'Soprano',seats:4},{name:'Alto',seats:4},{name:'Tenor',seats:3},{name:'Bass',seats:3}]},
-  orchestra:{label:'Orchestra',sections:[{name:'1st Violins',seats:4},{name:'2nd Violins',seats:4},{name:'Violas',seats:3},{name:'Cellos',seats:3},{name:'Woodwinds',seats:4},{name:'Brass',seats:3}]},
-  jazz:{label:'Jazz Band',sections:[{name:'Rhythm',seats:3},{name:'Horns',seats:3},{name:'Vocals',seats:1}]},
-  quartet:{label:'String Quartet',sections:[{name:'Quartet',seats:4}]},
-  band:{label:'Band',sections:[{name:'Front Line',seats:4},{name:'Rhythm',seats:3},{name:'Percussion',seats:2}]},
+  choir:{label:'🎤 Choir',desc:'rows / risers',sections:[{name:'Soprano',seats:4},{name:'Alto',seats:4},{name:'Tenor',seats:3},{name:'Bass',seats:3}]},
+  orchestra:{label:'🎻 Orchestra',desc:'curved arcs',sections:[{name:'1st Violins',seats:4},{name:'2nd Violins',seats:4},{name:'Violas',seats:3},{name:'Cellos',seats:3},{name:'Woodwinds',seats:4},{name:'Brass',seats:3}]},
+  jazz:{label:'🎷 Jazz Band',desc:'loose cluster',sections:[{name:'Rhythm',seats:3},{name:'Horns',seats:3},{name:'Vocals',seats:1}]},
+  quartet:{label:'🎻 Quartet',desc:'4 seats',sections:[{name:'Quartet',seats:4}]},
+  band:{label:'🎸 Band',desc:'rows',sections:[{name:'Front Line',seats:4},{name:'Rhythm',seats:3},{name:'Percussion',seats:2}]},
+  chamber:{label:'🎼 Chamber',desc:'small ensemble',sections:[{name:'Ensemble',seats:6}]},
 };
 
 function newSectionId(){return 's'+Math.random().toString(36).substr(2,6);}
+
+function getStageTheme(){
+  const t=(_wheel.stageConfig&&_wheel.stageConfig.theme)?_wheel.stageConfig.theme:'vivace';
+  return STAGE_THEMES[t]||STAGE_THEMES.vivace;
+}
+
+window.setStageTheme=async function(key){
+  if(!_wheel.stageConfig)_wheel.stageConfig={sections:[]};
+  _wheel.stageConfig.theme=key;
+  try{await setDoc(doc(db,'rosterFolders',_wheel.fid),{stageConfig:_wheel.stageConfig},{merge:true});}catch(e){}
+  renderStage();
+};
 
 function renderStage(){
   const el=document.getElementById('fd-view');if(!el)return;
   const cfg=_wheel.stageConfig;
   if(!cfg||!cfg.sections||cfg.sections.length===0){return renderStageSetup();}
-  // map seated members: seatSection+seatSlot
+  const th=getStageTheme();
+  const curTheme=(cfg&&cfg.theme)||'vivace';
+  // map seated members
   const seated={};
   _wheel.members.forEach(m=>{if(m.seatSection){seated[m.seatSection+'_'+(m.seatSlot||0)]=m;}});
   const benchMembers=_wheel.members.filter(m=>!m.seatSection);
+  const totalSeated=_wheel.members.length-benchMembers.length;
+  const totalSeats=cfg.sections.reduce((a,s)=>a+s.seats,0);
 
-  let html='<div style="background:#06231c;border-radius:14px;padding:14px 12px;margin-top:4px">';
-  // each section as a labeled band of seats
+  let html=`<div style="background:${th.bg};border-radius:14px;padding:14px 12px;margin-top:4px">`;
+  // theme toggle row
+  html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:11px;color:${th.sub}">${totalSeated}/${totalSeats} seated · ${cfg.sections.length} sections</div>
+    <div style="display:flex;gap:4px">`;
+  Object.entries(STAGE_THEMES).forEach(([k,t])=>{
+    const sel=k===curTheme;
+    html+=`<button onclick="setStageTheme('${k}')" style="padding:4px 8px;border-radius:8px;border:1px solid ${sel?th.accent:th.border};background:${sel?th.card:'transparent'};color:${sel?th.accent:th.sub};font-size:11px;cursor:pointer;font-family:inherit">${t.label}</button>`;
+  });
+  html+=`</div></div>`;
+
+  // sections
   cfg.sections.forEach((sec,si)=>{
     const col=sec.color||STAGE_COLORS[si%STAGE_COLORS.length];
     html+=`<div style="margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:7px">
           <span style="width:9px;height:9px;border-radius:50%;background:${col}"></span>
-          <span style="font-size:11px;font-weight:600;color:#f3efe2;letter-spacing:0.4px">${sec.name}</span>
-          <span style="font-size:10px;color:#6f9286">${sec.seats} seat${sec.seats===1?'':'s'}</span>
+          <span style="font-size:11px;font-weight:600;color:${th.text};letter-spacing:0.4px">${sec.name}</span>
+          <span style="font-size:10px;color:${th.sub}">${sec.seats} seat${sec.seats===1?'':'s'}</span>
         </div>
-        <button onclick="editStageSection('${sec.id}')" style="background:none;border:none;color:#5DCAA5;font-size:14px;cursor:pointer;padding:2px 4px"><i class="ti ti-dots"></i></button>
+        <button onclick="editStageSection('${sec.id}')" style="background:none;border:none;color:${th.accent};font-size:14px;cursor:pointer;padding:2px 4px"><i class="ti ti-dots"></i></button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:9px">`;
     for(let slot=0;slot<sec.seats;slot++){
@@ -5542,23 +5575,23 @@ function renderStage(){
         const ini=(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase();
         const nm=(mem.musicianName||mem.musicianEmail?.split('@')[0]||'—');
         html+=`<div onclick="stageSeatTap('${sec.id}',${slot})" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;width:54px">
-          <div style="position:relative;width:46px;height:46px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.3)${mem.soloist?';border:2.5px solid #FFD86B':''}">${ini}${mem.soloist?'<span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:11px">★</span>':''}</div>
-          <div style="font-size:9px;color:#cfe8df;margin-top:3px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${nm}</div>
-          <div style="font-size:8px;color:#6f9286;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${mem.instrument||''}</div>
+          <div style="position:relative;width:46px;height:46px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.3)${mem.soloist?';border:2.5px solid '+th.gold:''}">${ini}${mem.soloist?'<span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:11px">★</span>':''}</div>
+          <div style="font-size:9px;color:${th.text};opacity:.85;margin-top:3px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${nm}</div>
+          <div style="font-size:8px;color:${th.sub};max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${mem.instrument||''}</div>
         </div>`;
       }else{
         html+=`<div onclick="stageSeatTap('${sec.id}',${slot})" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;width:54px">
-          <div style="width:46px;height:46px;border-radius:50%;background:#0a2d24;border:1.5px dashed #2f5e4e;display:flex;align-items:center;justify-content:center;color:#4c8270;font-size:20px;font-weight:300">+</div>
-          <div style="font-size:9px;color:#4c8270;margin-top:3px">empty</div>
+          <div style="width:46px;height:46px;border-radius:50%;background:${th.empty};border:1.5px dashed ${th.emptyBorder};display:flex;align-items:center;justify-content:center;color:${th.emptyText};font-size:20px;font-weight:300">+</div>
+          <div style="font-size:9px;color:${th.emptyText};margin-top:3px">empty</div>
         </div>`;
       }
     }
     html+=`</div></div>`;
   });
-  // conductor — tap to set name
+  // conductor
   const cn=(cfg&&cfg.conductor)?cfg.conductor:'';
   html+=`<div style="text-align:center;margin-top:6px">
-    <button onclick="setStageConductor()" style="display:inline-flex;align-items:center;gap:6px;background:#0d0d0d;border:1px solid ${cn?'#C9A84C':'#3a2c08'};color:#FFD86B;font-size:11px;font-weight:600;padding:6px 14px;border-radius:14px;cursor:pointer;font-family:inherit">
+    <button onclick="setStageConductor()" style="display:inline-flex;align-items:center;gap:6px;background:#0d0d0d;border:1px solid ${cn?th.gold:'#3a2c08'};color:${th.gold};font-size:11px;font-weight:600;padding:6px 14px;border-radius:14px;cursor:pointer;font-family:inherit">
       <span style="font-size:13px;line-height:1">${cn?'🎼':'＋'}</span>
       <span>${cn?cn:'Add Conductor / Director'}</span>
     </button>
@@ -5569,7 +5602,7 @@ function renderStage(){
   html+=`<div style="margin-top:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span style="font-size:10px;font-weight:600;color:#8893a8;letter-spacing:0.5px;text-transform:uppercase">Bench · ${benchMembers.length} not seated</span>
-      <button onclick="showAddToFolder('${_wheel.fid}')" style="background:none;border:none;color:#5DCAA5;font-size:12px;font-weight:600;cursor:pointer">+ Add person</button>
+      <button onclick="showAddToFolder('${_wheel.fid}')" style="background:none;border:none;color:${th.accent};font-size:12px;font-weight:600;cursor:pointer">+ Add person</button>
     </div>`;
   if(benchMembers.length===0){
     html+=`<div style="font-size:11px;color:#6b7689;padding:6px 0">Everyone is seated. Add more people with "+ Add person".</div>`;
@@ -5578,9 +5611,9 @@ function renderStage(){
     benchMembers.forEach(m=>{
       const ini=(m.musicianName||m.musicianEmail||'?').substring(0,2).toUpperCase();
       const nm=(m.musicianName||m.musicianEmail?.split('@')[0]||'—');
-      html+=`<div style="display:flex;align-items:center;gap:7px;background:#0f1f2b;border:1px solid #243447;border-radius:24px;padding:5px 12px 5px 5px">
+      html+=`<div style="display:flex;align-items:center;gap:7px;background:${th.bench};border:1px solid ${th.benchBorder};border-radius:24px;padding:5px 12px 5px 5px">
         <div style="width:28px;height:28px;border-radius:50%;background:#3a4d6e;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500">${ini}</div>
-        <div><div style="font-size:11px;color:#f3efe2;font-weight:500;line-height:1.1">${nm}</div><div style="font-size:9px;color:#6f9286">${m.instrument||'—'}</div></div>
+        <div><div style="font-size:11px;color:${th.text};font-weight:500;line-height:1.1">${nm}</div><div style="font-size:9px;color:${th.sub}">${m.instrument||'—'}</div></div>
       </div>`;
     });
     html+='</div>';
@@ -5610,7 +5643,7 @@ function renderStageSetup(editing){
           ${Object.entries(STAGE_TEMPLATES).map(([k,t])=>`
           <button onclick="useStageTemplate('${k}')" style="background:#0f1f2b;border:1px solid #243447;border-radius:12px;padding:13px 11px;text-align:left;cursor:pointer;font-family:inherit">
             <div style="font-size:13px;color:#f3efe2;font-weight:600">${t.label}</div>
-            <div style="font-size:10px;color:#6f9286;margin-top:2px">${t.sections.length} sections · ${t.sections.reduce((a,s)=>a+s.seats,0)} seats</div>
+            <div style="font-size:10px;color:#6f9286;margin-top:2px">${t.desc||''} · ${t.sections.length} sections · ${t.sections.reduce((a,s)=>a+s.seats,0)} seats</div>
           </button>`).join('')}
           <button onclick="startCustomStage()" style="background:#0a2d24;border:1px dashed #2f5e4e;border-radius:12px;padding:13px 11px;text-align:left;cursor:pointer;font-family:inherit">
             <div style="font-size:13px;color:#5DCAA5;font-weight:600">+ Custom</div>
@@ -5757,17 +5790,31 @@ function stageSeatedMemberSheet(mid){
   const mem=_wheel.members.find(m=>m.id===mid);if(!mem)return;
   const nm=(mem.musicianName||mem.musicianEmail?.split('@')[0]||'—');
   const ini=(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase();
+  const sec=_wheel.stageConfig?.sections?.find(s=>s.id===mem.seatSection);
+  const col=sec?.color||'#1D9E75';
   document.getElementById('stage-sheet')?.remove();
   const s=document.createElement('div');s.id='stage-sheet';
   s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
   s.onclick=function(e){if(e.target===s)s.remove();};
-  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px">
+  // build section move options
+  const otherSections=(_wheel.stageConfig?.sections||[]).filter(ss=>ss.id!==mem.seatSection);
+  let moveHtml='';
+  if(otherSections.length>0){
+    moveHtml=`<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;margin-bottom:6px;font-weight:600">Move to section:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${otherSections.map(ss=>
+      `<button onclick="moveMemberToSection('${mid}','${ss.id}')" style="display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:20px;border:1px solid #e0e0e0;background:#f9f9f9;cursor:pointer;font-family:inherit;font-size:12px;color:#333">
+        <span style="width:8px;height:8px;border-radius:50%;background:${ss.color||'#999'}"></span>${ss.name}
+      </button>`).join('')}</div></div>`;
+  }
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px;max-height:80vh;overflow-y:auto">
     <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
-      <div style="width:46px;height:46px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${ini}</div>
-      <div style="flex:1"><div style="font-size:16px;font-weight:700;color:#111">${nm}${mem.soloist?' <span style="color:#C9A84C">★</span>':''}</div><div style="font-size:12px;color:#888">${mem.instrument||'—'}</div></div>
+      <div style="width:46px;height:46px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${ini}</div>
+      <div style="flex:1"><div style="font-size:16px;font-weight:700;color:#111">${nm}${mem.soloist?' <span style="color:#C9A84C">★</span>':''}</div><div style="font-size:12px;color:#888">${mem.instrument||'—'}${sec?' · '+sec.name:''}</div></div>
     </div>
+    <button onclick="editMemberInstrument('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#E1F5EE;color:#0F6E56;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-music" style="vertical-align:-2px;margin-right:5px"></i>Change instrument</button>
     <button onclick="toggleSoloist('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#FBF3DD;color:#9c7a1e;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-star" style="vertical-align:-2px;margin-right:5px"></i>${mem.soloist?'Remove soloist mark':'Mark as soloist'}</button>
+    ${moveHtml}
     <button onclick="unseatMember('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#f5f5f5;color:#555;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-arrow-down" style="vertical-align:-2px;margin-right:5px"></i>Send to bench</button>
     <button onclick="document.getElementById('stage-sheet').remove();removeFromFolder('${_wheel.fid}','${mid}')" style="width:100%;padding:14px;border:1px solid #F09595;border-radius:12px;background:#fff;color:#D14343;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-x" style="vertical-align:-2px;margin-right:5px"></i>Remove from roster</button>
     <button onclick="document.getElementById('stage-sheet').remove()" style="width:100%;padding:12px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>
@@ -5784,6 +5831,70 @@ window.toggleSoloist=async function(mid){
 window.unseatMember=async function(mid){
   document.getElementById('stage-sheet')?.remove();
   try{await updateDoc(doc(db,'rosterMembers',mid),{seatSection:'',seatSlot:-1});}catch(e){}
+  await reloadWheelMembers();setWheelView('stage');
+};
+
+window.editMemberInstrument=function(mid){
+  document.getElementById('stage-sheet')?.remove();
+  const mem=_wheel.members.find(m=>m.id===mid);if(!mem)return;
+  const nm=(mem.musicianName||mem.musicianEmail?.split('@')[0]||'—');
+  document.getElementById('inst-sheet')?.remove();
+  const s=document.createElement('div');s.id='inst-sheet';
+  s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  s.onclick=function(e){if(e.target===s)s.remove();};
+  // build grouped instrument picker from VIVACE_INSTRUMENTS
+  let groups={};
+  if(typeof VIVACE_INSTRUMENTS!=='undefined'){
+    VIVACE_INSTRUMENTS.forEach(inst=>{
+      if(!groups[inst.group])groups[inst.group]=[];
+      groups[inst.group].push(inst.name);
+    });
+  }
+  let listHtml='';
+  if(Object.keys(groups).length>0){
+    Object.entries(groups).forEach(([g,items])=>{
+      listHtml+=`<div style="font-size:10px;color:#1D9E75;font-weight:700;margin:10px 0 4px;text-transform:uppercase;letter-spacing:0.5px">${g}</div>`;
+      listHtml+=`<div style="display:flex;flex-wrap:wrap;gap:5px">`;
+      items.forEach(name=>{
+        const sel=mem.instrument===name;
+        listHtml+=`<button onclick="saveMemberInstrument('${mid}','${name.replace(/'/g,"\\'")}')" style="padding:5px 10px;border-radius:16px;border:1px solid ${sel?'#1D9E75':'#e0e0e0'};background:${sel?'#E1F5EE':'#f9f9f9'};color:${sel?'#0F6E56':'#444'};font-size:11px;cursor:pointer;font-family:inherit;font-weight:${sel?'600':'400'}">${name}</button>`;
+      });
+      listHtml+=`</div>`;
+    });
+  }else{
+    // fallback if VIVACE_INSTRUMENTS not available
+    listHtml=`<div style="margin:8px 0"><input id="inst-custom-inp" class="finp" placeholder="Type instrument name" value="${(mem.instrument||'').replace(/"/g,'&quot;')}"/></div>
+    <button onclick="saveMemberInstrument('${mid}',document.getElementById('inst-custom-inp').value)" style="width:100%;padding:12px;border:none;border-radius:10px;background:#1D9E75;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Save</button>`;
+  }
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px;max-height:75vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:2px">Change instrument</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">${nm} · currently: <strong>${mem.instrument||'none'}</strong></div>
+    ${listHtml}
+    <button onclick="document.getElementById('inst-sheet').remove()" style="width:100%;padding:12px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:10px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+};
+
+window.saveMemberInstrument=async function(mid,inst){
+  document.getElementById('inst-sheet')?.remove();
+  const clean=(inst||'').trim();
+  try{await updateDoc(doc(db,'rosterMembers',mid),{instrument:clean});}catch(e){console.error(e);}
+  ts('Instrument updated: '+clean);
+  await reloadWheelMembers();setWheelView('stage');
+};
+
+window.moveMemberToSection=async function(mid,newSid){
+  document.getElementById('stage-sheet')?.remove();
+  // find first empty slot in the target section
+  const sec=_wheel.stageConfig.sections.find(s=>s.id===newSid);if(!sec)return;
+  const occupied=new Set();
+  _wheel.members.forEach(m=>{if(m.seatSection===newSid)occupied.add(m.seatSlot||0);});
+  let slot=-1;
+  for(let i=0;i<sec.seats;i++){if(!occupied.has(i)){slot=i;break;}}
+  if(slot===-1){ts('No empty seat in '+sec.name);return;}
+  try{await updateDoc(doc(db,'rosterMembers',mid),{seatSection:newSid,seatSlot:slot});}catch(e){console.error(e);}
+  ts('Moved to '+sec.name);
   await reloadWheelMembers();setWheelView('stage');
 };
 
