@@ -139,12 +139,17 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const FB={apiKey:"AIzaSyDG6mjLSYp5gJpLZrI4hjBNIJrSC83qwj0",authDomain:"vivaceevents-1a8ff.firebaseapp.com",projectId:"vivaceevents-1a8ff",storageBucket:"vivaceevents-1a8ff.firebasestorage.app",messagingSenderId:"215295054411",appId:"1:215295054411:web:f7ce28486848ec0a1373ce"};
 const fbApp=initializeApp(FB);
 const auth=getAuth(fbApp);
 const db=getFirestore(fbApp);
 const storage=getStorage(fbApp);
+// Push notifications (FCM). VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+const VAPID_KEY="BEMaRyjhfZPdbQZ4DXVm9-jEeZzTPYl55jAOJgPuSjyzcqvzGTtvXsKbHY9I90D-O71RSF_baeQsyDqwBSwPXL8";
+let fbMessaging=null;
+try{ fbMessaging=getMessaging(fbApp); }catch(e){ console.log('Messaging unavailable:',e); }
 const gp=new GoogleAuthProvider();
 const fp=new FacebookAuthProvider();
 fp.addScope('public_profile');
@@ -1777,6 +1782,65 @@ async function checkNotifications(){
   }catch(e){console.log('notif check error:',e);}
 }
 
+// ─── PUSH NOTIFICATIONS ──────────────────────────────────────
+async function registerServiceWorker(){
+  if(!('serviceWorker' in navigator))return null;
+  try{
+    const reg=await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    return reg;
+  }catch(e){console.log('SW register failed:',e);return null;}
+}
+
+// Ask permission + get the FCM token, save it to the user's profile
+window.enablePushNotifications=async function(silent){
+  if(!fbMessaging){if(!silent)ts('Push not supported on this device');return false;}
+  if(!VAPID_KEY||VAPID_KEY.indexOf('REPLACE_WITH')===0){if(!silent)ts('Push setup pending (VAPID key)');return false;}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){if(!silent)ts('Notifications not allowed');return false;}
+    const reg=await registerServiceWorker();
+    const token=await getToken(fbMessaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg||undefined});
+    if(token&&CU){
+      // save token to user doc (array of tokens for multi-device)
+      const uref=doc(db,'users',CU.uid);
+      let tokens=(UP&&UP.pushTokens)||[];
+      if(!tokens.includes(token)){tokens.push(token);}
+      await setDoc(uref,{pushTokens:tokens,pushEnabled:true},{merge:true});
+      if(UP)UP.pushTokens=tokens;
+      if(!silent)ts('🔔 Notifications on! You\'ll get alerts even when the app is closed.');
+      return true;
+    }
+  }catch(e){console.log('push enable error:',e);if(!silent)ts('Could not enable notifications');}
+  return false;
+};
+
+// Foreground messages — show a toast when app is open
+function initForegroundPush(){
+  if(!fbMessaging)return;
+  try{
+    onMessage(fbMessaging,function(payload){
+      const body=(payload.notification&&payload.notification.body)||(payload.data&&payload.data.body)||'New message';
+      const isEmerg=payload.data&&payload.data.emergency==='true';
+      ts((isEmerg?'🚨 ':'📣 ')+body);
+      checkNotifications();
+    });
+  }catch(e){}
+}
+
+window.toggleMuteGroup=async function(){
+  if(!CU)return;
+  const newVal=!(UP&&UP.muteGroupMessages);
+  try{
+    await setDoc(doc(db,'users',CU.uid),{muteGroupMessages:newVal},{merge:true});
+    if(UP)UP.muteGroupMessages=newVal;
+    ts(newVal?'🔕 Group messages muted (emergencies still alert you)':'🔔 Group messages unmuted');
+  }catch(e){console.error(e);}
+  document.getElementById('notif-modal')?.remove();
+  showNotifications();
+};
+
+
+
 window.showNotifications=async function(){
   try{
     let notifs=[];
@@ -1790,14 +1854,25 @@ window.showNotifications=async function(){
     }
     const m=document.createElement('div');m.className='modal-bg';m.id='notif-modal';
     document.getElementById('notif-modal')?.remove();
+    const pushOn=(typeof Notification!=='undefined'&&Notification.permission==='granted'&&UP&&UP.pushEnabled);
+    const muted=UP&&UP.muteGroupMessages;
     m.innerHTML=`<div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <div style="font-size:17px;font-weight:700;color:#111">Notifications</div>
         <button onclick="document.getElementById('notif-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
       </div>
+      ${!pushOn?`<button onclick="enablePushNotifications(false)" style="width:100%;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#1D9E75,#0F6E56);border:none;border-radius:12px;padding:13px 14px;margin-bottom:10px;cursor:pointer;font-family:inherit;text-align:left">
+        <span style="font-size:20px">🔔</span>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#fff">Turn on alerts</div><div style="font-size:11px;color:#d7f0e6">Get notified even when the app is closed</div></div>
+      </button>`:''}
+      <div style="display:flex;align-items:center;justify-content:space-between;background:#f7faf9;border:1px solid #e1f0ea;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">🔕 Mute group messages</div><div style="font-size:11px;color:#888">Silence chatter — emergencies still alert you</div></div>
+        <button onclick="toggleMuteGroup()" style="position:relative;width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;background:${muted?'#1D9E75':'#ccc'};transition:background .2s"><span style="position:absolute;top:3px;left:${muted?'23px':'3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s"></span></button>
+      </div>
       ${notifs.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No notifications</p>':
         notifs.map(n=>`
-        <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;opacity:${n.read?0.6:1}">
+        <div style="padding:12px${n.type==='ensemble_msg'?' 12px':' 0'};border-bottom:1px solid #f5f5f5;opacity:${n.read?0.6:1}${n.type==='ensemble_msg'?';background:linear-gradient(135deg,#FBF8EC,#fff);border:1.5px solid #E8D69A;border-radius:12px;margin-bottom:8px':''}">
+          ${n.type==='ensemble_msg'?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:14px">📣</span><span style="font-size:11px;font-weight:700;color:#9c7a1e;letter-spacing:0.3px">${n.fromName?('From '+n.fromName):'Ensemble message'}${n.scope?' · '+n.scope:''}</span></div>`:''}
           <div style="font-size:13px;color:#111;line-height:1.5;margin-bottom:6px">${n.message||''}</div>
           ${n.type==='connection_request'&&n.connectionId?`
             <div style="display:flex;gap:8px;margin-top:8px">
@@ -3568,7 +3643,10 @@ async function checkNever(managerId,musicianName){
 }
 
 function feedHTML(){
-  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();initVU();},100);
+  setTimeout(()=>{loadGigs();checkNotifications();loadFeedBroadcast();initVU();initForegroundPush();
+    // auto-enable push silently if user already granted permission before
+    if(typeof Notification!=='undefined'&&Notification.permission==='granted'){enablePushNotifications(true);}
+  },100);
   return `
 <div class="hdr">
   <div><div class="logo">Vivace<em>Events</em></div><div style="font-size:11px;color:#aaa;margin-top:1px">by Virtual Studio Orchestra LLC</div></div>
@@ -5275,7 +5353,7 @@ var _wheel={fid:null,members:[],ft:null,rot:0,dragging:false,startAng:0,startRot
 window.openFolder=async function(fid){
   const folder=rosterFolders.find(f=>f.id===fid);if(!folder)return;
   const ft=FOLDER_TYPES.find(x=>x.id===folder.type)||FOLDER_TYPES[0];
-  _wheel={fid,members:[],ft,rot:0,dragging:false,startAng:0,startRot:0,view:'wheel',moved:false};
+  _wheel={fid,members:[],ft,ftName:folder.name,rot:0,dragging:false,startAng:0,startRot:0,view:'wheel',moved:false};
   const m=document.createElement('div');m.className='modal-bg';m.id='fdmodal';
   m.innerHTML=`<div class="modal" style="max-height:92vh;overflow-y:auto;padding:0;background:linear-gradient(170deg,#0c1322 0%,#0a0e1a 60%,#070a12 100%);border:1px solid #1c2536;border-radius:22px">
     <style>
@@ -5613,6 +5691,9 @@ function renderStage(){
   });
   html+=`</div></div>`;
 
+  // 📣 Notify ensemble button
+  html+=`<button onclick="openNotifyEnsemble()" style="width:100%;margin-bottom:14px;padding:11px;border:none;border-radius:11px;background:linear-gradient(135deg,#C9A84C,#B08F35);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 8px rgba(201,168,76,.3)"><span style="font-size:15px">📣</span>Notify the ensemble</button>`;
+
   // sections
   cfg.sections.forEach((sec,si)=>{
     const col=sec.color||STAGE_COLORS[si%STAGE_COLORS.length];
@@ -5654,12 +5735,17 @@ function renderStage(){
     }
     html+=`</div></div>`;
   });
-  // conductor
+  // conductor + stage manager
   const cn=(cfg&&cfg.conductor)?cfg.conductor:'';
-  html+=`<div style="text-align:center;margin-top:6px">
+  const smName=(cfg&&cfg.stageManagerName)?cfg.stageManagerName:'';
+  html+=`<div style="text-align:center;margin-top:6px;display:flex;flex-direction:column;gap:6px;align-items:center">
     <button onclick="setStageConductor()" style="display:inline-flex;align-items:center;gap:6px;background:#0d0d0d;border:1px solid ${cn?th.gold:'#3a2c08'};color:${th.gold};font-size:11px;font-weight:600;padding:6px 14px;border-radius:14px;cursor:pointer;font-family:inherit">
       <span style="font-size:13px;line-height:1">${cn?'🎼':'＋'}</span>
       <span>${cn?cn:'Add Conductor / Director'}</span>
+    </button>
+    <button onclick="setStageManager()" style="display:inline-flex;align-items:center;gap:6px;background:${smName?'rgba(93,202,165,.12)':'transparent'};border:1px solid ${smName?th.accent:'rgba(93,202,165,.35)'};color:${th.accent};font-size:11px;font-weight:600;padding:6px 14px;border-radius:14px;cursor:pointer;font-family:inherit">
+      <span style="font-size:13px;line-height:1">${smName?'🎧':'＋'}</span>
+      <span>${smName?('Stage Mgr: '+smName):'Assign Stage Manager'}</span>
     </button>
   </div>`;
   html+='</div>';
@@ -5887,6 +5973,7 @@ function stageSeatedMemberSheet(mid){
       <div style="flex:1"><div style="font-size:16px;font-weight:700;color:#111">${nm}${mem.soloist?' <span style="color:#C9A84C">★</span>':''}</div><div style="font-size:12px;color:#888">${mem.instrument||'—'}${sec?' · '+sec.name:''}</div></div>
     </div>
     <button onclick="editMemberInstrument('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#E1F5EE;color:#0F6E56;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-music" style="vertical-align:-2px;margin-right:5px"></i>Change instrument</button>
+    <button onclick="messageOneMember('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#FBF3DD;color:#9c7a1e;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><span style="margin-right:5px">📣</span>Send a message</button>
     <button onclick="toggleSoloist('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#FBF3DD;color:#9c7a1e;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-star" style="vertical-align:-2px;margin-right:5px"></i>${mem.soloist?'Remove soloist mark':'Mark as soloist'}</button>
     ${moveHtml}
     <button onclick="unseatMember('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#f5f5f5;color:#555;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-arrow-down" style="vertical-align:-2px;margin-right:5px"></i>Send to bench</button>
@@ -5906,6 +5993,207 @@ window.unseatMember=async function(mid){
   document.getElementById('stage-sheet')?.remove();
   try{await updateDoc(doc(db,'rosterMembers',mid),{seatSection:'',seatSlot:-1});}catch(e){}
   await reloadWheelMembers();setWheelView('stage');
+};
+
+// ─── 📣 ENSEMBLE COMMUNICATION ───────────────────────────────
+var NOTIFY_PRESETS=[
+  {icon:'📍',label:'Room location',text:"We're in Room "},
+  {icon:'⏰',label:'Running late',text:"Running late — we'll start at "},
+  {icon:'🚪',label:'Door locked',text:"Door's locked — call/text me when you arrive."},
+  {icon:'🎯',label:"You're up next",text:"You're up next — please get ready."},
+  {icon:'🔄',label:'Schedule change',text:"Schedule change: "},
+  {icon:'✅',label:'All set',text:"All set — see you there!"},
+];
+
+function getMyName(){
+  return (UP&&(UP.name||UP.displayName))||(CU&&CU.displayName)||(CU&&CU.email?CU.email.split('@')[0]:'Conductor');
+}
+
+window.openNotifyEnsemble=function(){
+  const sections=_wheel.stageConfig?.sections||[];
+  const members=_wheel.members||[];
+  document.getElementById('notify-sheet')?.remove();
+  const s=document.createElement('div');s.id='notify-sheet';
+  s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  s.onclick=function(e){if(e.target===s)s.remove();};
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px;max-height:85vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:20px">📣</span><span style="font-size:18px;font-weight:700;color:#111">Notify the ensemble</span></div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">Send a quick, noticeable message. They'll see it instantly in the app + by email.</div>
+
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Who gets it?</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button id="nf-aud-section" onclick="nfSetAud('section')" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid #1D9E75;background:#E1F5EE;color:#0F6E56;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🎯 A section</button>
+      <button id="nf-aud-pick" onclick="nfSetAud('pick')" style="flex:1;padding:11px;border-radius:10px;border:1px solid #e0e0e0;background:#fafafa;color:#666;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">☑️ Pick people</button>
+    </div>
+    <div id="nf-section-pick" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+      ${sections.map(sec=>`<button onclick="nfPickSection('${sec.id}')" data-sid="${sec.id}" class="nf-sec-btn" style="display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:18px;border:1px solid #e0e0e0;background:#fafafa;cursor:pointer;font-family:inherit;font-size:12px;color:#444"><span style="width:8px;height:8px;border-radius:50%;background:${sec.color||'#999'}"></span>${sec.name}</button>`).join('')}
+    </div>
+    <div id="nf-people-pick" style="display:none;flex-direction:column;gap:5px;margin-bottom:6px;max-height:180px;overflow-y:auto">
+      ${members.filter(m=>m.musicianEmail).map(m=>{
+        const nm=getDisplayName(m);const ini=getInitials(m.musicianName,m.musicianEmail);
+        return `<label style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid #eee;border-radius:10px;cursor:pointer;font-family:inherit"><input type="checkbox" class="nf-person-cb" value="${m.id}" style="width:17px;height:17px;accent-color:#1D9E75"/><div style="width:28px;height:28px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600">${ini}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${nm}</div><div style="font-size:10px;color:#999">${m.instrument||'—'}</div></div></label>`;
+      }).join('')||'<div style="font-size:12px;color:#aaa;padding:8px">No members with email.</div>'}
+    </div>
+    <button id="nf-aud-all" onclick="nfSetAud('all')" style="width:100%;padding:10px;border-radius:10px;border:1px solid #f0c0c0;background:#fff6f6;color:#D14343;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:6px">🚨 Emergency — alert EVERYONE</button>
+
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 8px">Quick messages</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${NOTIFY_PRESETS.map((p,i)=>`<button onclick="nfPreset(${i})" style="display:flex;align-items:center;gap:5px;padding:8px 11px;border-radius:18px;border:1px solid #e8e8e8;background:#f9f9f9;cursor:pointer;font-family:inherit;font-size:12px;color:#444"><span>${p.icon}</span>${p.label}</button>`).join('')}
+    </div>
+
+    <textarea id="nf-msg" placeholder="Type your message…" style="width:100%;min-height:80px;border:1px solid #ddd;border-radius:12px;padding:12px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;color:#111"></textarea>
+
+    <button onclick="sendEnsembleNotify()" style="width:100%;margin-top:14px;padding:15px;border:none;border-radius:12px;background:linear-gradient(135deg,#C9A84C,#B08F35);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(201,168,76,.3)">📣 Send now</button>
+    <button onclick="document.getElementById('notify-sheet').remove()" style="width:100%;padding:12px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+  window._nfAud={mode:'section',sectionId:null};
+};
+
+window.nfSetAud=function(mode){
+  window._nfAud={mode,sectionId:null};
+  const all=document.getElementById('nf-aud-all'),sec=document.getElementById('nf-aud-section'),pick=document.getElementById('nf-aud-pick');
+  const secPick=document.getElementById('nf-section-pick'),peoplePick=document.getElementById('nf-people-pick');
+  const onCss='padding:11px;border-radius:10px;border:1.5px solid #1D9E75;background:#E1F5EE;color:#0F6E56;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit';
+  const offCss='padding:11px;border-radius:10px;border:1px solid #e0e0e0;background:#fafafa;color:#666;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+  if(sec)sec.style.cssText='flex:1;'+(mode==='section'?onCss:offCss);
+  if(pick)pick.style.cssText='flex:1;'+(mode==='pick'?onCss:offCss);
+  if(all)all.style.cssText='width:100%;padding:10px;border-radius:10px;border:1.5px solid '+(mode==='all'?'#D14343':'#f0c0c0')+';background:'+(mode==='all'?'#ffecec':'#fff6f6')+';color:#D14343;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:6px';
+  if(secPick)secPick.style.display=mode==='section'?'flex':'none';
+  if(peoplePick)peoplePick.style.display=mode==='pick'?'flex':'none';
+};
+
+window.nfPickSection=function(sid){
+  window._nfAud={mode:'section',sectionId:sid};
+  document.querySelectorAll('.nf-sec-btn').forEach(b=>{
+    const sec=(_wheel.stageConfig?.sections||[]).find(s=>s.id===b.getAttribute('data-sid'));
+    const on=b.getAttribute('data-sid')===sid;
+    b.style.cssText=`display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:18px;border:1.5px solid ${on?'#1D9E75':'#e0e0e0'};background:${on?'#E1F5EE':'#fafafa'};cursor:pointer;font-family:inherit;font-size:12px;color:${on?'#0F6E56':'#444'};font-weight:${on?'700':'400'}`;
+    b.innerHTML=`<span style="width:8px;height:8px;border-radius:50%;background:${sec?.color||'#999'}"></span>${sec?.name||''}`;
+  });
+};
+
+window.nfPreset=function(i){
+  const p=NOTIFY_PRESETS[i];if(!p)return;
+  const ta=document.getElementById('nf-msg');if(ta){ta.value=p.text;ta.focus();
+    // put cursor at end
+    ta.setSelectionRange(ta.value.length,ta.value.length);}
+};
+
+window.sendEnsembleNotify=async function(){
+  const msg=(document.getElementById('nf-msg')?.value||'').trim();
+  if(!msg){ts('Type a message first');return;}
+  const aud=window._nfAud||{mode:'section'};
+  const members=_wheel.members||[];
+  const sections=_wheel.stageConfig?.sections||[];
+  let recipients=[], scopeLabel='Everyone';
+  if(aud.mode==='section'&&aud.sectionId){
+    const sec=sections.find(s=>s.id===aud.sectionId);
+    scopeLabel=sec?sec.name:'Section';
+    recipients=members.filter(m=>m.seatSection===aud.sectionId);
+  }else if(aud.mode==='section'&&!aud.sectionId){
+    ts('Pick a section first');return;
+  }else if(aud.mode==='pick'){
+    const ids=Array.from(document.querySelectorAll('.nf-person-cb:checked')).map(c=>c.value);
+    if(ids.length===0){ts('Select at least one person');return;}
+    recipients=members.filter(m=>ids.includes(m.id));
+    scopeLabel=recipients.length===1?'Direct message':(recipients.length+' people');
+  }else{
+    // emergency = everyone, needs confirm
+    recipients=members.slice();
+    scopeLabel='Everyone (emergency)';
+  }
+  recipients=recipients.filter(m=>m.musicianEmail);
+  if(recipients.length===0){ts('No one with an email to notify');return;}
+
+  // Emergency confirmation for "all"
+  if(aud.mode==='all'){
+    const ok=confirm(`🚨 This will alert ALL ${recipients.length} members at once.\n\nUse this only for emergencies. Send now?`);
+    if(!ok)return;
+  }
+
+  document.getElementById('notify-sheet')?.remove();
+  const fromName=getMyName();
+  let sent=0;
+  const isEmerg=(aud.mode==='all');
+  for(const m of recipients){
+    try{
+      await addDoc(collection(db,'notifications'),{
+        toEmail:m.musicianEmail,type:'ensemble_msg',
+        message:msg,fromName:fromName,scope:scopeLabel,
+        folderId:_wheel.fid,read:false,timestamp:new Date()
+      });
+      // queue a real push notification (works when app closed)
+      try{
+        await addDoc(collection(db,'pushQueue'),{
+          toEmail:m.musicianEmail,
+          title:(isEmerg?'🚨 Emergency — ':'📣 ')+fromName,
+          body:msg,emergency:isEmerg,timestamp:new Date()
+        });
+      }catch(e){}
+      try{
+        await addDoc(collection(db,'mail'),{
+          to:m.musicianEmail,
+          message:{subject:`${isEmerg?'🚨 EMERGENCY':'📣'} From ${fromName}: ensemble message`,
+            html:`<div style="font-family:sans-serif"><p style="font-size:15px"><strong>${fromName}</strong> sent a message to <strong>${scopeLabel}</strong>:</p><div style="background:${isEmerg?'#FFECEC;border:1.5px solid #F0A0A0':'#FBF8EC;border:1.5px solid #E8D69A'};border-radius:10px;padding:16px;font-size:15px;color:#111">${msg.replace(/</g,'&lt;')}</div><p style="font-size:12px;color:#888;margin-top:16px">Open Vivace Events to reply.</p></div>`}
+        });
+      }catch(e){}
+      sent++;
+    }catch(e){console.error(e);}
+  }
+  ts(`📣 Sent to ${sent} ${(scopeLabel==='Everyone (emergency)')?'people (emergency)':(aud.mode==='section'?('in '+scopeLabel):'')}`);
+};
+
+window.messageOneMember=function(mid){
+  document.getElementById('stage-sheet')?.remove();
+  const mem=_wheel.members.find(m=>m.id===mid);if(!mem)return;
+  const nm=getDisplayName(mem);
+  if(!mem.musicianEmail){ts('No email on file for this person');return;}
+  document.getElementById('notify-sheet')?.remove();
+  const s=document.createElement('div');s.id='notify-sheet';
+  s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  s.onclick=function(e){if(e.target===s)s.remove();};
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px;max-height:85vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:20px">📣</span><span style="font-size:18px;font-weight:700;color:#111">Message ${nm}</span></div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">They'll see it instantly in the app + by email.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${NOTIFY_PRESETS.map((p,i)=>`<button onclick="nfPreset(${i})" style="display:flex;align-items:center;gap:5px;padding:8px 11px;border-radius:18px;border:1px solid #e8e8e8;background:#f9f9f9;cursor:pointer;font-family:inherit;font-size:12px;color:#444"><span>${p.icon}</span>${p.label}</button>`).join('')}
+    </div>
+    <textarea id="nf-msg" placeholder="Type your message to ${nm}…" style="width:100%;min-height:80px;border:1px solid #ddd;border-radius:12px;padding:12px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;color:#111"></textarea>
+    <button onclick="sendOneMessage('${mid}')" style="width:100%;margin-top:14px;padding:15px;border:none;border-radius:12px;background:linear-gradient(135deg,#C9A84C,#B08F35);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(201,168,76,.3)">📣 Send now</button>
+    <button onclick="document.getElementById('notify-sheet').remove()" style="width:100%;padding:12px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+};
+
+window.sendOneMessage=async function(mid){
+  const msg=(document.getElementById('nf-msg')?.value||'').trim();
+  if(!msg){ts('Type a message first');return;}
+  const mem=_wheel.members.find(m=>m.id===mid);if(!mem||!mem.musicianEmail){ts('No email on file');return;}
+  document.getElementById('notify-sheet')?.remove();
+  const fromName=getMyName();
+  try{
+    await addDoc(collection(db,'notifications'),{
+      toEmail:mem.musicianEmail,type:'ensemble_msg',
+      message:msg,fromName:fromName,scope:'Direct message',
+      folderId:_wheel.fid,read:false,timestamp:new Date()
+    });
+    try{
+      await addDoc(collection(db,'pushQueue'),{
+        toEmail:mem.musicianEmail,title:'📣 '+fromName,body:msg,emergency:false,timestamp:new Date()
+      });
+    }catch(e){}
+    try{
+      await addDoc(collection(db,'mail'),{
+        to:mem.musicianEmail,
+        message:{subject:`📣 From ${fromName}: a message`,
+          html:`<div style="font-family:sans-serif"><p style="font-size:15px"><strong>${fromName}</strong> sent you a message:</p><div style="background:#FBF8EC;border:1.5px solid #E8D69A;border-radius:10px;padding:16px;font-size:15px;color:#111">${msg.replace(/</g,'&lt;')}</div><p style="font-size:12px;color:#888;margin-top:16px">Open Vivace Events to reply.</p></div>`}
+      });
+    }catch(e){}
+    ts(`📣 Message sent to ${getDisplayName(mem)}`);
+  }catch(e){console.error(e);ts('Could not send');}
 };
 
 window.editMemberInstrument=function(mid){
@@ -6003,6 +6291,78 @@ window.saveStageConductor=async function(name){
     ts(clean?'Conductor set: '+clean:'Conductor removed');
   }catch(e){console.error(e);ts('Saved');}
   document.getElementById('cond-sheet')?.remove();
+  renderStage();
+};
+
+window.setStageManager=function(){
+  const cfg=_wheel.stageConfig||{};
+  const curName=cfg.stageManagerName||'';
+  const members=_wheel.members||[];
+  const myName=getMyName();
+  document.getElementById('sm-sheet')?.remove();
+  const s=document.createElement('div');s.id='sm-sheet';
+  s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  s.onclick=function(e){if(e.target===s)s.remove();};
+  let memberList='';
+  if(members.length>0){
+    memberList=members.map(m=>{
+      const nm=getDisplayName(m);
+      const ini=getInitials(m.musicianName,m.musicianEmail);
+      const on=cfg.stageManagerId===m.id;
+      return `<button onclick="saveStageManager('${m.id}')" style="display:flex;align-items:center;gap:11px;width:100%;background:${on?'#E1F5EE':'#f7faf9'};border:1px solid ${on?'#1D9E75':'#e1f0ea'};border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;text-align:left">
+        <div style="width:34px;height:34px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:12px">${ini}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#111">${nm}</div><div style="font-size:11px;color:#888">${m.instrument||'—'}</div></div>
+        ${on?'<span style="color:#1D9E75;font-size:18px">✓</span>':'<i class="ti ti-headphones" style="color:#1D9E75;font-size:18px"></i>'}
+      </button>`;
+    }).join('');
+  }
+  s.innerHTML=`<div style="background:#fff;width:100%;max-width:430px;border-radius:20px 20px 0 0;padding:20px 18px 28px;max-height:80vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:#e5e5e5;border-radius:2px;margin:0 auto 16px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:20px">🎧</span><span style="font-size:18px;font-weight:700;color:#111">Stage Manager</span></div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">The go-to person for logistics — locked doors, room changes, "where do I go." Musicians reach them first instead of disturbing everyone.</div>
+    <button onclick="saveStageManagerSelf()" style="display:flex;align-items:center;gap:11px;width:100%;background:#FBF8EC;border:1.5px solid #E8D69A;border-radius:12px;padding:12px;margin-bottom:14px;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="width:34px;height:34px;border-radius:50%;background:#C9A84C;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px">🎧</div>
+      <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#9c7a1e">I'll be the Stage Manager</div><div style="font-size:11px;color:#b08f35">Assign myself — ${myName}</div></div>
+    </button>
+    ${members.length>0?`<div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Or pick from the ensemble</div>${memberList}`:`<div style="font-size:12px;color:#aaa;text-align:center;padding:10px 0">No ensemble members yet to choose from.</div>`}
+    ${curName?`<button onclick="saveStageManager('')" style="width:100%;padding:13px;border:1px solid #F09595;border-radius:11px;background:#fff;color:#D14343;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px">Remove Stage Manager (${curName})</button>`:''}
+    <button onclick="document.getElementById('sm-sheet').remove()" style="width:100%;padding:12px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+};
+
+window.saveStageManagerSelf=async function(){
+  if(!_wheel.stageConfig)_wheel.stageConfig={sections:[]};
+  _wheel.stageConfig.stageManagerId='__self__';
+  _wheel.stageConfig.stageManagerName=getMyName();
+  _wheel.stageConfig.stageManagerEmail=(CU&&CU.email)||'';
+  try{
+    await setDoc(doc(db,'rosterFolders',_wheel.fid),{stageConfig:_wheel.stageConfig},{merge:true});
+    ts('You are the Stage Manager 🎧');
+  }catch(e){console.error(e);ts('Saved');}
+  document.getElementById('sm-sheet')?.remove();
+  renderStage();
+};
+
+window.saveStageManager=async function(mid){
+  if(!_wheel.stageConfig)_wheel.stageConfig={sections:[]};
+  if(!mid){
+    _wheel.stageConfig.stageManagerId='';
+    _wheel.stageConfig.stageManagerName='';
+    _wheel.stageConfig.stageManagerEmail='';
+  }else{
+    const m=_wheel.members.find(x=>x.id===mid);
+    if(m){
+      _wheel.stageConfig.stageManagerId=mid;
+      _wheel.stageConfig.stageManagerName=getDisplayName(m);
+      _wheel.stageConfig.stageManagerEmail=m.musicianEmail||'';
+    }
+  }
+  try{
+    await setDoc(doc(db,'rosterFolders',_wheel.fid),{stageConfig:_wheel.stageConfig},{merge:true});
+    ts(mid?('Stage Manager: '+_wheel.stageConfig.stageManagerName+' 🎧'):'Stage Manager removed');
+  }catch(e){console.error(e);ts('Saved');}
+  document.getElementById('sm-sheet')?.remove();
   renderStage();
 };
 
