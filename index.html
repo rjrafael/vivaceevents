@@ -5626,7 +5626,7 @@ function renderStage(){
   el.innerHTML=html;
 }
 
-function renderStageSetup(editing){
+window.renderStageSetup=function(editing){
   const el=document.getElementById('fd-view');if(!el)return;
   const cfg=_wheel.stageConfig;
   // working copy
