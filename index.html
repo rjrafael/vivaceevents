@@ -111,19 +111,20 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.5)}60%{box-shadow:0 0 0 8px rgba(255,59,48,0)}}
 /* Hover tooltip for stage seats and bench */
 .vv-tip{position:relative}
-.vv-tip .vv-tip-body{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 8px);background:linear-gradient(135deg,#fff,#fafffd);color:#0d0d0d;padding:10px 14px;border-radius:12px;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.35),0 0 0 1px rgba(29,158,117,.25);z-index:9999;pointer-events:none;transition:opacity .15s ease, transform .15s ease;font-weight:500;line-height:1.4;text-align:left;max-width:calc(100vw - 24px)}
+.vv-tip .vv-tip-body{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 8px);background:linear-gradient(135deg,#fff,#fafffd);color:#0d0d0d;padding:10px 14px;border-radius:12px;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.35),0 0 0 1px rgba(29,158,117,.25);z-index:9999;pointer-events:none;transition:opacity .15s ease;font-weight:500;line-height:1.4;text-align:left;max-width:280px}
 /* default: center over the element */
 .vv-tip .vv-tip-body{left:50%;transform:translateX(-50%)}
 .vv-tip .vv-tip-body::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff}
-/* left-edge: anchor to left so it grows to the right */
-.vv-tip.tip-left .vv-tip-body{left:-6px;transform:none}
-.vv-tip.tip-left .vv-tip-body::after{left:30px;transform:none}
-/* right-edge: anchor to right so it grows to the left */
-.vv-tip.tip-right .vv-tip-body{left:auto;right:-6px;transform:none}
-.vv-tip.tip-right .vv-tip-body::after{left:auto;right:24px;transform:none}
+/* If seat is first child of its row → anchor tooltip left */
+.vv-row > .vv-tip:first-child .vv-tip-body{left:0;transform:none}
+.vv-row > .vv-tip:first-child .vv-tip-body::after{left:18px;transform:none}
+/* If seat is last child of its row → anchor tooltip right */
+.vv-row > .vv-tip:last-child .vv-tip-body{left:auto;right:0;transform:none}
+.vv-row > .vv-tip:last-child .vv-tip-body::after{left:auto;right:16px;transform:none}
+/* Single seat in row stays centered (overrides above) */
+.vv-row > .vv-tip:only-child .vv-tip-body{left:50%;transform:translateX(-50%)}
+.vv-row > .vv-tip:only-child .vv-tip-body::after{left:50%;right:auto;transform:translateX(-50%)}
 .vv-tip:hover .vv-tip-body{visibility:visible;opacity:1}
-.vv-tip:hover .vv-tip-body{transform:translateX(-50%) translateY(-2px)}
-.vv-tip.tip-left:hover .vv-tip-body, .vv-tip.tip-right:hover .vv-tip-body{transform:translateY(-2px)}
 .vv-tip .vv-tip-name{font-weight:700;color:#0F6E56;margin-bottom:2px;font-size:13px}
 .vv-tip .vv-tip-line{color:#555;font-size:11px}
 .vv-tip .vv-tip-line .vv-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}
@@ -5576,28 +5577,6 @@ var STAGE_TEMPLATES={
 
 function newSectionId(){return 's'+Math.random().toString(36).substr(2,6);}
 
-// Smart tooltip edge detection — keep tooltips on screen
-if(!window._vvTipInit){
-  window._vvTipInit=true;
-  document.addEventListener('mouseenter',function(e){
-    const el=e.target.closest?e.target.closest('.vv-tip'):null;
-    if(!el)return;
-    el.classList.remove('tip-left','tip-right');
-    const rect=el.getBoundingClientRect();
-    const vw=window.innerWidth||document.documentElement.clientWidth;
-    // estimate tooltip width — content varies but generally 200-320px
-    const estTipWidth=300;
-    const seatCenter=rect.left+rect.width/2;
-    if(seatCenter-estTipWidth/2<8){
-      // too close to left — anchor left
-      el.classList.add('tip-left');
-    }else if(seatCenter+estTipWidth/2>vw-8){
-      // too close to right — anchor right
-      el.classList.add('tip-right');
-    }
-  },true);
-}
-
 function getStageTheme(){
   const t=(_wheel.stageConfig&&_wheel.stageConfig.theme)?_wheel.stageConfig.theme:'vivace';
   return STAGE_THEMES[t]||STAGE_THEMES.vivace;
@@ -5646,7 +5625,7 @@ function renderStage(){
         </div>
         <button onclick="editStageSection('${sec.id}')" style="background:none;border:none;color:${th.accent};font-size:14px;cursor:pointer;padding:2px 4px"><i class="ti ti-dots"></i></button>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:9px">`;
+      <div class="vv-row" style="display:flex;flex-wrap:wrap;gap:9px">`;
     for(let slot=0;slot<sec.seats;slot++){
       const mem=seated[sec.id+'_'+slot];
       if(mem){
@@ -5694,7 +5673,7 @@ function renderStage(){
   if(benchMembers.length===0){
     html+=`<div style="font-size:11px;color:#6b7689;padding:6px 0">Everyone is seated. Add more people with "+ Add person".</div>`;
   }else{
-    html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    html+='<div class="vv-row" style="display:flex;flex-wrap:wrap;gap:8px">';
     benchMembers.forEach(m=>{
       const ini=getInitials(m.musicianName,m.musicianEmail);
       const nm=getDisplayName(m);
