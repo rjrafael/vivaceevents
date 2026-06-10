@@ -1054,7 +1054,7 @@ window.showFillGig=async function(gigId,gigTitle){
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
           <div class="member-check" id="sel-${a.id}" onclick="toggleSel('${a.id}')"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none"><polyline points="20 6 9 17 4 12"/></svg></div>
           <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">${a.userEmail||'Applicant'}</div></div>
-          <span class="tag tg">Applied</span>
+          <button onclick="openJobSheet('${gigId}','${(a.userName||'').replace(/'/g,"\\'")}','${(a.userEmail||'').replace(/'/g,"\\'")}')" style="background:#FBF8EC;border:1px solid #E8D69A;color:#9c7a1e;border-radius:16px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📄 Job Sheet</button>
         </div>`).join(''):`<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">No applications yet. You can still close this position.</p>`}
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="bg" style="flex:1;padding:12px" onclick="document.getElementById('fill-modal').remove()">Cancel</button>
@@ -1642,6 +1642,151 @@ window.downloadContract=function(url,title){
   link.download=`VivaceEvents_${title.replace(/\s+/g,'_')}.pdf`;
   link.click();
 }
+
+// ─── JOB SHEET PDF (v1) ──────────────────────────────────────────
+// Auto-generated when a musician is confirmed. Professional, downloadable,
+// with a per-musician dress code (presets + custom).
+var DRESS_CODE_PRESETS=[
+  {id:'tux',icon:'🎩',label:'Formal tuxedo',text:'Formal tuxedo — black bow tie, black dress shoes'},
+  {id:'allblack',icon:'🖤',label:'All black',text:'All black — long sleeves, dress shoes (no logos)'},
+  {id:'smartcasual',icon:'👔',label:'Smart casual',text:'Smart casual — collared shirt, dark trousers'},
+  {id:'whiteblack',icon:'👗',label:'White top / black bottom',text:'White top, black bottom, black shoes'},
+  {id:'orchestra',icon:'🎻',label:'Orchestra formal',text:'Orchestra formal — long black dress or black tuxedo, black shoes'},
+  {id:'custom',icon:'✏️',label:'Custom',text:''},
+];
+
+// Open the dress-code picker, then generate the Job Sheet for a gig+musician
+window.openJobSheet=function(gigId, musicianName, musicianEmail){
+  document.getElementById('jobsheet-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='jobsheet-modal';
+  m.innerHTML=`<div class="modal" style="max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📄 Job Sheet</div>
+      <button onclick="document.getElementById('jobsheet-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Generate a professional job sheet${musicianName?(' for <strong>'+musicianName+'</strong>'):''}. Pick a dress code — it prints on their sheet.</div>
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Dress code</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+      ${DRESS_CODE_PRESETS.map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #eee;border-radius:11px;cursor:pointer;font-family:inherit">
+        <input type="radio" name="dc-preset" value="${p.id}" ${p.id==='allblack'?'checked':''} onchange="jsDressPick('${p.id}')" style="width:18px;height:18px;accent-color:#1D9E75"/>
+        <span style="font-size:15px">${p.icon}</span>
+        <span style="font-size:13px;color:#333;font-weight:500">${p.label}</span>
+      </label>`).join('')}
+    </div>
+    <textarea id="js-dress-text" placeholder="Dress code details…" style="width:100%;min-height:54px;border:1px solid #ddd;border-radius:10px;padding:11px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;color:#111;margin-bottom:6px">All black — long sleeves, dress shoes (no logos)</textarea>
+    <div style="font-size:11px;color:#aaa;margin-bottom:16px">You can edit the text above for any preset.</div>
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Extra notes for this musician (optional)</div>
+    <textarea id="js-extra" placeholder="e.g. Arrive 30 min early for sound check · Load in through back door" style="width:100%;min-height:48px;border:1px solid #ddd;border-radius:10px;padding:11px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;color:#111;margin-bottom:18px"></textarea>
+    <button class="bt" style="width:100%;padding:15px;font-size:15px;font-weight:700" onclick="generateJobSheet('${gigId}','${(musicianName||'').replace(/'/g,"\\'")}','${(musicianEmail||'').replace(/'/g,"\\'")}')">📄 Generate Job Sheet PDF</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.jsDressPick=function(id){
+  const p=DRESS_CODE_PRESETS.find(x=>x.id===id);
+  const ta=document.getElementById('js-dress-text');
+  if(ta&&p){if(id==='custom'){ta.value='';ta.focus();}else{ta.value=p.text;}}
+};
+
+window.generateJobSheet=async function(gigId, musicianName, musicianEmail){
+  const dressText=(document.getElementById('js-dress-text')?.value||'').trim();
+  const extra=(document.getElementById('js-extra')?.value||'').trim();
+  document.getElementById('jobsheet-modal')?.remove();
+  ts('Generating job sheet…');
+  // fetch gig
+  let g={};
+  try{const s=await getDoc(doc(db,'gigs',gigId));if(s.exists())g=s.data();}catch(e){}
+  const managerName=g.managerName||UP.name||CU.displayName||CU.email?.split('@')[0]||'Manager';
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,margin=20;let y=margin;
+
+    // Header
+    pdf.setFillColor(13,13,13);pdf.rect(0,0,W,45,'F');
+    pdf.setTextColor(29,158,117);pdf.setFontSize(9);pdf.setFont('helvetica','bold');
+    pdf.text('VIVACE EVENTS · VIRTUAL STUDIO ORCHESTRA LLC',margin,18);
+    pdf.setTextColor(255,255,255);pdf.setFontSize(22);pdf.setFont('helvetica','bold');
+    pdf.text('Job Sheet',margin,30);
+    pdf.setTextColor(150,150,150);pdf.setFontSize(8);pdf.setFont('helvetica','normal');
+    pdf.text(`Ref #${gigId.slice(-10).toUpperCase()}`,margin,38);
+    pdf.text(`Issued: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`,W-margin,38,{align:'right'});
+    y=58;
+
+    // Musician + Event summary boxes
+    const halfW=(W-2*margin-6)/2;
+    pdf.setFillColor(230,241,251);pdf.roundedRect(margin,y,halfW,26,3,3,'F');
+    pdf.setTextColor(12,68,124);pdf.setFontSize(7);pdf.setFont('helvetica','bold');
+    pdf.text('MUSICIAN',margin+4,y+6);
+    pdf.setFontSize(12);pdf.setFont('helvetica','bold');
+    pdf.text((musicianName||musicianEmail||'—').substring(0,26),margin+4,y+14);
+    if(musicianEmail){pdf.setFontSize(8);pdf.setFont('helvetica','normal');pdf.text(musicianEmail.substring(0,30),margin+4,y+21);}
+    const mx=margin+halfW+6;
+    pdf.setFillColor(225,245,238);pdf.roundedRect(mx,y,halfW,26,3,3,'F');
+    pdf.setTextColor(8,80,65);pdf.setFontSize(7);pdf.setFont('helvetica','bold');
+    pdf.text('BOOKED BY',mx+4,y+6);
+    pdf.setFontSize(12);pdf.setFont('helvetica','bold');
+    pdf.text((managerName||'—').substring(0,26),mx+4,y+14);
+    if(g.instruments){pdf.setFontSize(8);pdf.setFont('helvetica','normal');pdf.text(('Role: '+g.instruments).substring(0,30),mx+4,y+21);}
+    y+=34;
+
+    // Event details
+    function section(title){pdf.setTextColor(136,136,136);pdf.setFontSize(8);pdf.setFont('helvetica','bold');pdf.text(title,margin,y);y+=6;}
+    function row(label,val){if(!val)return;pdf.setTextColor(120,120,120);pdf.setFontSize(8);pdf.setFont('helvetica','normal');pdf.text(label,margin,y);pdf.setTextColor(30,30,30);pdf.setFontSize(10);pdf.setFont('helvetica','bold');const lines=pdf.splitTextToSize(String(val),W-2*margin-42);pdf.text(lines,margin+42,y);y+=Math.max(6,lines.length*5)+1;}
+
+    section('EVENT');
+    row('Event',g.title||'—');
+    row('Type',g.type||'');
+    row('Date',g.date?(g.date+(g.dateEnd&&g.dateEnd!==g.date?(' → '+g.dateEnd):'')):'');
+    row('Time',g.time?(g.time+(g.timeEnd?(' – '+g.timeEnd):'')):'');
+    if(g.duration)row('Duration',g.duration);
+    row('Venue',g.location||g.onlinePlatform||'');
+    if(g.onlineLink)row('Link',g.onlineLink);
+    y+=2;
+
+    section('COMPENSATION');
+    row('Pay',g.pay||'To be discussed');
+    y+=2;
+
+    // Parking (if enabled)
+    if(g.parkingEnabled){
+      section('PARKING');
+      row('Address',g.parkingAddress||'');
+      if(g.parkingType)row('Type',g.parkingType);
+      if(g.parkingSpots)row('Spots',g.parkingSpots);
+      y+=2;
+    }
+
+    // DRESS CODE — the key feature (highlighted box)
+    if(dressText){
+      pdf.setFillColor(251,248,236);pdf.setDrawColor(232,214,154);
+      const dcLines=pdf.splitTextToSize(dressText,W-2*margin-8);
+      const boxH=12+dcLines.length*5;
+      pdf.roundedRect(margin,y,W-2*margin,boxH,3,3,'FD');
+      pdf.setTextColor(156,122,30);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+      pdf.text('DRESS CODE',margin+4,y+7);
+      pdf.setTextColor(60,50,20);pdf.setFontSize(10);pdf.setFont('helvetica','normal');
+      pdf.text(dcLines,margin+4,y+13);
+      y+=boxH+6;
+    }
+
+    // Extra notes
+    if(extra){section('NOTES');pdf.setTextColor(50,50,50);pdf.setFontSize(9);pdf.setFont('helvetica','normal');const eLines=pdf.splitTextToSize(extra,W-2*margin);pdf.text(eLines,margin,y);y+=eLines.length*5+4;}
+    if(g.notes){pdf.setTextColor(50,50,50);pdf.setFontSize(9);pdf.setFont('helvetica','normal');const nLines=pdf.splitTextToSize('Gig notes: '+g.notes,W-2*margin);pdf.text(nLines,margin,y);y+=nLines.length*5+4;}
+
+    // Footer
+    const fy=285;
+    pdf.setDrawColor(220,220,220);pdf.line(margin,fy-6,W-margin,fy-6);
+    pdf.setTextColor(150,150,150);pdf.setFontSize(7);pdf.setFont('helvetica','italic');
+    pdf.text('Vivace Events provides this platform as a service only and is not a party to this booking. This sheet is between the Manager and Musician named above.',margin,fy,{maxWidth:W-2*margin});
+    pdf.setTextColor(120,120,120);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    pdf.text('vivaceevents.com',W-margin,fy+8,{align:'right'});
+
+    const fname=`Vivace_JobSheet_${(g.title||'Gig').replace(/\s+/g,'_')}_${g.date||''}.pdf`;
+    pdf.save(fname);
+    ts('📄 Job sheet ready!');
+  }catch(e){console.error('job sheet error:',e);ts('Could not generate job sheet');}
+};
 
 // ─── UNIFIED CANCELLATION SYSTEM ────────────────────────────────
 let _cancelState={type:'',reason:'',hoursLeft:0};
