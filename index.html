@@ -484,10 +484,13 @@ async function sendWelcomeEmail(){
           <div style="background:#fff;padding:28px 24px;border:1px solid #eee;border-top:none">
             <p style="font-size:20px;font-weight:700;color:#111;margin:0 0 6px">Welcome, ${name}! 🎉</p>
             <p style="font-size:15px;color:#444;line-height:1.6;margin:0 0 18px">You're in. Vivace Events is your home for booking, discovering, and managing musicians — gigs, payments, seating charts, and more.</p>
-            <div style="background:#F7FBF9;border:1px solid #E1F5EE;border-radius:12px;padding:16px;margin-bottom:18px">
+            <div style="background:#F7FBF9;border:1px solid #E1F5EE;border-radius:12px;padding:16px;margin-bottom:12px">
               <p style="font-size:12px;color:#6f9286;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Your account</p>
               <p style="font-size:14px;color:#111;margin:0 0 4px">📧 <strong>Login email:</strong> ${CU.email}</p>
-              <p style="font-size:13px;color:#888;margin:8px 0 0">Tip: pick your unique <strong>@username</strong> inside the app — it's your permanent public handle, and your email can change anytime without losing it.</p>
+            </div>
+            <div style="background:#FBF8EC;border:1px solid #E8D69A;border-radius:12px;padding:16px;margin-bottom:18px">
+              <p style="font-size:12px;color:#9c7a1e;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">🪪 Next step — claim your username</p>
+              <p style="font-size:13px;color:#555;margin:0">Your unique <strong>@username</strong> is your permanent public handle on Vivace. Open the app and claim yours now — you'll get a confirmation email once it's set.</p>
             </div>
             <a href="https://vivaceevents.com" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:15px;border-radius:10px;text-align:center;font-weight:700;font-size:15px">Open Vivace Events →</a>
             <p style="font-size:12px;color:#aaa;margin:18px 0 0;line-height:1.5">For your security, we never include your password in any email. If you ever forget it, reset it from the login screen — or simply sign in with Google.</p>
@@ -497,6 +500,42 @@ async function sendWelcomeEmail(){
       }
     });
   }catch(e){console.log('welcome email error:',e);}
+}
+
+// Fires when a user claims their username — confirms it by email
+async function sendUsernameConfirmEmail(username){
+  if(!CU||!CU.email)return;
+  const name=(UP&&UP.name)||(CU.displayName)||CU.email.split('@')[0]||'there';
+  try{
+    await addDoc(collection(db,'mail'),{
+      to:CU.email,
+      message:{
+        subject:`🪪 Your Vivace username is @${username}`,
+        html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#f7faf9;padding:0">
+          <div style="background:#0d0d0d;padding:24px;border-radius:12px 12px 0 0;text-align:center">
+            <div style="font-size:24px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div>
+            <div style="font-size:11px;color:#888;margin-top:4px">by Virtual Studio Orchestra LLC</div>
+          </div>
+          <div style="background:#fff;padding:28px 24px;border:1px solid #eee;border-top:none">
+            <p style="font-size:20px;font-weight:700;color:#111;margin:0 0 6px">Username confirmed, ${name}! 🪪</p>
+            <p style="font-size:15px;color:#444;line-height:1.6;margin:0 0 18px">Your permanent public handle on Vivace has been set. Save this email — it has everything you need to log back in.</p>
+            <div style="background:#F7FBF9;border:1px solid #E1F5EE;border-radius:12px;padding:20px;margin-bottom:18px">
+              <p style="font-size:12px;color:#6f9286;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Your account details</p>
+              <p style="font-size:16px;color:#1D9E75;font-weight:700;margin:0 0 8px">🪪 Username: @${username}</p>
+              <p style="font-size:14px;color:#111;margin:0 0 4px">📧 Login email: ${CU.email}</p>
+              <p style="font-size:12px;color:#888;margin:12px 0 0">Your username is permanent — it stays even if you change your email. Your email is just your login method and can be updated anytime from your profile.</p>
+            </div>
+            <div style="background:#f9f9f9;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:18px">
+              <p style="font-size:12px;color:#888;margin:0 0 6px;font-weight:700">🔐 Security reminder</p>
+              <p style="font-size:12px;color:#aaa;margin:0;line-height:1.5">We never send your password by email. If you forget it, reset it from the login screen — or sign in with Google for password-free access.</p>
+            </div>
+            <a href="https://vivaceevents.com" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:15px;border-radius:10px;text-align:center;font-weight:700;font-size:15px">Open Vivace Events →</a>
+          </div>
+          <div style="text-align:center;padding:16px;font-size:11px;color:#aaa">vivaceevents.com · Washington DC</div>
+        </div>`
+      }
+    });
+  }catch(e){console.log('username confirm email error:',e);}
 }
 
 // ─── USERNAME SYSTEM ─────────────────────────────────────────────
@@ -587,6 +626,8 @@ window.saveUsername=async function(forced){
   const r=await claimUsername(inp.value);
   if(r.ok){
     ts('Username set: @'+r.username+' ✅');
+    // send confirmation email with their username + login email
+    sendUsernameConfirmEmail(r.username);
     document.getElementById('uname-modal')?.remove();
     if(CS==='profile')go('profile');
   }else{
