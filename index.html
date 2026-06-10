@@ -109,6 +109,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .featured-badge{display:inline-flex;align-items:center;gap:3px;background:#C9A84C;color:#7A5800;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
 .pro-badge{display:inline-flex;align-items:center;gap:3px;background:#1D9E75;color:#fff;border-radius:20px;padding:3px 8px;font-size:10px;font-weight:700}
 @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.5)}60%{box-shadow:0 0 0 8px rgba(255,59,48,0)}}
+/* Hover tooltip for stage seats and bench */
+.vv-tip{position:relative}
+.vv-tip .vv-tip-body{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#fff,#fafffd);color:#0d0d0d;padding:10px 14px;border-radius:12px;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.35),0 0 0 1px rgba(29,158,117,.25);z-index:9999;pointer-events:none;transition:opacity .15s ease, transform .15s ease;font-weight:500;line-height:1.4;text-align:left}
+.vv-tip .vv-tip-body::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff}
+.vv-tip:hover .vv-tip-body{visibility:visible;opacity:1;transform:translateX(-50%) translateY(-2px)}
+.vv-tip .vv-tip-name{font-weight:700;color:#0F6E56;margin-bottom:2px;font-size:13px}
+.vv-tip .vv-tip-line{color:#555;font-size:11px}
+.vv-tip .vv-tip-line .vv-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.vv-tip .vv-tip-gold{color:#9c7a1e;font-weight:600}
 </style>
 <script src="https://js.stripe.com/v3/"></script>
 </head>
@@ -5503,6 +5512,43 @@ async function loadFolderMembers(fid,ft){await reloadWheelMembers();}
 // ─── STAGE / SEATING CHART — Phase 2 ─────────────────────────────
 var STAGE_COLORS=['#1D9E75','#E0609F','#9B6FE0','#3B8EE0','#E8993A','#E0506A','#2BB8A0','#C9A84C','#5B8DEF','#D4794A','#16B8A6','#EC6F9B'];
 
+// Smart initials: "mix two"→"MT", "Sarah Johnson"→"SJ", "Buba"→"BU", "mix2"→"M2", "violin1"→"V1", "Anna 7"→"A7"
+function getInitials(name, email){
+  let src=(name||'').trim();
+  if(src){
+    // Insert a space between letters↔digits boundary so "mix2" becomes "mix 2"
+    src=src.replace(/([A-Za-z])(\d)/g,'$1 $2').replace(/(\d)([A-Za-z])/g,'$1 $2');
+    // Split on spaces, hyphens, underscores, dots
+    const parts=src.split(/[\s\-_.]+/).filter(Boolean);
+    if(parts.length>=2){
+      // First char of first word + first char of last word
+      return (parts[0].charAt(0)+parts[parts.length-1].charAt(0)).toUpperCase();
+    }
+    if(parts.length===1){
+      // Single token — use first 2 chars
+      return parts[0].substring(0,2).toUpperCase();
+    }
+  }
+  // Fall back to email username
+  if(email){
+    let u=email.split('@')[0];
+    u=u.replace(/([A-Za-z])(\d)/g,'$1 $2').replace(/(\d)([A-Za-z])/g,'$1 $2');
+    const parts=u.split(/[\s\-_.]+/).filter(Boolean);
+    if(parts.length>=2){
+      return (parts[0].charAt(0)+parts[parts.length-1].charAt(0)).toUpperCase();
+    }
+    return u.substring(0,2).toUpperCase();
+  }
+  return '?';
+}
+
+// Get the best display name for a member
+function getDisplayName(mem){
+  if(mem.musicianName&&mem.musicianName.trim())return mem.musicianName.trim();
+  if(mem.musicianEmail)return mem.musicianEmail.split('@')[0];
+  return '—';
+}
+
 var STAGE_THEMES={
   vivace:{label:'🌿 Vivace',bg:'#06231c',card:'#0b3327',border:'#154538',text:'#f3efe2',sub:'#6f9286',accent:'#5DCAA5',gold:'#FFD86B',bench:'#0f1f2b',benchBorder:'#243447',empty:'#0a2d24',emptyBorder:'#2f5e4e',emptyText:'#4c8270'},
   neon:{label:'🌙 Neon',bg:'#070b16',card:'#0f1729',border:'#22304d',text:'#f0f0f8',sub:'#7a8499',accent:'#6ee7d4',gold:'#FFE08A',bench:'#111a2e',benchBorder:'#243447',empty:'#0c1322',emptyBorder:'#2a3b5a',emptyText:'#4a6080'},
@@ -5572,12 +5618,21 @@ function renderStage(){
     for(let slot=0;slot<sec.seats;slot++){
       const mem=seated[sec.id+'_'+slot];
       if(mem){
-        const ini=(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase();
-        const nm=(mem.musicianName||mem.musicianEmail?.split('@')[0]||'—');
-        html+=`<div onclick="stageSeatTap('${sec.id}',${slot})" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;width:54px">
+        const ini=getInitials(mem.musicianName,mem.musicianEmail);
+        const nm=getDisplayName(mem);
+        const tipName=nm.replace(/</g,'&lt;');
+        const tipInst=(mem.instrument||'—').replace(/</g,'&lt;');
+        const tipEmail=mem.musicianEmail?mem.musicianEmail.replace(/</g,'&lt;'):'';
+        const tipSec=(sec.name||'').replace(/</g,'&lt;');
+        html+=`<div class="vv-tip" onclick="stageSeatTap('${sec.id}',${slot})" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;width:54px">
           <div style="position:relative;width:46px;height:46px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.3)${mem.soloist?';border:2.5px solid '+th.gold:''}">${ini}${mem.soloist?'<span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:11px">★</span>':''}</div>
           <div style="font-size:9px;color:${th.text};opacity:.85;margin-top:3px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${nm}</div>
           <div style="font-size:8px;color:${th.sub};max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">${mem.instrument||''}</div>
+          <div class="vv-tip-body">
+            <div class="vv-tip-name">${tipName}${mem.soloist?' <span class="vv-tip-gold">★ Soloist</span>':''}</div>
+            <div class="vv-tip-line"><span class="vv-dot" style="background:${col}"></span>${tipSec} · ${tipInst}</div>
+            ${tipEmail?`<div class="vv-tip-line" style="margin-top:2px;color:#888;font-size:10px">${tipEmail}</div>`:''}
+          </div>
         </div>`;
       }else{
         html+=`<div onclick="stageSeatTap('${sec.id}',${slot})" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;width:54px">
@@ -5609,11 +5664,19 @@ function renderStage(){
   }else{
     html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
     benchMembers.forEach(m=>{
-      const ini=(m.musicianName||m.musicianEmail||'?').substring(0,2).toUpperCase();
-      const nm=(m.musicianName||m.musicianEmail?.split('@')[0]||'—');
-      html+=`<div style="display:flex;align-items:center;gap:7px;background:${th.bench};border:1px solid ${th.benchBorder};border-radius:24px;padding:5px 12px 5px 5px">
+      const ini=getInitials(m.musicianName,m.musicianEmail);
+      const nm=getDisplayName(m);
+      const tipName=nm.replace(/</g,'&lt;');
+      const tipInst=(m.instrument||'—').replace(/</g,'&lt;');
+      const tipEmail=m.musicianEmail?m.musicianEmail.replace(/</g,'&lt;'):'';
+      html+=`<div class="vv-tip" style="display:flex;align-items:center;gap:7px;background:${th.bench};border:1px solid ${th.benchBorder};border-radius:24px;padding:5px 12px 5px 5px;cursor:default">
         <div style="width:28px;height:28px;border-radius:50%;background:#3a4d6e;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500">${ini}</div>
         <div><div style="font-size:11px;color:${th.text};font-weight:500;line-height:1.1">${nm}</div><div style="font-size:9px;color:${th.sub}">${m.instrument||'—'}</div></div>
+        <div class="vv-tip-body">
+          <div class="vv-tip-name">${tipName}</div>
+          <div class="vv-tip-line"><span class="vv-dot" style="background:#3a4d6e"></span>On bench · ${tipInst}</div>
+          ${tipEmail?`<div class="vv-tip-line" style="margin-top:2px;color:#888;font-size:10px">${tipEmail}</div>`:''}
+        </div>
       </div>`;
     });
     html+='</div>';
@@ -5762,8 +5825,8 @@ function stageAssignSheet(sid,slot){
     inner+=`<div style="text-align:center;padding:18px 0;color:#aaa;font-size:13px">No one on the bench.</div>`;
   }else{
     inner+=bench.map(m=>{
-      const ini=(m.musicianName||m.musicianEmail||'?').substring(0,2).toUpperCase();
-      const nm=(m.musicianName||m.musicianEmail?.split('@')[0]||'—');
+      const ini=getInitials(m.musicianName,m.musicianEmail);
+      const nm=getDisplayName(m);
       return `<button onclick="seatMember('${m.id}','${sid}',${slot})" style="display:flex;align-items:center;gap:11px;width:100%;background:#f7faf9;border:1px solid #e1f0ea;border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;text-align:left">
         <div style="width:36px;height:36px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px">${ini}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#111">${nm}</div><div style="font-size:11px;color:#888">${m.instrument||'—'}</div></div>
@@ -5788,8 +5851,8 @@ window.seatMember=async function(mid,sid,slot){
 
 function stageSeatedMemberSheet(mid){
   const mem=_wheel.members.find(m=>m.id===mid);if(!mem)return;
-  const nm=(mem.musicianName||mem.musicianEmail?.split('@')[0]||'—');
-  const ini=(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase();
+  const nm=getDisplayName(mem);
+  const ini=getInitials(mem.musicianName,mem.musicianEmail);
   const sec=_wheel.stageConfig?.sections?.find(s=>s.id===mem.seatSection);
   const col=sec?.color||'#1D9E75';
   document.getElementById('stage-sheet')?.remove();
