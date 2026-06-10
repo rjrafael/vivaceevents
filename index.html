@@ -622,13 +622,15 @@ async function checkUsernameAvailable(u){
 async function claimUsername(u){
   const n=normalizeUsername(u);
   if(!validUsername(n))return{ok:false,error:'3–20 letters, numbers, or _'};
+  // RULE: usernames are PERMANENT. Once a user has one, they cannot change it.
+  // This protects user identity (anti-impersonation) and is the locked architecture decision.
+  if(UP&&UP.username&&UP.username!==n){
+    return{ok:false,error:'Usernames are permanent and cannot be changed. Contact support if needed.'};
+  }
   try{
     const chk=await checkUsernameAvailable(n);
     if(!chk.available)return{ok:false,error:chk.reason};
-    // free old username if user is changing it
-    const oldU=UP&&UP.username?normalizeUsername(UP.username):'';
-    if(oldU&&oldU!==n){try{await deleteDoc(doc(db,'usernames',oldU));}catch(e){}}
-    // reserve new
+    // reserve new (first time claim)
     await setDoc(doc(db,'usernames',n),{uid:CU.uid,claimedAt:new Date()});
     await setDoc(doc(db,'users',CU.uid),{username:n},{merge:true});
     UP.username=n;
@@ -8114,17 +8116,14 @@ function profileHTML(){
         <button onclick="showEditName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;padding:2px">✏️</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-        ${UP.username?`<span style="font-size:13px;color:#5DCAA5;font-weight:600">@${UP.username}</span><button onclick="changeUsername()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:0">✏️</button>`:`<button onclick="showUsernamePrompt(false)" style="background:#0d3d2e;border:1px solid #1D9E75;color:#5DCAA5;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Claim your @username</button>`}
+        ${UP.username?`<span style="font-size:13px;color:#5DCAA5;font-weight:600">@${UP.username}</span><span title="Your username is permanent" style="font-size:11px;color:#666">🔒</span>`:`<button onclick="showUsernamePrompt(false)" style="background:#0d3d2e;border:1px solid #1D9E75;color:#5DCAA5;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Claim your @username</button>`}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
         ${UP.verified?`<span class="verified-badge">✓ Verified</span>`:''}
         ${UP.featured?`<span class="featured-badge">⭐ Featured</span>`:''}
         ${plan!=='free'?`<span class="pro-badge">${planLabels[plan]}</span>`:''}
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <span style="font-size:12px;color:#aaa">${CU.email}</span>
-        <button onclick="showEditEmail()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:11px;padding:0" title="Change login email">✏️</button>
-      </div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px">${CU.email}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${roles.includes('artist')?'<span class="tag" style="background:#1D9E75;color:#fff;border:none">🎻 Artist</span>':''}
         ${roles.includes('manager')?'<span class="tag" style="background:#378ADD;color:#fff;border:none">🎯 Agent / Manager</span>':''}
