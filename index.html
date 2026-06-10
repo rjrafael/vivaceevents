@@ -445,7 +445,13 @@ async function loadUP(){
         setDoc(doc(db,'users',CU.uid),{roles:UP.roles},{merge:true}).catch(()=>{});
       }
     }
-    else{lang=detectLang();await setDoc(doc(db,'users',CU.uid),{roles:['artist'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});}
+    else{
+      lang=detectLang();
+      await setDoc(doc(db,'users',CU.uid),{roles:['artist'],email:CU.email,name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});
+      UP.email=CU.email;UP.name=CU.displayName||CU.email.split('@')[0];UP.plan='free';UP.roles=['artist'];
+      // brand-new user → send a warm welcome email (username comes after they claim it)
+      sendWelcomeEmail();
+    }
   }catch(e){}
 }
 
@@ -460,6 +466,135 @@ function detectLang(){
 }
 
 async function saveUP(){try{await setDoc(doc(db,'users',CU.uid),{...UP,email:CU.email},{merge:true});}catch(e){}}
+
+// ─── WELCOME EMAIL ───────────────────────────────────────────────
+async function sendWelcomeEmail(){
+  if(!CU||!CU.email)return;
+  const name=(CU.displayName||CU.email.split('@')[0]||'there');
+  try{
+    await addDoc(collection(db,'mail'),{
+      to:CU.email,
+      message:{
+        subject:'🎉 Welcome to Vivace Events!',
+        html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#f7faf9;padding:0">
+          <div style="background:#0d0d0d;padding:24px;border-radius:12px 12px 0 0;text-align:center">
+            <div style="font-size:24px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div>
+            <div style="font-size:11px;color:#888;margin-top:4px">by Virtual Studio Orchestra LLC</div>
+          </div>
+          <div style="background:#fff;padding:28px 24px;border:1px solid #eee;border-top:none">
+            <p style="font-size:20px;font-weight:700;color:#111;margin:0 0 6px">Welcome, ${name}! 🎉</p>
+            <p style="font-size:15px;color:#444;line-height:1.6;margin:0 0 18px">You're in. Vivace Events is your home for booking, discovering, and managing musicians — gigs, payments, seating charts, and more.</p>
+            <div style="background:#F7FBF9;border:1px solid #E1F5EE;border-radius:12px;padding:16px;margin-bottom:18px">
+              <p style="font-size:12px;color:#6f9286;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Your account</p>
+              <p style="font-size:14px;color:#111;margin:0 0 4px">📧 <strong>Login email:</strong> ${CU.email}</p>
+              <p style="font-size:13px;color:#888;margin:8px 0 0">Tip: pick your unique <strong>@username</strong> inside the app — it's your permanent public handle, and your email can change anytime without losing it.</p>
+            </div>
+            <a href="https://vivaceevents.com" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:15px;border-radius:10px;text-align:center;font-weight:700;font-size:15px">Open Vivace Events →</a>
+            <p style="font-size:12px;color:#aaa;margin:18px 0 0;line-height:1.5">For your security, we never include your password in any email. If you ever forget it, reset it from the login screen — or simply sign in with Google.</p>
+          </div>
+          <div style="text-align:center;padding:16px;font-size:11px;color:#aaa">vivaceevents.com · Washington DC</div>
+        </div>`
+      }
+    });
+  }catch(e){console.log('welcome email error:',e);}
+}
+
+// ─── USERNAME SYSTEM ─────────────────────────────────────────────
+// Username = permanent public identity. Unique. Email stays changeable.
+// A "usernames" collection maps lowercased username → uid (enforces uniqueness).
+function normalizeUsername(u){
+  return (u||'').toLowerCase().trim().replace(/[^a-z0-9_]/g,'');
+}
+function validUsername(u){
+  const n=normalizeUsername(u);
+  return n.length>=3 && n.length<=20;
+}
+// Check if a username is free. Returns {available:bool, reason:string}
+async function checkUsernameAvailable(u){
+  const n=normalizeUsername(u);
+  if(n.length<3)return{available:false,reason:'At least 3 characters'};
+  if(n.length>20)return{available:false,reason:'20 characters max'};
+  try{
+    const d=await getDoc(doc(db,'usernames',n));
+    if(d.exists()){
+      // taken — unless it's already this user's own
+      if(d.data().uid===CU.uid)return{available:true,reason:'This is yours'};
+      return{available:false,reason:'Taken — try another'};
+    }
+    return{available:true,reason:'Available!'};
+  }catch(e){return{available:false,reason:'Could not check'};}
+}
+// Claim/set a username for the current user (frees old one if changing)
+async function claimUsername(u){
+  const n=normalizeUsername(u);
+  if(!validUsername(n))return{ok:false,error:'3–20 letters, numbers, or _'};
+  try{
+    const chk=await checkUsernameAvailable(n);
+    if(!chk.available)return{ok:false,error:chk.reason};
+    // free old username if user is changing it
+    const oldU=UP&&UP.username?normalizeUsername(UP.username):'';
+    if(oldU&&oldU!==n){try{await deleteDoc(doc(db,'usernames',oldU));}catch(e){}}
+    // reserve new
+    await setDoc(doc(db,'usernames',n),{uid:CU.uid,claimedAt:new Date()});
+    await setDoc(doc(db,'users',CU.uid),{username:n},{merge:true});
+    UP.username=n;
+    return{ok:true,username:n};
+  }catch(e){console.error('claimUsername:',e);return{ok:false,error:'Could not save'};}
+}
+
+// Prompt shown when a logged-in user has no username yet
+window.showUsernamePrompt=function(forced){
+  if(document.getElementById('uname-modal'))return;
+  const suggested=normalizeUsername((UP&&UP.name)||(CU&&CU.displayName)||(CU&&CU.email?CU.email.split('@')[0]:''))||'';
+  const m=document.createElement('div');m.className='modal-bg';m.id='uname-modal';
+  if(forced)m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:11000;display:flex;align-items:center;justify-content:center;padding:18px';
+  m.innerHTML=`<div class="modal" style="max-width:400px">
+    <div style="text-align:center;margin-bottom:6px"><span style="font-size:34px">🪪</span></div>
+    <div style="font-size:19px;font-weight:700;color:#111;text-align:center;margin-bottom:4px">Choose your username</div>
+    <div style="font-size:13px;color:#888;text-align:center;margin-bottom:18px">This is your permanent public handle on Vivace — like @${suggested||'yourname'}. People find you by it. Your email can change anytime; your username stays.</div>
+    <div style="display:flex;align-items:center;background:#f7faf9;border:1.5px solid #e1f0ea;border-radius:12px;padding:0 12px;margin-bottom:4px">
+      <span style="font-size:18px;color:#1D9E75;font-weight:700">@</span>
+      <input id="uname-input" oninput="unameCheck()" maxlength="20" placeholder="${suggested||'username'}" value="${suggested}" autocomplete="off" style="flex:1;border:none;background:transparent;padding:13px 8px;font-size:16px;color:#111;font-family:inherit;outline:none"/>
+    </div>
+    <div id="uname-status" style="font-size:12px;min-height:18px;margin:6px 2px 14px;color:#888"></div>
+    <button id="uname-save" onclick="saveUsername(${forced?'true':'false'})" class="bt" style="width:100%;padding:14px;font-size:15px;font-weight:700">Claim username</button>
+    ${forced?'':'<button onclick="document.getElementById(\'uname-modal\').remove()" style="width:100%;padding:11px;border:none;background:transparent;color:#bbb;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">Later</button>'}
+  </div>`;
+  document.getElementById('app').appendChild(m);
+  setTimeout(()=>{unameCheck();document.getElementById('uname-input')?.focus();},80);
+};
+
+let _unameTimer=null,_unameOk=false;
+window.unameCheck=function(){
+  const inp=document.getElementById('uname-input');const st=document.getElementById('uname-status');
+  if(!inp||!st)return;
+  const n=normalizeUsername(inp.value);
+  if(inp.value!==n){inp.value=n;}
+  _unameOk=false;
+  if(n.length<3){st.textContent='At least 3 characters';st.style.color='#888';return;}
+  st.textContent='Checking…';st.style.color='#888';
+  clearTimeout(_unameTimer);
+  _unameTimer=setTimeout(async()=>{
+    const r=await checkUsernameAvailable(n);
+    _unameOk=r.available;
+    st.textContent=(r.available?'✓ ':'✕ ')+r.reason;
+    st.style.color=r.available?'#1D9E75':'#D14343';
+  },350);
+};
+window.saveUsername=async function(forced){
+  const inp=document.getElementById('uname-input');if(!inp)return;
+  const btn=document.getElementById('uname-save');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  const r=await claimUsername(inp.value);
+  if(r.ok){
+    ts('Username set: @'+r.username+' ✅');
+    document.getElementById('uname-modal')?.remove();
+    if(CS==='profile')go('profile');
+  }else{
+    const st=document.getElementById('uname-status');if(st){st.textContent='✕ '+r.error;st.style.color='#D14343';}
+    if(btn){btn.disabled=false;btn.textContent='Claim username';}
+  }
+};
+window.changeUsername=function(){showUsernamePrompt(false);};
 async function loadGroups(){try{const s=await getDocs(query(collection(db,'groups'),where('managerId','==',CU.uid)));groups=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}}
 async function loadVenues(){try{const s=await getDocs(query(collection(db,'venues'),where('managerId','==',CU.uid)));venues=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}}
 
@@ -5973,6 +6108,11 @@ function stageSeatedMemberSheet(mid){
       <div style="flex:1"><div style="font-size:16px;font-weight:700;color:#111">${nm}${mem.soloist?' <span style="color:#C9A84C">★</span>':''}</div><div style="font-size:12px;color:#888">${mem.instrument||'—'}${sec?' · '+sec.name:''}</div></div>
     </div>
     <button onclick="editMemberInstrument('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#E1F5EE;color:#0F6E56;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-music" style="vertical-align:-2px;margin-right:5px"></i>Change instrument</button>
+    ${mem.phone?`<div style="display:flex;gap:8px;margin-bottom:8px">
+      <a href="${telHref(mem.phone)}" style="flex:1;text-decoration:none;text-align:center;padding:13px;border-radius:12px;background:#E1F5EE;color:#0F6E56;font-size:13px;font-weight:700;font-family:inherit">📞 Call</a>
+      ${mem.hasWhatsApp?`<a href="${waHref(mem.phone)}" target="_blank" rel="noopener" style="flex:1;text-decoration:none;text-align:center;padding:13px;border-radius:12px;background:#E7F8EE;color:#128C3E;font-size:13px;font-weight:700;font-family:inherit">🟢 WhatsApp</a>`:''}
+      <a href="${smsHref(mem.phone)}" style="flex:1;text-decoration:none;text-align:center;padding:13px;border-radius:12px;background:#f5f5f5;color:#555;font-size:13px;font-weight:700;font-family:inherit">💬 Text</a>
+    </div>`:''}
     <button onclick="messageOneMember('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#FBF3DD;color:#9c7a1e;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><span style="margin-right:5px">📣</span>Send a message</button>
     <button onclick="toggleSoloist('${mid}')" style="width:100%;padding:14px;border:none;border-radius:12px;background:#FBF3DD;color:#9c7a1e;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px"><i class="ti ti-star" style="vertical-align:-2px;margin-right:5px"></i>${mem.soloist?'Remove soloist mark':'Mark as soloist'}</button>
     ${moveHtml}
@@ -6368,11 +6508,22 @@ window.saveStageManager=async function(mid){
 
 window.showAddToFolder=function(fid){
   document.getElementById('atfmodal')?.remove();
+  const myName=(UP&&(UP.name||UP.displayName))||(CU&&CU.displayName)||(CU&&CU.email?CU.email.split('@')[0]:'Me');
   const m=document.createElement('div');m.className='modal-bg';m.id='atfmodal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Add to Queue</div>
     <div style="font-size:13px;color:#888;margin-bottom:14px">Search by name or enter their email</div>
+    <button onclick="addSelfToFolder('${fid}')" style="width:100%;display:flex;align-items:center;gap:10px;background:#E1F5EE;border:1px solid #B7E0D2;border-radius:12px;padding:11px 13px;margin-bottom:14px;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="width:32px;height:32px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">${(myName||'M').substring(0,2).toUpperCase()}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#0F6E56">+ Add myself</div><div style="font-size:11px;color:#6f9286">${myName}${CU&&CU.email?(' · '+CU.email):''}</div></div>
+    </button>
+    <div style="font-size:11px;color:#bbb;text-align:center;margin-bottom:12px">— or add someone else —</div>
     <div style="margin-bottom:12px"><span class="flbl">Name or email</span><input class="finp" id="af-q" placeholder="john@email.com or John Smith" autocomplete="off"/></div>
+    <div style="margin-bottom:12px"><span class="flbl">Phone (optional — for quick contact)</span><input class="finp" id="af-phone" placeholder="+1 202 555 1234" autocomplete="off"/></div>
+    <label style="display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid #e1f0ea;border-radius:10px;background:#F7FBF9;cursor:pointer;margin-bottom:12px">
+      <input type="checkbox" id="af-wa" style="width:18px;height:18px;accent-color:#25D366"/>
+      <span style="font-size:13px;color:#111">🟢 Uses WhatsApp on this number</span>
+    </label>
     <div style="margin-bottom:16px"><span class="flbl">Instrument / Role</span>
       <select class="finp" id="af-instr">
         <option value="">— Select instrument / role —</option>
@@ -6387,9 +6538,35 @@ window.showAddToFolder=function(fid){
   document.getElementById('app').appendChild(m);
 };
 
+window.addSelfToFolder=async function(fid){
+  const instrument=document.getElementById('af-instr')?.value||'';
+  const myName=(UP&&(UP.name||UP.displayName))||(CU&&CU.displayName)||(CU&&CU.email?CU.email.split('@')[0]:'Me');
+  let maxPos=0;
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{if((d.data().queuePosition||0)>=maxPos)maxPos=(d.data().queuePosition||0)+1;});
+  }catch(e){}
+  try{
+    await addDoc(collection(db,'rosterMembers'),{
+      folderId:fid,managerId:CU.uid,managerEmail:CU.email,
+      musicianId:CU.uid,musicianName:myName,musicianEmail:CU.email,instrument,
+      queuePosition:maxPos,addedAt:new Date()
+    });
+    const newCount=maxPos+1;
+    await setDoc(doc(db,'rosterFolders',fid),{memberCount:newCount},{merge:true});
+    const f=rosterFolders.find(x=>x.id===fid);if(f)f.memberCount=newCount;
+    document.getElementById('atfmodal')?.remove();
+    ts('You\'ve been added! ✅');
+    if(_wheel.fid===fid){await reloadWheelMembers();}
+    renderRosterFolders();
+  }catch(e){console.error('add self failed:',e);ts('❌ '+(e.message||e.code||'check Firestore rules'));}
+};
+
 window.addMusicianToFolder=async function(fid){
   const qVal=document.getElementById('af-q').value.trim();
   const instrument=document.getElementById('af-instr').value;
+  const phone=(document.getElementById('af-phone')?.value||'').trim();
+  const hasWhatsApp=!!document.getElementById('af-wa')?.checked;
   if(!qVal){ts('Please enter a name or email');return;}
   let musicianId='',musicianName='',musicianEmail='';
   try{
@@ -6412,6 +6589,7 @@ window.addMusicianToFolder=async function(fid){
     await addDoc(collection(db,'rosterMembers'),{
       folderId:fid,managerId:CU.uid,managerEmail:CU.email,
       musicianId,musicianName,musicianEmail,instrument,
+      phone,hasWhatsApp,
       queuePosition:maxPos,addedAt:new Date()
     });
     const newCount=maxPos+1;
@@ -7690,6 +7868,9 @@ function profileHTML(){
         <div style="font-size:18px;font-weight:700;color:#fff">${UP.name||name}</div>
         <button onclick="showEditName()" style="background:none;border:none;color:#555;cursor:pointer;font-size:14px;padding:2px">✏️</button>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        ${UP.username?`<span style="font-size:13px;color:#1D9E75;font-weight:600">@${UP.username}</span><button onclick="changeUsername()" style="background:none;border:none;color:#555;cursor:pointer;font-size:12px;padding:0">✏️</button>`:`<button onclick="showUsernamePrompt(false)" style="background:#E1F5EE;border:1px solid #B7E0D2;color:#0F6E56;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Claim your @username</button>`}
+      </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
         ${UP.verified?`<span class="verified-badge">✓ Verified</span>`:''}
         ${UP.featured?`<span class="featured-badge">⭐ Featured</span>`:''}
@@ -7978,6 +8159,21 @@ function profileHTML(){
   </div>
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="st">📞 Contact</div>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showContactEditor()">Edit</span>
+    </div>
+    <div id="profile-contact">
+      ${(UP.phone)?
+        `<div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span class="tag" style="font-size:12px;padding:6px 12px;background:#E1F5EE;border-color:#1D9E75;color:#0F6E56">📞 ${UP.phone}</span>
+          ${UP.hasWhatsApp?`<span class="tag" style="font-size:12px;padding:6px 12px;background:#E7F8EE;border-color:#25D366;color:#128C3E">🟢 WhatsApp</span>`:''}
+        </div>`:
+        `<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showContactEditor()">+ Add phone for quick contact</div>`
+      }
+    </div>
+  </div>
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">🎵 Instruments</div>
       <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showInstrumentEditor()">Edit</span>
     </div>
@@ -8226,6 +8422,50 @@ const SKILL_LIST=[
   'Music Therapist','Session Contractor','Casting Director',
   'Other'
 ];
+
+window.showContactEditor=function(){
+  const m=document.createElement('div');m.className='modal-bg';m.id='contact-modal';
+  m.innerHTML=`<div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📞 Contact</div>
+      <button onclick="document.getElementById('contact-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Your phone lets people reach you fast — call or WhatsApp — in an emergency.</div>
+    <div style="margin-bottom:6px"><span class="flbl">Phone number (with country code)</span>
+      <input class="finp" id="ce-phone" placeholder="+1 202 555 1234" value="${(UP.phone||'').replace(/"/g,'&quot;')}" autocomplete="off"/>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-bottom:16px">Include your country code (e.g. +1 for US, +44 UK). We keep this private — only people you work with on Vivace can see it.</div>
+    <label style="display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid #e1f0ea;border-radius:12px;background:#F7FBF9;cursor:pointer;margin-bottom:18px">
+      <input type="checkbox" id="ce-wa" ${UP.hasWhatsApp?'checked':''} style="width:20px;height:20px;accent-color:#25D366"/>
+      <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#111">🟢 I use WhatsApp on this number</div><div style="font-size:11px;color:#888">Shows a WhatsApp button so people can message you instantly</div></div>
+    </label>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('contact-modal').remove()">Cancel</button>
+      <button class="bt" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="saveContact()">Save</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.saveContact=async function(){
+  let phone=(document.getElementById('ce-phone').value||'').trim();
+  const hasWA=document.getElementById('ce-wa').checked;
+  // light normalize for display (keep + and digits/spaces)
+  UP.phone=phone;
+  UP.hasWhatsApp=hasWA;
+  try{
+    await setDoc(doc(db,'users',CU.uid),{phone:phone,hasWhatsApp:hasWA},{merge:true});
+    ts('Contact saved 📞');
+  }catch(e){console.error(e);ts('Saved');}
+  document.getElementById('contact-modal')?.remove();
+  go('profile');
+};
+
+// Build clean WhatsApp/tel links from a stored phone string
+function phoneDigits(p){return (p||'').replace(/[^\d]/g,'');}  // strip everything but digits (drops +, spaces, dashes)
+function telHref(p){const d=(p||'').replace(/[^\d+]/g,'');return 'tel:'+d;}
+function waHref(p){return 'https://wa.me/'+phoneDigits(p);}
+function smsHref(p){const d=(p||'').replace(/[^\d+]/g,'');return 'sms:'+d;}
 
 window.showInstrumentEditor=function(){
   const current=UP.instruments||[];
@@ -10359,6 +10599,8 @@ onAuthStateChanged(auth,async user=>{
     CS='feed';
     await loadUP();await loadGroups();await loadVenues();
     render();
+    // Prompt to claim a username if they don't have one yet
+    setTimeout(()=>{if(CU&&(!UP||!UP.username)){showUsernamePrompt(true);}},1800);
     // Check birthday and holidays after render
     setTimeout(()=>{checkGreetings();checkAutoVerification();checkFounderAccess();checkTrialStatus();},1500);
     // Check $1 verification
