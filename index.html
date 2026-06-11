@@ -7799,16 +7799,16 @@ ${UP.plan&&UP.plan!=='free'?`
 
 ${plan==='free'&&!UP.trialUsed?`
 <div style="background:#0d0d0d;border-radius:16px;padding:18px;margin-bottom:16px">
-  <div style="font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:0.12em;margin-bottom:8px">🏆 FOUNDING MEMBER OFFER</div>
-  <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px">First 3 months — $1/month</div>
-  <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:14px;line-height:1.6">Pay just $1 today — enjoy 3 full months of access, then your plan continues monthly.</div>
+  <div style="font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:0.12em;margin-bottom:8px">🎁 YOUR FREE ACCESS</div>
+  <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px">3 months free — everything unlocked</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:14px;line-height:1.6">You've already verified with $1 at signup. Enjoy 3 full months of complete access — no charge.</div>
   <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
-    <span style="color:rgba(255,255,255,0.6)">Months 1–3</span>
-    <span style="color:#1D9E75;font-weight:700">$1/month</span>
+    <span style="color:rgba(255,255,255,0.6)">Now → 3 months</span>
+    <span style="color:#1D9E75;font-weight:700">Free</span>
   </div>
   <div style="display:flex;justify-content:space-between;font-size:13px">
-    <span style="color:rgba(255,255,255,0.6)">Month 4+</span>
-    <span style="color:rgba(255,255,255,0.75)">Regular price</span>
+    <span style="color:rgba(255,255,255,0.6)">After that</span>
+    <span style="color:rgba(255,255,255,0.75)">Choose a plan below</span>
   </div>
 </div>`:''}
 
@@ -8604,7 +8604,7 @@ function showTrialBanner(daysLeft){
   banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:#0d0d0d;border-bottom:1px solid #1D9E75;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px';
   const d=document.createElement('div');
   d.style.cssText='display:flex;align-items:center;gap:10px;flex:1';
-  d.innerHTML=`<span style="font-size:13px;color:#fff;font-weight:600">⏳ ${daysLeft} day${daysLeft>1?'s':''} left in your free trial</span><button onclick="go('billing')" style="padding:6px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Upgrade — $1/month</button>`;
+  d.innerHTML=`<span style="font-size:13px;color:#fff;font-weight:600">⏳ ${daysLeft} day${daysLeft>1?'s':''} left in your free trial</span><button onclick="go('billing')" style="padding:6px 14px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Choose a plan</button>`;
   const close=document.createElement('button');
   close.style.cssText='background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:0;flex-shrink:0';
   close.textContent='✕';
@@ -8625,21 +8625,21 @@ function showTrialExpiredModal(){
     <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:8px">Your free trial has ended</div>
     <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:20px">
       Thank you for trying Vivace Events!<br>
-      Continue with just <strong style="color:#1D9E75">$1/month</strong> for your first 3 months.
+      Choose a plan to keep your Pro tools, or stay on the free account.
     </div>
     <div style="background:#111;border-radius:12px;padding:14px;margin-bottom:20px;text-align:left">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;color:#aaa">Months 1–3</span>
-        <span style="font-size:16px;font-weight:700;color:#1D9E75">$1/month</span>
+        <span style="font-size:13px;color:#aaa">First 3 months</span>
+        <span style="font-size:16px;font-weight:700;color:#1D9E75">Free</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:13px;color:#aaa">Month 4+</span>
-        <span style="font-size:14px;color:#fff">Regular price</span>
+        <span style="font-size:13px;color:#aaa">To continue</span>
+        <span style="font-size:14px;color:#fff">Pick a plan</span>
       </div>
     </div>
     <button onclick="go('billing');this.closest('div[style*=fixed]').remove()" 
       style="width:100%;padding:14px;border-radius:10px;background:#1D9E75;border:none;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
-      Continue for $1/month
+      Choose a plan
     </button>
     <button onclick="this.closest('div[style*=fixed]').remove()" 
       style="width:100%;padding:12px;border-radius:10px;background:transparent;border:1px solid #333;color:#666;font-size:13px;cursor:pointer;font-family:inherit">
@@ -8774,15 +8774,15 @@ async function showStripeModal(planId, priceId, isTrial){
   const m=document.createElement('div');m.className='modal-bg';m.id='stripe-modal';
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">${isTrial?'🎉 Launch offer — ':''}${names[planId]}</div>
-    <div style="font-size:13px;color:#888;margin-bottom:16px">${isTrial?'$1/month for 3 months, then '+prices[planId]:prices[planId]} · Cancel anytime</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">${isTrial?'Free for 3 months, then '+prices[planId]:prices[planId]} · Cancel anytime</div>
     ${isTrial?`
     <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:#085041">Months 1–3</span>
-        <span style="font-size:14px;font-weight:700;color:#1D9E75">$1/month</span>
+        <span style="font-size:12px;color:#085041">First 3 months</span>
+        <span style="font-size:14px;font-weight:700;color:#1D9E75">Free</span>
       </div>
       <div style="display:flex;justify-content:space-between">
-        <span style="font-size:12px;color:#085041">Month 4+</span>
+        <span style="font-size:12px;color:#085041">After trial</span>
         <span style="font-size:13px;color:#085041">${prices[planId]}</span>
       </div>
     </div>`:''}
@@ -8796,7 +8796,7 @@ async function showStripeModal(planId, priceId, isTrial){
     <div style="display:flex;gap:8px">
       <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('stripe-modal').remove()">Cancel</button>
       <button class="bt" id="checkout-btn" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processPlan('${planId}','${priceId||PRICE_IDS[planId]}',${isTrial||false})">
-        ${isTrial?'Start for $1/month →':'Continue to checkout →'}
+        ${isTrial?'Start free trial →':'Continue to checkout →'}
       </button>
     </div>
   </div>`;
