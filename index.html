@@ -475,7 +475,7 @@ async function loadUP(){
           if(pub.stripeCustomerId)privPayload.stripeCustomerId=pub.stripeCustomerId;
           await setDoc(doc(db,'users_private',CU.uid),privPayload,{merge:true});
           // Overwrite public doc with ONLY safe fields (strips sensitive fields)
-          const safeFields=['name','displayName','username','photoURL','roles','plan','lang','created','verified','verifiedAt','verifiedReason','featured','founderAccess','instruments','genres','primaryInstrument','reelURL','spotifyUrl','appleMusicUrl','bio','availableDates','documentationPending','cancellations','referralCode','giftCreditsAvailable','signedInFirstTime','tosAcceptedAt','language','radio'];
+          const safeFields=['name','displayName','username','photoURL','roles','plan','lang','created','verified','verifiedAt','verifiedReason','featured','founderAccess','instruments','genres','primaryInstrument','reelURL','spotifyUrl','appleMusicUrl','bio','availableDates','documentationPending','cancellations','referralCode','giftCreditsAvailable','signedInFirstTime','tosAcceptedAt','language','radio','visibility','rosterDisclosureSeen','tosAccepted','tosVersion','trialStarted','trialExpiredShown','skills','ensembles','ensembleFormats','birthday','birthdayWishes','holidayGreetings'];
           const cleanPub={};
           safeFields.forEach(k=>{if(pub[k]!==undefined)cleanPub[k]=pub[k];});
           await setDoc(doc(db,'users',CU.uid),cleanPub);
@@ -5823,7 +5823,19 @@ function renderRosterFolders(){
       </div>`;
     return;
   }
-  el.innerHTML=rosterFolders.map((f,fi)=>{
+  el.innerHTML=`
+    ${(!UP||!UP.rosterDisclosureSeen)?`
+    <div id="roster-disclosure" style="background:linear-gradient(135deg,#FBF8EC,#F7FBF9);border:1px solid #E8D69A;border-radius:14px;padding:14px 16px;margin-bottom:14px;position:relative">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:20px;flex-shrink:0">⚖️</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#7a5a14;margin-bottom:4px">How rosters work on Vivace</div>
+          <div style="font-size:11px;color:#666;line-height:1.6">Your roster is <strong>private</strong> — other managers can't see who's on it. But every musician here is an independent professional, free to be discovered publicly or join other rosters if they choose. You organize and book them fairly; you can't restrict their freedom to work. This keeps Vivace fair, trusted, and legal for everyone. 🤝</div>
+          <button onclick="dismissRosterDisclosure()" style="margin-top:8px;background:#C9A84C;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Got it</button>
+        </div>
+      </div>
+    </div>`:''}
+    `+rosterFolders.map((f,fi)=>{
     const ft=FOLDER_TYPES.find(x=>x.id===f.type)||FOLDER_TYPES[0];
     return `
     <div class="card" style="border-left:4px solid ${ft.color};margin-bottom:10px;cursor:pointer" onclick="openFolder('${f.id}')">
@@ -5844,6 +5856,12 @@ function renderRosterFolders(){
   }).join('')+`
   <button class="bg" style="width:100%;padding:12px;font-size:14px;margin-top:6px;border-radius:12px;font-weight:600" onclick="showCreateFolder()">+ New Folder</button>`;
 }
+
+window.dismissRosterDisclosure=async function(){
+  if(UP)UP.rosterDisclosureSeen=true;
+  try{await setDoc(doc(db,'users',CU.uid),{rosterDisclosureSeen:true},{merge:true});}catch(e){}
+  const el=document.getElementById('roster-disclosure');if(el)el.style.display='none';
+};
 
 window.showCreateFolder=function(){
   window._selectedFolderType='custom';
@@ -8767,23 +8785,24 @@ function profileHTML(){
 
   <!-- Profile Visibility -->
   <div style="margin-bottom:18px">
-    <div class="st" style="margin-bottom:10px">👁️ Profile visibility</div>
+    <div class="st" style="margin-bottom:4px">👁️ Discovery &amp; visibility</div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.5">You're always free to choose. Go public to get discovered by new managers, or stay private and work only with people you know.</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${[
-        {id:'public',icon:'🌍',label:'Public',desc:'Anyone can find you in search',color:'#1D9E75',bg:'#E1F5EE'},
-        {id:'private',icon:'🔒',label:'Private',desc:'Name visible — full profile needs approval',color:'#BA7517',bg:'#FAEEDA'},
-        {id:'hidden',icon:'👻',label:'Hidden',desc:'Invisible — only active in your groups',color:'#888',bg:'#f5f5f5'}
+        {id:'public',icon:'🌍',label:'Public — discoverable',desc:'New managers can find you in search & invite you to gigs',color:'#1D9E75',bg:'#E1F5EE'},
+        {id:'private',icon:'🔒',label:'Private — invite only',desc:'You only appear to managers you already work with',color:'#BA7517',bg:'#FAEEDA'},
+        {id:'hidden',icon:'👻',label:'Hidden',desc:'Invisible everywhere except your active groups',color:'#888',bg:'#f5f5f5'}
       ].map(v=>`
-        <button onclick="setVisibility('${v.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:${(UP.visibility||'public')===v.id?`2px solid ${v.color}`:'1px solid #eee'};background:${(UP.visibility||'public')===v.id?v.bg:'#fff'};cursor:pointer;text-align:left;font-family:inherit;width:100%">
+        <button onclick="setVisibility('${v.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:${(UP.visibility||'private')===v.id?`2px solid ${v.color}`:'1px solid #eee'};background:${(UP.visibility||'private')===v.id?v.bg:'#fff'};cursor:pointer;text-align:left;font-family:inherit;width:100%">
           <span style="font-size:20px">${v.icon}</span>
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600;color:#111">${v.label}</div>
             <div style="font-size:11px;color:#888;margin-top:1px">${v.desc}</div>
           </div>
-          ${(UP.visibility||'public')===v.id?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${v.color};color:#fff;font-weight:600">Active</span>`:''}
+          ${(UP.visibility||'private')===v.id?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${v.color};color:#fff;font-weight:600">Active</span>`:''}
         </button>`).join('')}
     </div>
-    <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.5">🛡️ Contact info is always protected by the Trust Network regardless of visibility.</div>
+    <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.5">🛡️ Your contact info is always protected, regardless of visibility. This choice is yours alone — no manager can change it for you.</div>
   </div>
   <div style="margin-bottom:18px">
     <div class="st" style="margin-bottom:10px">${t('language')}</div>
@@ -9479,6 +9498,14 @@ window.loadSmartSuggestions=async function(date, neededInstruments, neededSkills
       ratings[d.data().musicianId]={priority:d.data().priority,average:d.data().average};
     });
 
+    // PRIVACY: gather the set of musicians who belong to THIS manager's own rosters.
+    // Private musicians are only discoverable by the manager who already has them.
+    const myRosterMusicianIds=new Set();
+    try{
+      const rmSnap=await getDocs(query(collection(db,'rosterMembers'),where('managerId','==',CU.uid)));
+      rmSnap.docs.forEach(d=>{const mid=d.data().musicianId;if(mid)myRosterMusicianIds.add(mid);});
+    }catch(e){}
+
     // Filter and score users
     const needed=(neededInstruments||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
     const neededSkillsList=(neededSkills||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
@@ -9487,16 +9514,24 @@ window.loadSmartSuggestions=async function(date, neededInstruments, neededSkills
       if(u.id===CU.uid)return false; // not yourself
       if(confirmedOnDate.has(u.id))return false; // already booked
       if(ratings[u.id]?.priority==='never')return false; // never again
-      
+
+      // ── PRIVACY GATE ──
+      // A musician is discoverable ONLY if they are PUBLIC, OR already on this manager's roster.
+      // Default (no visibility set) is treated as PRIVATE for safety — must opt into public.
+      const vis=u.visibility||'private';
+      const isPublic=(vis==='public');
+      const isMine=myRosterMusicianIds.has(u.id);
+      if(!isPublic && !isMine)return false; // private + not mine → invisible
+
       // Match instruments or skills
       const userInst=(u.instruments||[]).map(i=>i.name.toLowerCase());
       const userSkills=(u.skills||[]).map(s=>s.toLowerCase());
-      
+
       if(needed.length===0&&neededSkillsList.length===0)return true;
-      
+
       const instMatch=needed.some(n=>userInst.some(i=>i.includes(n)||n.includes(i)));
       const skillMatch=neededSkillsList.some(n=>userSkills.some(s=>s.includes(n)||n.includes(s)));
-      
+
       return instMatch||skillMatch;
     }).map(u=>{
       const r=ratings[u.id];
