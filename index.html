@@ -763,7 +763,11 @@ function render(){
     </nav>`;
 }
 
-function go(s){CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;}
+function go(s){
+  // Safety: remove any leftover full-screen overlays that could lock the screen
+  ['cal-action','avail-modal','phone-modal','guests-modal'].forEach(id=>{var o=document.getElementById(id);if(o)o.remove();});
+  CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;
+}
 window.go=go;window.ts=ts;
 
 function getScr(){
@@ -2533,6 +2537,7 @@ window.showAvailabilityCalendar=async function(){
   }catch(e){_availDates=new Set();_unavailDates=new Set();_perfEvents={};}
 
   const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
+  m.onclick=function(ev){if(ev.target===m)m.remove();};
   document.getElementById('app').appendChild(m);
   renderCalendarModal();
 }
@@ -2681,6 +2686,8 @@ window.handleCalDay=function(dateStr){
   const sheet=document.createElement('div');
   sheet.id='cal-action';
   sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  // Tap the dark backdrop to close (prevents the overlay from locking the screen)
+  sheet.onclick=function(ev){if(ev.target===sheet)sheet.remove();};
   
   const date=new Date(dateStr+'T00:00:00');
   const dateLabel=date.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'});
@@ -2938,26 +2945,39 @@ async function loadAvailabilityPreview(){
   const el=document.getElementById('availability-preview');if(!el)return;
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
-    if(!snap.exists()||!snap.data().dates?.length){
+    const data=snap.exists()?snap.data():{};
+    const avail=(data.available||data.dates||[]).slice().sort();
+    const unavail=(data.unavailable||[]).slice().sort();
+
+    if(avail.length===0&&unavail.length===0){
       el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showAvailabilityCalendar()">+ Set your available dates</div>`;
       return;
     }
-    const dates=snap.data().dates||[];
+
     const now=new Date().toISOString().split('T')[0];
-    const upcoming=dates.filter(d=>d>=now).slice(0,6);
+    const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en',{month:'short',day:'numeric'});
+    const futureAvail=avail.filter(d=>d>=now);
+    const futureUnavail=unavail.filter(d=>d>=now);
+
     el.innerHTML=`
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        ${upcoming.map(d=>{
-          const date=new Date(d+'T00:00:00');
-          return `<span style="padding:5px 10px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">
-            ${date.toLocaleDateString('en',{month:'short',day:'numeric'})}
-          </span>`;
-        }).join('')}
-        ${dates.filter(d=>d>=now).length>6?`<span style="font-size:11px;color:#aaa;padding:5px 0">+${dates.filter(d=>d>=now).length-6} more</span>`:''}
+      <div style="background:#f9fbfa;border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:8px">
+        ${futureAvail.length?`
+        <div style="font-size:11px;font-weight:700;color:#0F6E56;margin-bottom:6px">✅ AVAILABLE · ${futureAvail.length} day${futureAvail.length===1?'':'s'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:${futureUnavail.length?'12px':'0'}">
+          ${futureAvail.slice(0,8).map(d=>`<span style="padding:4px 9px;border-radius:20px;background:#E1F5EE;border:1px solid #5DCAA5;font-size:11px;color:#085041;font-weight:600">${fmt(d)}</span>`).join('')}
+          ${futureAvail.length>8?`<span style="font-size:11px;color:#aaa;padding:4px 0">+${futureAvail.length-8} more</span>`:''}
+        </div>`:''}
+        ${futureUnavail.length?`
+        <div style="font-size:11px;font-weight:700;color:#791F1F;margin-bottom:6px">❌ UNAVAILABLE · ${futureUnavail.length} day${futureUnavail.length===1?'':'s'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${futureUnavail.slice(0,8).map(d=>`<span style="padding:4px 9px;border-radius:20px;background:#FCEBEB;border:1px solid #F09595;font-size:11px;color:#791F1F;font-weight:600">${fmt(d)}</span>`).join('')}
+          ${futureUnavail.length>8?`<span style="font-size:11px;color:#aaa;padding:4px 0">+${futureUnavail.length-8} more</span>`:''}
+        </div>`:''}
+        ${futureAvail.length===0&&futureUnavail.length===0?`<div style="font-size:12px;color:#aaa">Your saved dates are all in the past. Tap below to set new ones.</div>`:''}
       </div>
-      <button onclick="showAvailabilityCalendar()" style="font-size:12px;color:#1D9E75;background:none;border:none;cursor:pointer;padding:0">Edit availability →</button>
+      <button onclick="showAvailabilityCalendar()" style="font-size:12px;color:#1D9E75;background:none;border:none;cursor:pointer;padding:0;font-weight:600">📅 View &amp; edit full calendar →</button>
     `;
-  }catch(e){}
+  }catch(e){console.log('avail preview:',e);}
 }
 
 // ─── LESSON BOOKING FLOW ─────────────────────────────────────────
