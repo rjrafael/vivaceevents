@@ -8270,6 +8270,17 @@ window.showVerificationWall=function(){
       </div>
     </div>`;
   document.body.appendChild(wall);
+  // Wire the sign-out button directly (bulletproof — bypasses any onclick issues)
+  setTimeout(function(){
+    var soBtn=wall.querySelector('button[onclick="doSignOut()"]');
+    if(soBtn){
+      soBtn.onclick=function(ev){
+        if(ev){ev.preventDefault();ev.stopPropagation();}
+        try{const w=document.getElementById('verify-wall');if(w)w.remove();}catch(e){}
+        doSignOut();
+      };
+    }
+  },50);
   // Mount Stripe Elements
   if(window.Stripe){
     var stripe=Stripe('pk_live_51TeF4aR49hhPnbuag079MEnv7Wo4S2ZSneYA4YFgP62wBuZiTPpgwFt8nrVT9dLWheu4i4VX5macB7uYa9ZlcKWG00uICu8Q32');
@@ -11689,8 +11700,14 @@ window.purchaseGigAd=async function(gigId, gigTitle, gigDate, gigLocation){
 }
 
 window.doSignOut=async function(){
-  closeRadioBar();
-  await signOut(auth);CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];render();
+  try{closeRadioBar();}catch(e){}
+  // remove the verification wall if it's open (so it doesn't linger after sign-out)
+  try{const w=document.getElementById('verify-wall');if(w)w.remove();}catch(e){}
+  try{
+    await signOut(auth);
+  }catch(e){console.log('signOut:',e);}
+  CU=null;UP={roles:['artist']};groups=[];venues=[];CP=[];
+  try{render();}catch(e){}
 }
 
 onAuthStateChanged(auth,async user=>{
