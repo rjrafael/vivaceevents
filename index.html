@@ -2526,15 +2526,10 @@ window._rangeMode=false;
 
 window.showAvailabilityCalendar=async function(){
   window._rangeMode=false;_rangeStart=null;_rangeEnd=null;
-  // Remove any existing/leftover calendar modal first (prevents empty shield on reopen)
+  // Remove any leftover modal first
   document.getElementById('avail-modal')?.remove();
   document.getElementById('cal-action')?.remove();
-  // Create the modal shell immediately so there's no blank-shield delay
-  const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
-  m.onclick=function(ev){if(ev.target===m)m.remove();};
-  m.innerHTML='<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:40px 20px;text-align:center;color:#aaa;font-size:14px">Loading your calendar…</div>';
-  document.getElementById('app').appendChild(m);
-  // Load saved data, then render the real calendar into the shell
+  // Load saved data BEFORE showing anything (no loading flash)
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
     if(snap.exists()){
@@ -2546,8 +2541,11 @@ window.showAvailabilityCalendar=async function(){
       _availDates=new Set();_unavailDates=new Set();_perfEvents={};
     }
   }catch(e){_availDates=new Set();_unavailDates=new Set();_perfEvents={};}
-  // Make sure the modal is still open (user may have closed it during load)
-  if(document.getElementById('avail-modal'))renderCalendarModal();
+  // Now show the modal fully formed in one step
+  const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
+  m.onclick=function(ev){if(ev.target===m)m.remove();};
+  document.getElementById('app').appendChild(m);
+  renderCalendarModal();
 }
 
 function renderCalendarModal(){
