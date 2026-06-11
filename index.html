@@ -2561,10 +2561,10 @@ async function loadEarningsSummary(){
           <div style="font-size:11px;color:#aaa;margin-top:2px">All time</div>
         </div>
       </div>
-      <button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">+ Log payment received</button>
+      <button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">${t('logPayment')}</button>
     `;
   }catch(e){
-    el.innerHTML=`<button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">+ Log payment received</button>`;
+    el.innerHTML=`<button onclick="showAddEarning()" class="bt" style="width:100%;padding:10px;font-size:13px">${t('logPayment')}</button>`;
   }
 }
 
@@ -3284,7 +3284,7 @@ async function loadMyLessons(){
 
     if(lessons.length===0){
       el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">
-        ${isTeacher()?'No lesson requests yet':'No lessons booked yet'}
+        ${isTeacher()?'${t('noLessonRequests')}':'No lessons booked yet'}
       </div>`;
       return;
     }
@@ -9160,7 +9160,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('myAvailability')||'My Availability'}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showAvailabilityCalendar()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showAvailabilityCalendar()">${t('edit')}</span>
     </div>
     <div id="availability-preview">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="showAvailabilityCalendar()">
@@ -9299,7 +9299,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">📚 ${isTeacher()?'My lesson requests':'My lessons'}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyLessons()">Refresh</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyLessons()">${t('refresh')}</span>
     </div>
     <div id="my-lessons">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
@@ -9308,7 +9308,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('messages')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyMessages()">Refresh</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyMessages()">${t('refresh')}</span>
     </div>
     <div id="my-messages">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
@@ -9317,7 +9317,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('earnings')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEarningsTracker()">View all</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEarningsTracker()">${t('viewAll')}</span>
     </div>
     <div id="earnings-summary">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
@@ -9326,7 +9326,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('myConnections')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyConnections()">Refresh</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyConnections()">${t('refresh')}</span>
     </div>
     <div id="my-connections">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
@@ -9335,7 +9335,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('myContracts')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyContracts()">Refresh</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="loadMyContracts()">${t('refresh')}</span>
     </div>
     <div id="my-contracts">
       <div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">Loading...</div>
@@ -9344,7 +9344,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('musicGenres')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showGenreEditor()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showGenreEditor()">${t('edit')}</span>
     </div>
     <div id="profile-genres">
       ${(UP.genres||[]).length===0?
@@ -9358,7 +9358,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('ensembleFormats')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEnsembleEditor()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showEnsembleEditor()">${t('edit')}</span>
     </div>
     <div id="profile-ensembles">
       ${(UP.ensembles||[]).length===0?
@@ -9372,7 +9372,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('contact')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showContactEditor()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showContactEditor()">${t('edit')}</span>
     </div>
     <div id="profile-contact">
       ${(UP.phone)?
@@ -9387,7 +9387,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">🎵 Instruments</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showInstrumentEditor()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showInstrumentEditor()">${t('edit')}</span>
     </div>
     <div id="profile-instruments">
       ${(UP.instruments||[]).length===0?
@@ -9404,7 +9404,7 @@ function profileHTML(){
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="st">${t('skills')}</div>
-      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showSkillEditor()">Edit</span>
+      <span style="font-size:12px;color:#1D9E75;cursor:pointer" onclick="showSkillEditor()">${t('edit')}</span>
     </div>
     <div id="profile-skills">
       ${(UP.skills||[]).length===0?
