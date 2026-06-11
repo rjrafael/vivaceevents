@@ -475,7 +475,7 @@ async function loadUP(){
           if(pub.stripeCustomerId)privPayload.stripeCustomerId=pub.stripeCustomerId;
           await setDoc(doc(db,'users_private',CU.uid),privPayload,{merge:true});
           // Overwrite public doc with ONLY safe fields (strips sensitive fields)
-          const safeFields=['name','displayName','username','photoURL','roles','plan','lang','created','verified','verifiedAt','verifiedReason','featured','founderAccess','instruments','genres','primaryInstrument','reelURL','spotifyUrl','appleMusicUrl','bio','availableDates','documentationPending','cancellations','referralCode','giftCreditsAvailable','signedInFirstTime','tosAcceptedAt','language','radio','visibility','rosterDisclosureSeen','tosAccepted','tosVersion','trialStarted','trialExpiredShown','skills','ensembles','ensembleFormats','birthday','birthdayWishes','holidayGreetings'];
+          const safeFields=['name','displayName','username','photoURL','roles','plan','lang','created','verified','verifiedAt','verifiedReason','featured','founderAccess','instruments','genres','primaryInstrument','reelURL','spotifyUrl','appleMusicUrl','bio','availableDates','documentationPending','cancellations','referralCode','giftCreditsAvailable','signedInFirstTime','tosAcceptedAt','language','radio','visibility','rosterDisclosureSeen','tosAccepted','tosVersion','trialStarted','trialExpiredShown','skills','ensembles','ensembleFormats','birthday','birthdayWishes','holidayGreetings','foundingMember','foundingNumber'];
           const cleanPub={};
           safeFields.forEach(k=>{if(pub[k]!==undefined)cleanPub[k]=pub[k];});
           await setDoc(doc(db,'users',CU.uid),cleanPub);
@@ -487,11 +487,24 @@ async function loadUP(){
     }
     else{
       lang=detectLang();
+      // Determine founding-member status: first 100 users get the badge.
+      let foundingMember=false, foundingNumber=0;
+      try{
+        const counterRef=doc(db,'meta','signupCounter');
+        const counterSnap=await getDoc(counterRef);
+        const count=counterSnap.exists()?(counterSnap.data().count||0):0;
+        const newCount=count+1;
+        await setDoc(counterRef,{count:newCount},{merge:true});
+        if(newCount<=100){foundingMember=true;foundingNumber=newCount;}
+      }catch(e){console.log('founding counter:',e);}
       // Create public doc with safe fields only
-      await setDoc(doc(db,'users',CU.uid),{roles:['artist'],name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()});
+      const newDoc={roles:['artist'],name:CU.displayName||CU.email.split('@')[0],lang,plan:'free',created:new Date()};
+      if(foundingMember){newDoc.foundingMember=true;newDoc.foundingNumber=foundingNumber;}
+      await setDoc(doc(db,'users',CU.uid),newDoc);
       // Create private doc (locked — only the owner can read)
       await setDoc(doc(db,'users_private',CU.uid),{email:CU.email});
       UP.email=CU.email;UP.name=CU.displayName||CU.email.split('@')[0];UP.plan='free';UP.roles=['artist'];
+      if(foundingMember){UP.foundingMember=true;UP.foundingNumber=foundingNumber;}
       // brand-new user → send a warm welcome email
       sendWelcomeEmail();
       // If they arrived via an invite link, connect them to the manager's placeholder (no duplicate)
@@ -8745,6 +8758,7 @@ function profileHTML(){
         ${UP.verified?`<span class="verified-badge">✓ Verified</span>`:''}
         ${UP.featured?`<span class="featured-badge">⭐ Featured</span>`:''}
         ${plan!=='free'?`<span class="pro-badge">${planLabels[plan]}</span>`:''}
+        ${UP.foundingMember?`<span title="One of the first 100 members of Vivace Events" style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#C9A84C,#A8842F);color:#1a1407;border-radius:20px;padding:3px 9px;font-size:10px;font-weight:700">🏆 Founding Member${UP.foundingNumber?` #${UP.foundingNumber}`:''}</span>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
         <span style="font-size:12px;color:#aaa">${CU.email}</span>

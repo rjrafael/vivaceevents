@@ -197,6 +197,13 @@ service cloud.firestore {
       allow update, delete: if signedIn();
     }
 
+    // ─── META (signup counter for Founding Member badge) ───────
+    // Any signed-in user can read + increment the counter at signup.
+    match /meta/{docId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
     // ─── Fallback — deny unknown collections ───────────────────
     match /{document=**} {
       allow read, write: if false;
