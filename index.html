@@ -451,7 +451,10 @@ async function loadUP(){
       UP={...UP,...d.data(),...priv};
       // CU.email is always source of truth for login email
       UP.email=CU.email;
-      lang=UP.lang||detectLang();
+      // Language priority: saved profile > this-session choice > browser detect
+      let sessLang=null;try{sessLang=sessionStorage.getItem('vv_lang');}catch(e){}
+      lang=UP.lang||sessLang||detectLang();
+      if(UP&&!UP.lang&&sessLang)UP.lang=sessLang;
       // Clean up legacy role names
       const validRoles=['artist','manager','teacher','student','organizer'];
       const roleMap={'musician':'artist','agent':'manager','mgr':'manager'};
@@ -1039,7 +1042,7 @@ async function saveTOS(uid){
 window.setLang=function(l){
   lang=l;
   if(UP)UP.lang=l;           // set synchronously so any re-render reads the new value
-  try{document.documentElement.setAttribute('lang',l);}catch(e){}
+  try{document.documentElement.setAttribute('lang',l);sessionStorage.setItem('vv_lang',l);}catch(e){}
   if(CU){saveUP();}          // persist in background
   render();
 }
