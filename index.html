@@ -1044,7 +1044,12 @@ window.setLang=function(l){
   if(UP)UP.lang=l;           // set synchronously so any re-render reads the new value
   try{document.documentElement.setAttribute('lang',l);sessionStorage.setItem('vv_lang',l);}catch(e){}
   if(CU){saveUP();}          // persist in background
+  // capture scroll position so the page doesn't jump to top (the "kickback")
+  const scrOld=document.getElementById('scr');
+  const savedScroll=scrOld?scrOld.scrollTop:0;
   render();
+  const scrNew=document.getElementById('scr');
+  if(scrNew)scrNew.scrollTop=savedScroll;
 }
 
 // ─── GIG STATUS SYSTEM ──────────────────────────────────────────
