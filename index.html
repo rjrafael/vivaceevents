@@ -831,7 +831,7 @@ function authHTML(){return `
     </div>
 
     <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:11px 12px;border-radius:10px;background:#fff;border:1.5px solid #1D9E75">
-      <input type="checkbox" id="tos-agree" onchange="checkTOS()" style="width:20px;height:20px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
+      <input type="checkbox" id="tos-agree" onclick="setTimeout(checkTOS,0)" style="width:20px;height:20px;border-radius:4px;margin-top:1px;flex-shrink:0;accent-color:#1D9E75"/>
       <span style="font-size:12px;color:#111;line-height:1.5"><strong>I have read and agree to all 10 Platform Terms above.</strong> Your acceptance is recorded with a timestamp and version for legal compliance.</span>
     </label>
 
