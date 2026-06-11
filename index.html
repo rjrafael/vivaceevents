@@ -7716,11 +7716,20 @@ window.generateJobSheetPDF=async function(){
 };
 
 // ─── BILLING SCREEN ─────────────────────────────────────────────
+const TRIAL_DAYS=90;  // Shopify-style: 3 months full access free
 function getTrialDaysLeft(){
-  if(!UP||!UP.trialStarted)return 14;
+  if(!UP||!UP.trialStarted)return TRIAL_DAYS;
   const start=UP.trialStarted?.toDate?UP.trialStarted.toDate():new Date(UP.trialStarted);
-  const days=14-Math.floor((new Date()-start)/(1000*60*60*24));
+  const days=TRIAL_DAYS-Math.floor((new Date()-start)/(1000*60*60*24));
   return Math.max(0,days);
+}
+// Hours left in the final day (for the "X hours left" urgency near the end)
+function getTrialHoursLeft(){
+  if(!UP||!UP.trialStarted)return TRIAL_DAYS*24;
+  const start=UP.trialStarted?.toDate?UP.trialStarted.toDate():new Date(UP.trialStarted);
+  const end=new Date(start.getTime()+TRIAL_DAYS*24*60*60*1000);
+  const hrs=Math.floor((end-new Date())/(1000*60*60));
+  return Math.max(0,hrs);
 }
 
 function billingHTML(){
@@ -7777,7 +7786,7 @@ ${plan==='free'&&!UP.trialUsed?`
 <div style="background:#0d0d0d;border-radius:16px;padding:18px;margin-bottom:16px">
   <div style="font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:0.12em;margin-bottom:8px">🏆 FOUNDING MEMBER OFFER</div>
   <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px">First 3 months — $1/month</div>
-  <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:14px;line-height:1.6">No credit card to start your 14-day trial. Pay $1 when you choose a plan.</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:14px;line-height:1.6">Pay just $1 today — enjoy 3 full months of access, then your plan continues monthly.</div>
   <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
     <span style="color:rgba(255,255,255,0.6)">Months 1–3</span>
     <span style="color:#1D9E75;font-weight:700">$1/month</span>
@@ -7789,12 +7798,63 @@ ${plan==='free'&&!UP.trialUsed?`
 </div>`:''}
 
 ${plan==='free'?`
-<div style="background:#FAEEDA;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
-  <div>
-    <div style="font-size:12px;color:#633806;font-weight:600">Free trial</div>
-    <div style="font-size:14px;font-weight:700;color:#111">${getTrialDaysLeft()} days remaining</div>
+${(()=>{
+  const daysLeft=getTrialDaysLeft();
+  const hoursLeft=getTrialHoursLeft();
+  const pct=Math.max(0,Math.min(100,(daysLeft/TRIAL_DAYS)*100));
+  // Color + mood shifts as the trial progresses
+  let grad,accent,msg,emoji;
+  if(daysLeft>30){grad='linear-gradient(135deg,#0F6E56,#1D9E75)';accent='#5DCAA5';emoji='✨';msg='Enjoy your full access — everything unlocked';}
+  else if(daysLeft>7){grad='linear-gradient(135deg,#1D6E8C,#3B8EE0)';accent='#85B7EB';emoji='🎵';msg='You\\'re loving Vivace — months of access left';}
+  else if(daysLeft>1){grad='linear-gradient(135deg,#9c5a14,#EF9F27)';accent='#FAC775';emoji='⏳';msg='Your trial is wrapping up soon';}
+  else {grad='linear-gradient(135deg,#7a1f1f,#D14343)';accent='#F09595';emoji='⏰';msg='Last hours of free access';}
+  const bigNum=daysLeft>1?daysLeft:hoursLeft;
+  const bigUnit=daysLeft>1?(daysLeft===1?'day':'days'):(hoursLeft===1?'hour':'hours');
+  return `<div style="background:${grad};border-radius:18px;padding:22px;margin-bottom:18px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.06)"></div>
+    <div style="position:absolute;bottom:-40px;left:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.04)"></div>
+    <div style="position:relative">
+      <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">${emoji} Your free access</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+        <span style="font-size:46px;font-weight:800;color:#fff;line-height:1">${bigNum}</span>
+        <span style="font-size:18px;font-weight:600;color:rgba(255,255,255,0.85)">${bigUnit} left</span>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.85);margin-bottom:14px">${msg}</div>
+      <div style="height:8px;background:rgba(0,0,0,0.18);border-radius:10px;overflow:hidden;margin-bottom:8px">
+        <div style="height:100%;width:${pct}%;background:${accent};border-radius:10px;transition:width 0.6s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,0.6)">
+        <span>Started</span>
+        <span>${daysLeft>1?`Day ${TRIAL_DAYS-daysLeft} of ${TRIAL_DAYS}`:'Almost there'}</span>
+        <span>Plan begins</span>
+      </div>
+    </div>
+  </div>`;
+})()}
+`:''}
+
+<!-- Tier education: what's free vs paid -->
+${plan==='free'?`
+<div style="background:#fff;border:1px solid #eee;border-radius:16px;padding:18px;margin-bottom:18px">
+  <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px">🎨 What you get</div>
+  <div style="font-size:12px;color:#888;margin-bottom:16px">Most musicians stay free forever. You only pay if you organize or teach.</div>
+
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <div style="flex:1;background:#E1F5EE;border-radius:12px;padding:13px">
+      <div style="font-size:22px;margin-bottom:4px">🎻</div>
+      <div style="font-size:13px;font-weight:700;color:#0F6E56;margin-bottom:6px">Free forever</div>
+      <div style="font-size:11px;color:#0F6E56;line-height:1.7">Perform &amp; get booked<br>Apply to gigs<br>Build your profile<br>Join groups &amp; ensembles<br>Learn as a student</div>
+    </div>
+    <div style="flex:1;background:#FBF3E1;border-radius:12px;padding:13px">
+      <div style="font-size:22px;margin-bottom:4px">🎯</div>
+      <div style="font-size:13px;font-weight:700;color:#9c5a14;margin-bottom:6px">Pro tools</div>
+      <div style="font-size:11px;color:#9c5a14;line-height:1.7">Manage rosters &amp; queues<br>Post &amp; book gigs<br>Smart Roster Queue<br>Job Sheet PDFs<br>Organize private events</div>
+    </div>
   </div>
-  <div style="font-size:11px;color:#EF9F27;font-weight:600">14-day full access</div>
+
+  <div style="background:#f9f9f9;border-radius:11px;padding:13px;font-size:12px;color:#555;line-height:1.6">
+    💡 <strong>One simple rule:</strong> If you perform or learn, you're <strong>free forever</strong>. The moment you organize, manage, or teach, you're on the <strong>3-month free trial</strong> — then it continues at a monthly rate. One payment covers all your roles.
+  </div>
 </div>`:''}
 
 <!-- Agent Plans -->
@@ -7843,7 +7903,7 @@ ${teacherPlans.map(p=>`
 </div>`).join('')}
 
 <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa">
-  14-day free trial for new users · $1/month for first 3 months · Cancel anytime · Secure payment via Stripe
+  $1 today · 3 months full access · then continues monthly · Cancel anytime · Secure payment via Stripe
 </div>
 
 <div style="background:#f9f9f9;border-radius:12px;padding:14px;margin-top:16px;font-size:12px;color:#555;line-height:1.7">
@@ -9888,6 +9948,7 @@ function organizerHTML(){
           +'</div>'
           +'<div style="display:flex;gap:8px">'
           +'<button onclick="go(&quot;discover&quot;)" style="flex:1;background:#1D9E75;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#127925; Find Musicians</button>'
+          +'<button onclick="manageGuests(&quot;'+e.id+'&quot;,&quot;'+(e.title||'').replace(/"/g,'&quot;').replace(/'/g,"\\'")+'&quot;)" style="flex:1;background:#0C447C;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#128101; Manage Guests</button>'
           +'</div></div>';
       }).join('');
   return '<div class="hdr"><div class="logo" style="font-size:15px">🎪 My Events</div>'
@@ -9953,6 +10014,101 @@ window.saveOrgEvent=async function(){
     closeCreateEvent();
     render();
   }catch(e){ts('Error: '+e.message);btn.disabled=false;btn.textContent='Create Event';}
+};
+
+// ─── ORGANIZER SEALED GUEST GROUPS ───────────────────────────────
+// Non-musician attendees join a PRIVATE, sealed group for one event.
+// They pay $1 (verification), attend, and are walled off from the public
+// musician marketplace. "The group is not shareable" — organizer controls access.
+window.manageGuests=async function(eventId,eventTitle){
+  document.getElementById('guests-modal')?.remove();
+  // load existing guests for this event
+  let guests=[];
+  try{
+    const s=await getDocs(query(collection(db,'event_guests'),where('eventId','==',eventId),where('organizerId','==',CU.uid)));
+    guests=s.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
+  const joined=guests.filter(g=>g.guestId).length;
+  const invited=guests.filter(g=>!g.guestId).length;
+  const link='https://vivaceevents.com/?event='+eventId;
+  const m=document.createElement('div');m.className='modal-bg';m.id='guests-modal';
+  m.innerHTML=`<div class="modal" style="max-width:460px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">👥 Guest list</div>
+      <button onclick="document.getElementById('guests-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">${eventTitle} — a private, sealed group. Guests are attendees (not musicians) and stay walled off from the public marketplace.</div>
+
+    <div style="background:#E6F1FB;border:1px solid #B5D4F4;border-radius:11px;padding:13px;margin-bottom:14px">
+      <div style="font-size:12px;color:#0C447C;font-weight:700;margin-bottom:6px">🔒 This group is private &amp; not shareable</div>
+      <div style="font-size:11px;color:#185FA5;line-height:1.6">Only people you invite can join. Each guest pays the one-time $1 verification (keeps it spam-free). They see only this event — never the public musician network.</div>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-bottom:14px">
+      <div style="flex:1;text-align:center;background:#f7faf9;border-radius:10px;padding:10px"><div style="font-size:20px;font-weight:700;color:#1D9E75">${joined}</div><div style="font-size:11px;color:#888">joined</div></div>
+      <div style="flex:1;text-align:center;background:#f7faf9;border-radius:10px;padding:10px"><div style="font-size:20px;font-weight:700;color:#C9A84C">${invited}</div><div style="font-size:11px;color:#888">invited</div></div>
+    </div>
+
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:11px;padding:12px;margin-bottom:14px">
+      <div style="font-size:11px;color:#0F6E56;font-weight:700;margin-bottom:6px">🔗 Private guest link</div>
+      <div style="font-size:11px;color:#444;font-family:monospace;background:#fff;border:1px solid #e1f0ea;border-radius:8px;padding:8px;word-break:break-all;margin-bottom:8px">${link}</div>
+      <button onclick="copyInviteLink('${link}')" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:600">📋 Copy guest link</button>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <span class="flbl">Add a guest by email</span>
+      <div style="display:flex;gap:8px">
+        <input class="finp" id="guest-email" type="email" placeholder="guest@email.com" style="flex:1"/>
+        <button onclick="addGuest('${eventId}')" class="bt" style="padding:11px 16px;font-size:13px;font-weight:600">Add</button>
+      </div>
+    </div>
+
+    ${guests.length>0?`<div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Guests — ${guests.length}</div>
+      ${guests.map(g=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0">
+        <div style="width:30px;height:30px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${(g.guestName||g.guestEmail||'?').substring(0,2).toUpperCase()}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;color:#111;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.guestName||g.guestEmail?.split('@')[0]||'—'}</div><div style="font-size:10px;color:${g.guestId?'#1D9E75':'#C9A84C'};font-weight:600">${g.guestId?'● joined':'○ invited'}</div></div>
+        <button onclick="removeGuest('${g.id}','${eventId}','${(g.guestName||'').replace(/'/g,"\\'")}')" style="background:none;border:none;color:#F09595;cursor:pointer;font-size:15px;padding:4px">✕</button>
+      </div>`).join('')}
+    </div>`:''}
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.addGuest=async function(eventId){
+  const email=(document.getElementById('guest-email')?.value||'').trim().toLowerCase();
+  if(!email||!email.includes('@')||!email.includes('.')){ts('Please enter a valid email');return;}
+  try{
+    // check for duplicate in this event
+    const dupe=await getDocs(query(collection(db,'event_guests'),where('eventId','==',eventId),where('guestEmail','==',email),where('organizerId','==',CU.uid)));
+    if(!dupe.empty){ts('That guest is already on the list');return;}
+    await addDoc(collection(db,'event_guests'),{
+      eventId,organizerId:CU.uid,
+      guestEmail:email,guestId:'',guestName:'',
+      invitedAt:new Date(),
+    });
+    // email the guest a private invite
+    const link='https://vivaceevents.com/?event='+eventId;
+    const myName=(UP&&UP.name)||CU.displayName||'An organizer';
+    try{
+      await addDoc(collection(db,'mail'),{to:email,message:{
+        subject:`🎫 You're invited — private event on Vivace`,
+        html:`<div style="font-family:sans-serif;max-width:460px;margin:0 auto"><div style="background:#0d0d0d;padding:20px;border-radius:12px 12px 0 0;text-align:center"><div style="font-size:20px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div></div><div style="background:#fff;padding:24px;border:1px solid #eee;border-top:none"><p style="font-size:16px;font-weight:700;color:#111;margin:0 0 8px">You've been invited to a private event 🎫</p><p style="font-size:14px;color:#444;line-height:1.6;margin:0 0 16px"><strong>${myName}</strong> invited you to a private event. This is a sealed, invitation-only group — your details stay private.</p><a href="${link}" style="display:block;background:#0C447C;color:#fff;text-decoration:none;padding:13px;border-radius:10px;text-align:center;font-weight:700;font-size:15px;margin-bottom:12px">View your invitation →</a><p style="font-size:11px;color:#aaa;line-height:1.5;margin:0">A one-time $1 verification applies to keep the group secure and private.</p></div><div style="text-align:center;padding:12px;font-size:11px;color:#aaa">vivaceevents.com · Washington DC</div></div>`
+      }});
+    }catch(e){}
+    document.getElementById('guest-email').value='';
+    ts('🎫 Guest invited!');
+    manageGuests(eventId,'');  // refresh
+  }catch(e){console.error('addGuest:',e);ts('Could not add guest');}
+};
+
+window.removeGuest=async function(guestId,eventId,name){
+  if(!confirm('Remove '+(name||'this guest')+' from the event?'))return;
+  try{
+    await deleteDoc(doc(db,'event_guests',guestId));
+    ts('Guest removed');
+    manageGuests(eventId,'');
+  }catch(e){ts('Could not remove');}
 };
 
 function dmcaHTML(){
