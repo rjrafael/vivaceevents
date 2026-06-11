@@ -2543,6 +2543,8 @@ window.showAvailabilityCalendar=async function(){
   }catch(e){_availDates=new Set();_unavailDates=new Set();_perfEvents={};}
   // Now show the modal fully formed in one step
   const m=document.createElement('div');m.className='modal-bg';m.id='avail-modal';
+  // Force critical styles inline so the backdrop paints correctly on first open (not waiting on CSS class)
+  m.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-end;justify-content:center';
   m.onclick=function(ev){if(ev.target===m)m.remove();};
   document.getElementById('app').appendChild(m);
   renderCalendarModal();
@@ -2587,7 +2589,7 @@ function renderCalendarModal(){
     </div>`;
   }
 
-  modal.innerHTML=`<div class="modal" style="max-height:90vh;overflow-y:auto">
+  modal.innerHTML=`<div class="modal" style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:20px;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:17px;font-weight:700;color:#111">📅 My Calendar</div>
       <button onclick="document.getElementById('avail-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
