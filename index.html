@@ -3284,7 +3284,7 @@ async function loadMyLessons(){
 
     if(lessons.length===0){
       el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">
-        ${isTeacher()?'${t('noLessonRequests')}':'No lessons booked yet'}
+        ${isTeacher()?t('noLessonRequests'):t('noLessonsBooked')}
       </div>`;
       return;
     }
