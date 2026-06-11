@@ -8246,7 +8246,7 @@ window.showVerificationWall=function(){
   wall.id='verify-wall';
   wall.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;padding:20px;box-sizing:border-box;overflow-y:auto';
   wall.innerHTML=`
-    <div style="background:#fff;border-radius:20px;padding:28px 24px 32px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto">
+    <div style="background:#fff;border-radius:20px;padding:28px 24px 32px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;position:relative">
       <div style="text-align:center;margin-bottom:20px">
         <div style="font-size:32px;margin-bottom:8px">🔐</div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:6px">One-time verification</div>
@@ -8264,6 +8264,10 @@ window.showVerificationWall=function(){
       </div>
       <button id="verify-pay-btn" onclick="submitVerification()" style="width:100%;padding:16px;border-radius:13px;background:#1D9E75;color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Verify my account — $1</button>
       <div style="text-align:center;margin-top:12px;font-size:11px;color:#bbb">🔒 Secured by Stripe · Card stored for easy upgrades</div>
+      <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <div style="font-size:12px;color:#999;margin-bottom:8px">Not ready to verify yet?</div>
+        <button onclick="doSignOut()" style="background:none;border:1px solid #ddd;color:#666;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:9px 20px;border-radius:10px">← Sign out</button>
+      </div>
     </div>`;
   document.body.appendChild(wall);
   // Mount Stripe Elements
@@ -8281,6 +8285,11 @@ window.showVerificationWall=function(){
     window._verifyStripe=stripe;
     window._verifyCard=card;
   }
+};
+
+window.closeVerificationWall=function(){
+  const w=document.getElementById('verify-wall');
+  if(w)w.remove();
 };
 
 window.submitVerification=async function(){
