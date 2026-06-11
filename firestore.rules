@@ -13,11 +13,19 @@ service cloud.firestore {
       return signedIn() && request.auth.token.email == email;
     }
 
-    // ─── Users ─────────────────────────────────────────────────
+    // ─── Users (public profile data) ───────────────────────────
+    // Public profile fields only. Email/phone/tokens live in users_private below.
     match /users/{userId} {
       allow read: if signedIn();
       allow create, update: if isOwner(userId);
       allow delete: if false;
+    }
+
+    // ─── Users PRIVATE (sensitive contact info — locked) ───────
+    // ONLY the owner can read. This stops bulk harvesting of emails/phones.
+    match /users_private/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
     }
 
     // ─── Gigs ──────────────────────────────────────────────────
@@ -147,16 +155,31 @@ service cloud.firestore {
 
     // ─── ROSTER FOLDERS (NEW — Phase 1) ────────────────────────
     match /rosterFolders/{folderId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && resource.data.managerId == request.auth.uid;
       allow create: if signedIn() && request.resource.data.managerId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.managerId == request.auth.uid;
     }
 
-    // ─── ROSTER MEMBERS (NEW — Phase 1) ────────────────────────
+    // ─── ROSTER MEMBERS (locked — only the manager who owns reads) ────
     match /rosterMembers/{memberId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && resource.data.managerId == request.auth.uid;
       allow create: if signedIn() && request.resource.data.managerId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.managerId == request.auth.uid;
+    }
+
+    // ─── USERNAMES (unique handle reservations) ────────────────
+    match /usernames/{username} {
+      allow read: if true;  // anyone can check if a username is taken
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ─── PUSH QUEUE (Cloud Function reads & deletes) ───────────
+    match /pushQueue/{docId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if signedIn();
     }
 
     // ─── Fallback — deny unknown collections ───────────────────

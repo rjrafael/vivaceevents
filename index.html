@@ -6916,9 +6916,13 @@ window.showAddToFolder=function(fid){
   m.innerHTML=`<div class="modal">
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:4px">Add to Queue</div>
     <div style="font-size:13px;color:#888;margin-bottom:14px">Search by name or enter their email</div>
-    <button onclick="addSelfToFolder('${fid}')" style="width:100%;display:flex;align-items:center;gap:10px;background:#E1F5EE;border:1px solid #B7E0D2;border-radius:12px;padding:11px 13px;margin-bottom:14px;cursor:pointer;font-family:inherit;text-align:left">
+    <button onclick="addSelfToFolder('${fid}')" style="width:100%;display:flex;align-items:center;gap:10px;background:#E1F5EE;border:1px solid #B7E0D2;border-radius:12px;padding:11px 13px;margin-bottom:8px;cursor:pointer;font-family:inherit;text-align:left">
       <div style="width:32px;height:32px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">${(myName||'M').substring(0,2).toUpperCase()}</div>
       <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#0F6E56">+ Add myself</div><div style="font-size:11px;color:#6f9286">${myName}${CU&&CU.email?(' · '+CU.email):''}</div></div>
+    </button>
+    <button onclick="document.getElementById('atfmodal').remove();showCsvImport('${fid}')" style="width:100%;display:flex;align-items:center;gap:10px;background:#FBF8EC;border:1px solid #E8D69A;border-radius:12px;padding:11px 13px;margin-bottom:14px;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="width:32px;height:32px;border-radius:8px;background:#C9A84C;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">📥</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#7a5a14">Import from CSV</div><div style="font-size:11px;color:#9c7a1e">Add multiple musicians at once (up to 200)</div></div>
     </button>
     <div style="font-size:11px;color:#bbb;text-align:center;margin-bottom:12px">— or add someone else —</div>
     <div style="margin-bottom:12px"><span class="flbl">Name or email</span><input class="finp" id="af-q" placeholder="john@email.com or John Smith" autocomplete="off"/></div>
@@ -7004,6 +7008,233 @@ window.addMusicianToFolder=async function(fid){
     renderRosterFolders();
   }catch(e){console.error('add musician failed:',e);ts('❌ '+(e.message||e.code||'check Firestore rules'));}
 };
+
+// ─── CSV BULK IMPORT — secure, validated, audited ────────────────
+// Hard cap 200 rows · email regex · CSV-injection sanitization
+// · skip duplicates · audit trail (importedAt/importedVia/managerId)
+const CSV_MAX_ROWS=200;
+const EMAIL_REGEX=/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+// Strip leading characters Excel interprets as formula triggers (CSV-injection defense)
+function sanitizeCell(v){
+  if(!v)return '';
+  v=String(v).trim();
+  // remove dangerous leading chars
+  while(v.length>0 && '=+-@\t\r'.indexOf(v[0])>=0){v=v.substring(1).trim();}
+  return v.substring(0,200); // hard length cap per cell
+}
+
+// Minimal CSV parser that handles quoted fields with commas/newlines
+function parseCSV(text){
+  const rows=[];let cur=[];let cell='';let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'&&text[i+1]==='"'){cell+='"';i++;}
+      else if(c==='"'){inQuotes=false;}
+      else cell+=c;
+    }else{
+      if(c==='"'){inQuotes=true;}
+      else if(c===','){cur.push(cell);cell='';}
+      else if(c==='\n'||c==='\r'){
+        if(cell||cur.length){cur.push(cell);rows.push(cur);cur=[];cell='';}
+        if(c==='\r'&&text[i+1]==='\n')i++;
+      }
+      else cell+=c;
+    }
+  }
+  if(cell||cur.length){cur.push(cell);rows.push(cur);}
+  return rows;
+}
+
+// Map header names → field, allowing common variations
+function mapHeaders(headerRow){
+  const m={name:-1,email:-1,phone:-1,instrument:-1,whatsapp:-1};
+  headerRow.forEach((h,i)=>{
+    const k=h.toLowerCase().trim();
+    if(['name','full name','musician','musician name'].includes(k))m.name=i;
+    else if(['email','e-mail','email address'].includes(k))m.email=i;
+    else if(['phone','phone number','mobile','cell'].includes(k))m.phone=i;
+    else if(['instrument','role','part','voice'].includes(k))m.instrument=i;
+    else if(['whatsapp','wa','uses whatsapp'].includes(k))m.whatsapp=i;
+  });
+  return m;
+}
+
+window.showCsvImport=function(fid){
+  document.getElementById('csv-modal')?.remove();
+  const m=document.createElement('div');m.className='modal-bg';m.id='csv-modal';
+  m.innerHTML=`<div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">📥 Import musicians from CSV</div>
+      <button onclick="document.getElementById('csv-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px">Add up to ${CSV_MAX_ROWS} musicians at once. Email is required (it's how we dedupe). All other columns optional.</div>
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:11px;padding:13px;margin-bottom:14px">
+      <div style="font-size:12px;color:#0F6E56;font-weight:700;margin-bottom:6px">Expected columns (first row = header)</div>
+      <div style="font-size:11px;color:#444;font-family:'SF Mono',Consolas,monospace;background:#fff;border:1px solid #e1f0ea;border-radius:8px;padding:8px;margin-bottom:8px;overflow-x:auto;white-space:pre">Name, Email, Phone, Instrument, WhatsApp
+Anna Berg, anna@gmail.com, +1 202 555 1234, Violin, yes
+John Lee, john@gmail.com, , Cello, no</div>
+      <button onclick="downloadCsvTemplate()" style="background:none;border:none;color:#0F6E56;font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0">⬇ Download template</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <span class="flbl">Option 1 — Upload a .csv file</span>
+      <input type="file" id="csv-file" accept=".csv,text/csv" onchange="loadCsvFile(this)" style="width:100%;padding:11px;border:1.5px dashed #ccc;border-radius:10px;font-family:inherit;font-size:13px;background:#fafafa"/>
+    </div>
+    <div style="text-align:center;font-size:11px;color:#bbb;margin:12px 0">— or —</div>
+    <div style="margin-bottom:14px">
+      <span class="flbl">Option 2 — Paste CSV text</span>
+      <textarea id="csv-text" placeholder="Name, Email, Phone, Instrument, WhatsApp&#10;Anna Berg, anna@gmail.com, +1 202 555 1234, Violin, yes" style="width:100%;min-height:110px;border:1px solid #ddd;border-radius:10px;padding:11px;font-size:12px;font-family:'SF Mono',Consolas,monospace;resize:vertical;box-sizing:border-box;color:#111"></textarea>
+    </div>
+    <div id="csv-preview" style="display:none;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="bg" style="flex:1;padding:13px" onclick="document.getElementById('csv-modal').remove()">Cancel</button>
+      <button class="bt" id="csv-go" style="flex:2;padding:13px;font-size:14px;font-weight:600" onclick="processCsvImport('${fid}')">Preview &amp; Import</button>
+    </div>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.downloadCsvTemplate=function(){
+  const csv='Name,Email,Phone,Instrument,WhatsApp\nAnna Berg,anna@example.com,+1 202 555 1234,Violin,yes\nJohn Lee,john@example.com,,Cello,no\n';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='vivace_roster_template.csv';a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.loadCsvFile=function(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  if(f.size>1024*1024){ts('File too large (max 1 MB)');input.value='';return;}
+  const r=new FileReader();
+  r.onload=e=>{document.getElementById('csv-text').value=e.target.result;};
+  r.readAsText(f);
+};
+
+window.processCsvImport=async function(fid){
+  const raw=(document.getElementById('csv-text')?.value||'').trim();
+  if(!raw){ts('Paste CSV text or upload a file first');return;}
+  const rows=parseCSV(raw).filter(r=>r.some(c=>c&&c.trim()));
+  if(rows.length<2){ts('Need at least a header row + one musician');return;}
+  const headers=rows[0];
+  const cols=mapHeaders(headers);
+  if(cols.email<0){ts('CSV must include an "Email" column');return;}
+  if(cols.name<0){ts('CSV must include a "Name" column');return;}
+
+  // Build clean record list
+  const dataRows=rows.slice(1,1+CSV_MAX_ROWS);
+  const overLimit=rows.length-1>CSV_MAX_ROWS;
+  const records=[];const errors=[];
+  dataRows.forEach((r,idx)=>{
+    const name=sanitizeCell(r[cols.name]);
+    const email=sanitizeCell(r[cols.email]).toLowerCase();
+    const phone=cols.phone>=0?sanitizeCell(r[cols.phone]):'';
+    const instrument=cols.instrument>=0?sanitizeCell(r[cols.instrument]):'';
+    const waVal=cols.whatsapp>=0?sanitizeCell(r[cols.whatsapp]).toLowerCase():'';
+    const hasWhatsApp=['yes','y','true','1','✓'].includes(waVal);
+    if(!name){errors.push({row:idx+2,reason:'Missing name'});return;}
+    if(!email){errors.push({row:idx+2,reason:'Missing email'});return;}
+    if(!EMAIL_REGEX.test(email)){errors.push({row:idx+2,reason:'Invalid email: '+email});return;}
+    records.push({name,email,phone,instrument,hasWhatsApp});
+  });
+
+  if(records.length===0){
+    ts('No valid rows. Check your file format and try again.');
+    return;
+  }
+
+  // Check existing emails in this folder for duplicate skipping
+  const existing=new Set();
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{const e=(d.data().musicianEmail||'').toLowerCase();if(e)existing.add(e);});
+  }catch(e){}
+
+  const toImport=[];const dupes=[];
+  records.forEach(r=>{if(existing.has(r.email))dupes.push(r);else toImport.push(r);});
+
+  // Show preview before commit
+  const previewHtml=`<div style="background:#fff;border:1px solid #e5e5e5;border-radius:11px;padding:12px;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:#111;margin-bottom:8px">Preview</div>
+    <div style="font-size:11px;color:#555;line-height:1.7">
+      ✅ Will add: <strong style="color:#0F6E56">${toImport.length}</strong> new musicians<br>
+      ⊘ Skip duplicates: <strong style="color:#9c7a1e">${dupes.length}</strong> (already in this folder)<br>
+      ${errors.length>0?`⚠️ Errors: <strong style="color:#D14343">${errors.length}</strong> rows skipped<br>`:''}
+      ${overLimit?`⚠️ <strong style="color:#D14343">Over limit:</strong> only first ${CSV_MAX_ROWS} rows processed<br>`:''}
+    </div>
+    ${errors.length>0?`<details style="margin-top:8px"><summary style="font-size:11px;color:#D14343;cursor:pointer">See errors</summary><div style="font-size:10px;color:#888;margin-top:6px;max-height:80px;overflow-y:auto">${errors.slice(0,20).map(e=>`Row ${e.row}: ${e.reason}`).join('<br>')}</div></details>`:''}
+    ${toImport.length>0?`<details style="margin-top:8px" open><summary style="font-size:11px;color:#0F6E56;cursor:pointer;font-weight:600">Preview first 5 to add</summary><div style="font-size:10px;color:#555;margin-top:6px;font-family:monospace;background:#fafafa;border-radius:6px;padding:6px;max-height:120px;overflow-y:auto">${toImport.slice(0,5).map(r=>`${r.name} · ${r.email}${r.instrument?(' · '+r.instrument):''}`).join('<br>')}${toImport.length>5?'<br>… and '+(toImport.length-5)+' more':''}</div></details>`:''}
+  </div>`;
+
+  const previewBox=document.getElementById('csv-preview');
+  previewBox.innerHTML=previewHtml;previewBox.style.display='block';
+
+  const goBtn=document.getElementById('csv-go');
+  if(toImport.length===0){
+    goBtn.textContent='Nothing new to import';
+    goBtn.style.opacity='0.5';goBtn.style.pointerEvents='none';
+    return;
+  }
+  goBtn.textContent=`✅ Confirm import of ${toImport.length}`;
+  goBtn.onclick=async()=>{await commitCsvImport(fid,toImport,dupes.length,errors.length);};
+};
+
+async function commitCsvImport(fid,records,dupesSkipped,errorCount){
+  const goBtn=document.getElementById('csv-go');
+  goBtn.disabled=true;goBtn.textContent='Importing…';
+  // get current max queue position
+  let maxPos=0;
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{const p=(d.data().queuePosition||0);if(p>=maxPos)maxPos=p+1;});
+  }catch(e){}
+  let added=0;const fails=[];
+  for(const r of records){
+    try{
+      await addDoc(collection(db,'rosterMembers'),{
+        folderId:fid,
+        managerId:CU.uid,
+        managerEmail:CU.email,
+        musicianId:'',
+        musicianName:r.name,
+        musicianEmail:r.email,
+        instrument:r.instrument||'',
+        phone:r.phone||'',
+        hasWhatsApp:!!r.hasWhatsApp,
+        queuePosition:maxPos++,
+        addedAt:new Date(),
+        // audit trail
+        importedAt:new Date(),
+        importedVia:'csv',
+        importedByManagerId:CU.uid,
+      });
+      added++;
+    }catch(e){fails.push(r.email);console.log('csv add fail:',r.email,e);}
+  }
+  // update folder count
+  try{
+    const total=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    await setDoc(doc(db,'rosterFolders',fid),{memberCount:total.size},{merge:true});
+    const f=rosterFolders.find(x=>x.id===fid);if(f)f.memberCount=total.size;
+  }catch(e){}
+  document.getElementById('csv-modal')?.remove();
+  // success summary
+  const s=document.createElement('div');s.className='modal-bg';s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:11001;display:flex;align-items:center;justify-content:center;padding:18px';
+  s.innerHTML=`<div class="modal" style="max-width:380px;text-align:center">
+    <div style="font-size:46px;margin-bottom:6px">${added>0?'🎉':'⚠️'}</div>
+    <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:10px">Import complete</div>
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:11px;padding:13px;margin-bottom:14px;text-align:left;font-size:13px;color:#0F6E56;line-height:1.8">
+      ✅ Added: <strong>${added}</strong><br>
+      ⊘ Skipped duplicates: <strong>${dupesSkipped}</strong><br>
+      ${errorCount>0?`⚠️ Format errors: <strong>${errorCount}</strong><br>`:''}
+      ${fails.length>0?`❌ Failed to save: <strong>${fails.length}</strong>`:''}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="this.parentElement.parentElement.remove()">Done</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+  if(_wheel.fid===fid){await reloadWheelMembers();}
+  renderRosterFolders();
+}
 
 window.removeFromFolder=async function(fid,memberId){
   if(!confirm('Remove from this queue?'))return;
