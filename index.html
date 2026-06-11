@@ -2848,6 +2848,8 @@ window.calNav=function(dir){
 }
 
 window.setDayStatus=function(dateStr, status){
+  // Always remove the day action sheet first (prevents a lingering translucent overlay)
+  const sheet=document.getElementById('cal-action');if(sheet)sheet.remove();
   if(status==='available'){
     _availDates.add(dateStr);
     _unavailDates.delete(dateStr);
