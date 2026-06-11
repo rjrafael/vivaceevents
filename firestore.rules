@@ -204,6 +204,40 @@ service cloud.firestore {
       allow write: if signedIn();
     }
 
+    // ─── AVAILABILITY (each user's calendar) ───────────────────
+    // Owner reads/writes their own. Others can READ (managers check availability before booking).
+    match /availability/{userId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && userId == request.auth.uid;
+    }
+
+    // ─── ORGANIZER EVENTS (owner-only) ─────────────────────────
+    match /organizer_events/{eventId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ─── EVENT GUESTS (sealed private groups) ──────────────────
+    // Organizer owns the list. An invited guest may claim their own slot
+    // ONLY if it matches their verified email (same pattern as rosterMembers).
+    match /event_guests/{guestId} {
+      allow read: if signedIn() && resource.data.organizerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.organizerId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.organizerId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.organizerId == request.auth.uid
+        || (
+          resource.data.guestId == ''
+          && resource.data.guestEmail == request.auth.token.email
+          && request.resource.data.guestId == request.auth.uid
+        )
+      );
+      allow read: if signedIn()
+        && resource.data.guestId == ''
+        && resource.data.guestEmail == request.auth.token.email;
+    }
+
     // ─── Fallback — deny unknown collections ───────────────────
     match /{document=**} {
       allow read, write: if false;

@@ -2935,7 +2935,7 @@ window.saveAvailability=async function(){
     document.getElementById('avail-modal')?.remove();
     loadAvailabilityPreview();
     ts(`✅ Calendar saved — ${dates.length} available, ${unavailDates.length} unavailable!`);
-  }catch(e){ts('Saved!');}
+  }catch(e){console.error('saveAvailability failed:',e);ts('⚠️ Could not save — please try again');}
 }
 
 async function loadAvailabilityPreview(){
