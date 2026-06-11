@@ -2518,8 +2518,10 @@ let _calYear=new Date().getFullYear();
 let _calMonth=new Date().getMonth();
 let _rangeStart=null;
 let _rangeEnd=null;
+window._rangeMode=false;
 
 window.showAvailabilityCalendar=async function(){
+  window._rangeMode=false;_rangeStart=null;_rangeEnd=null;
   try{
     const snap=await getDoc(doc(db,'availability',CU.uid));
     if(snap.exists()){
@@ -2622,18 +2624,20 @@ function renderCalendarModal(){
     </div>
 
     <!-- Range selection -->
-    <div id="range-bar" style="background:#f5f5f5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:12px;color:#555">
-        ${_rangeStart?`<span style="color:#1D9E75;font-weight:600">From: ${_rangeStart}</span> ${_rangeEnd?`→ <span style="color:#1D9E75;font-weight:600">${_rangeEnd}</span>`:'→ tap end date'}`:
-        '<span style="color:#888">Tap two dates to select a range</span>'}
+    <div id="range-bar" style="background:${window._rangeMode?'#E1F5EE':'#f5f5f5'};border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${window._rangeMode?'8px':'0'}">
+        <div style="font-size:12px;color:#555">
+          ${window._rangeMode?
+            (_rangeStart?`<span style="color:#1D9E75;font-weight:600">From: ${_rangeStart}</span> ${_rangeEnd?`→ <span style="color:#1D9E75;font-weight:600">${_rangeEnd}</span>`:'→ tap end date'}`:'<span style="color:#0F6E56;font-weight:600">Range mode ON — tap start date</span>')
+            :'<span style="color:#888">Tap a day to mark it, or use range mode →</span>'}
+        </div>
+        <button onclick="toggleRangeMode()" style="padding:5px 12px;border-radius:8px;background:${window._rangeMode?'#1D9E75':'#fff'};border:1px solid ${window._rangeMode?'#1D9E75':'#ccc'};color:${window._rangeMode?'#fff':'#555'};font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">${window._rangeMode?'Range ON':'📅 Range'}</button>
       </div>
-      ${_rangeStart?`<div style="display:flex;gap:6px">
-        ${_rangeEnd?`
-          <button onclick="applyRange('available')" style="padding:4px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">✅ Available</button>
-          <button onclick="applyRange('unavailable')" style="padding:4px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">❌ Busy</button>
-          <button onclick="applyRange('clear')" style="padding:4px 10px;border-radius:8px;background:#f5f5f5;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">⚪</button>
-        `:''}
-        <button onclick="clearRange()" style="padding:4px 8px;border-radius:8px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer">✕</button>
+      ${window._rangeMode&&_rangeStart&&_rangeEnd?`<div style="display:flex;gap:6px">
+        <button onclick="applyRange('available')" style="flex:1;padding:6px 10px;border-radius:8px;background:#1D9E75;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">✅ Available</button>
+        <button onclick="applyRange('unavailable')" style="flex:1;padding:6px 10px;border-radius:8px;background:#FF3B30;border:none;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">❌ Busy</button>
+        <button onclick="applyRange('clear')" style="padding:6px 10px;border-radius:8px;background:#fff;border:1px solid #eee;color:#555;font-size:11px;cursor:pointer;font-family:inherit">⚪ Clear</button>
+        <button onclick="clearRange()" style="padding:6px 8px;border-radius:8px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer">✕</button>
       </div>`:''}
     </div>
 
@@ -2648,74 +2652,28 @@ function renderCalendarModal(){
 let _perfEvents={}; // {dateStr: {title, venue, time, ticketLink, isPublic}}
 
 window.handleCalDay=function(dateStr){
-  // If range start is set and we tap a different date — set end of range
-  if(_rangeStart&&!_rangeEnd&&dateStr!==_rangeStart){
-    if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
-    else _rangeEnd=dateStr;
-    renderCalendarModal();
-    return;
-  }
-  // If same date tapped twice while range start — clear range start
-  if(_rangeStart===dateStr&&!_rangeEnd){
-    _rangeStart=null;
-    renderCalendarModal();
-    return;
-  }
-  // If range is complete, reset and start new
-  if(_rangeStart&&_rangeEnd){
-    _rangeStart=dateStr;_rangeEnd=null;
-    renderCalendarModal();
+  // RANGE MODE: taps build a start→end range
+  if(window._rangeMode){
+    // first tap sets start
+    if(!_rangeStart){_rangeStart=dateStr;_rangeEnd=null;renderCalendarModal();return;}
+    // tapping start again clears it
+    if(_rangeStart===dateStr&&!_rangeEnd){_rangeStart=null;renderCalendarModal();return;}
+    // second tap sets end (auto-orders)
+    if(_rangeStart&&!_rangeEnd){
+      if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
+      else _rangeEnd=dateStr;
+      renderCalendarModal();return;
+    }
+    // range complete → start a new one
+    if(_rangeStart&&_rangeEnd){_rangeStart=dateStr;_rangeEnd=null;renderCalendarModal();return;}
     return;
   }
 
-  // No range started — show single day options
+  // SINGLE-DAY MODE — show day options
   const perf=_perfEvents[dateStr];
   const isAvail=_availDates.has(dateStr);
   const isUnavail=_unavailDates&&_unavailDates.has(dateStr);
 
-// Mouse drag for desktop range selection
-let _isDragging=false;
-window.startCalDrag=function(dateStr){
-  _isDragging=true;
-  _rangeStart=dateStr;
-  _rangeEnd=null;
-  renderCalendarModal();
-}
-window.updateCalDrag=function(dateStr){
-  if(!_isDragging||!_rangeStart)return;
-  if(dateStr===_rangeStart){_rangeEnd=null;}
-  else if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
-  else{_rangeEnd=dateStr;}
-  renderCalendarModal();
-}
-window.endCalDrag=function(){
-  _isDragging=false;
-}
-document.addEventListener('mouseup',()=>{_isDragging=false;});
-
-window.applyRange=function(status){
-  if(!_rangeStart||!_rangeEnd)return;
-  const start=new Date(_rangeStart+'T00:00:00');
-  const end=new Date(_rangeEnd+'T00:00:00');
-  const d=new Date(start);
-  while(d<=end){
-    const dateStr=d.toISOString().split('T')[0];
-    if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
-    else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
-    else if(status==='clear'){_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
-    d.setDate(d.getDate()+1);
-  }
-  const count=Math.round((end-start)/(1000*60*60*24))+1;
-  _rangeStart=null;_rangeEnd=null;
-  renderCalendarModal();
-  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} days updated!`);
-}
-
-window.clearRange=function(){
-  _rangeStart=null;_rangeEnd=null;
-  renderCalendarModal();
-}
-  
   // Show action sheet
   const existing=document.getElementById('cal-action');
   if(existing)existing.remove();
@@ -2761,6 +2719,55 @@ window.clearRange=function(){
     </button>
   </div>`;
   document.getElementById('app').appendChild(sheet);
+}
+
+// Mouse drag for desktop range selection
+let _isDragging=false;
+window.startCalDrag=function(dateStr){
+  _isDragging=true;
+  _rangeStart=dateStr;
+  _rangeEnd=null;
+  renderCalendarModal();
+}
+window.updateCalDrag=function(dateStr){
+  if(!_isDragging||!_rangeStart)return;
+  if(dateStr===_rangeStart){_rangeEnd=null;}
+  else if(dateStr<_rangeStart){_rangeEnd=_rangeStart;_rangeStart=dateStr;}
+  else{_rangeEnd=dateStr;}
+  renderCalendarModal();
+}
+window.endCalDrag=function(){
+  _isDragging=false;
+}
+document.addEventListener('mouseup',()=>{_isDragging=false;});
+
+window.applyRange=function(status){
+  if(!_rangeStart||!_rangeEnd)return;
+  const start=new Date(_rangeStart+'T00:00:00');
+  const end=new Date(_rangeEnd+'T00:00:00');
+  const d=new Date(start);
+  while(d<=end){
+    const dateStr=d.toISOString().split('T')[0];
+    if(status==='available'){_availDates.add(dateStr);_unavailDates.delete(dateStr);}
+    else if(status==='unavailable'){_unavailDates.add(dateStr);_availDates.delete(dateStr);}
+    else if(status==='clear'){_availDates.delete(dateStr);_unavailDates.delete(dateStr);}
+    d.setDate(d.getDate()+1);
+  }
+  const count=Math.round((end-start)/(1000*60*60*24))+1;
+  _rangeStart=null;_rangeEnd=null;
+  renderCalendarModal();
+  ts(`${status==='available'?'✅':status==='unavailable'?'❌':'⚪'} ${count} days updated!`);
+}
+
+window.clearRange=function(){
+  _rangeStart=null;_rangeEnd=null;
+  renderCalendarModal();
+}
+
+window.toggleRangeMode=function(){
+  window._rangeMode=!window._rangeMode;
+  _rangeStart=null;_rangeEnd=null;
+  renderCalendarModal();
 }
 
 window.deletePerf=function(dateStr){
