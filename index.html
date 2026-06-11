@@ -1036,7 +1036,13 @@ async function saveTOS(uid){
   }catch(e){}
 }
 
-window.setLang=function(l){lang=l;if(CU){UP.lang=l;saveUP();}render();}
+window.setLang=function(l){
+  lang=l;
+  if(UP)UP.lang=l;           // set synchronously so any re-render reads the new value
+  try{document.documentElement.setAttribute('lang',l);}catch(e){}
+  if(CU){saveUP();}          // persist in background
+  render();
+}
 
 // ─── GIG STATUS SYSTEM ──────────────────────────────────────────
 function gigStatusBadge(status){
