@@ -482,6 +482,8 @@ async function loadUP(){
           console.log('🔒 Security migration complete');
         }catch(mig){console.log('migration will retry next login:',mig);}
       }
+      // Existing user arriving via an invite link → link to placeholder too
+      if(window._pendingInvite){processPendingInvite();}
     }
     else{
       lang=detectLang();
@@ -492,6 +494,8 @@ async function loadUP(){
       UP.email=CU.email;UP.name=CU.displayName||CU.email.split('@')[0];UP.plan='free';UP.roles=['artist'];
       // brand-new user → send a warm welcome email
       sendWelcomeEmail();
+      // If they arrived via an invite link, connect them to the manager's placeholder (no duplicate)
+      if(window._pendingInvite){processPendingInvite();}
     }
   }catch(e){}
 }
@@ -522,7 +526,38 @@ async function saveUP(){
   }catch(e){}
 }
 
-// ─── WELCOME EMAIL ───────────────────────────────────────────────
+// When a new user arrives via an invite link, connect their account to the
+// manager's roster placeholder — fills in musicianId, prevents duplicates.
+// Security: rules only allow claiming a placeholder whose musicianEmail matches
+// the signed-in user's own verified email, so this is safe.
+async function processPendingInvite(){
+  if(!CU||!CU.email)return;
+  try{
+    // Find any unlinked placeholder addressed to THIS user's email.
+    const snap=await getDocs(query(
+      collection(db,'rosterMembers'),
+      where('musicianEmail','==',CU.email.toLowerCase()),
+      where('musicianId','==','')
+    ));
+    if(snap.empty){window._pendingInvite=null;return;}
+    let linked=0;
+    for(const d of snap.docs){
+      try{
+        await setDoc(doc(db,'rosterMembers',d.id),{
+          musicianId:CU.uid,
+          musicianName:UP.name||d.data().musicianName,
+          joinedViaInvite:true,
+          joinedAt:new Date(),
+        },{merge:true});
+        linked++;
+      }catch(e){console.log('link one failed:',e);}
+    }
+    window._pendingInvite=null;
+    if(linked>0)setTimeout(()=>ts('🎉 You\'re connected to your manager\'s roster!'),2000);
+  }catch(e){console.log('processPendingInvite:',e);window._pendingInvite=null;}
+}
+
+
 async function sendWelcomeEmail(){
   if(!CU||!CU.email)return;
   const name=(CU.displayName||CU.email.split('@')[0]||'there');
@@ -6115,21 +6150,46 @@ function renderWheelListView(){
     return;
   }
   el.innerHTML=`
-    <div style="font-size:11px;font-weight:700;color:#8893a8;text-transform:uppercase;letter-spacing:.6px;margin:6px 0 10px">Queue Order — ${members.length}</div>
-    ${members.map((mem,i)=>`
+    ${(()=>{
+      const joined=members.filter(m=>m.musicianId).length;
+      const invited=members.filter(m=>!m.musicianId&&m.inviteEmailSentAt).length;
+      const toInvite=members.filter(m=>!m.musicianId&&!m.inviteEmailSentAt&&m.musicianEmail).length;
+      const hasPending=members.some(m=>m.musicianEmail&&!m.musicianId&&!m.inviteEmailSentAt);
+      if(joined===0&&invited===0&&toInvite===0)return '';
+      return `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 13px;margin-bottom:12px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#5DCAA5;display:inline-block"></span><span style="font-size:12px;color:#cdd5e3"><strong style="color:#5DCAA5">${joined}</strong> joined</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#C9A84C;display:inline-block"></span><span style="font-size:12px;color:#cdd5e3"><strong style="color:#C9A84C">${invited}</strong> invited</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#8893a8;display:inline-block"></span><span style="font-size:12px;color:#cdd5e3"><strong style="color:#fff">${toInvite}</strong> to invite</span></div>
+          ${hasPending?`<button onclick="inviteAllPending('${fid}')" style="margin-left:auto;background:#1D9E75;border:none;color:#fff;border-radius:14px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✉️ Invite next batch</button>`:''}
+        </div>
+      </div>`;
+    })()}
+    <div style="font-size:11px;font-weight:700;color:#8893a8;text-transform:uppercase;letter-spacing:.6px;margin:6px 0 10px">
+      Queue Order — ${members.length}
+    </div>
+    ${members.map((mem,i)=>{
+      const joined=!!mem.musicianId;
+      const invited=!joined&&!!mem.inviteEmailSentAt;
+      let statusBadge='';
+      if(joined)statusBadge='<span style="font-size:9px;color:#5DCAA5;font-weight:700">● joined</span>';
+      else if(invited)statusBadge='<span style="font-size:9px;color:#C9A84C;font-weight:700">✓ invited</span>';
+      else statusBadge='<span style="font-size:9px;color:#8893a8;font-weight:600">○ not invited</span>';
+      return `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)">
       <div style="width:26px;height:26px;border-radius:50%;background:${i===0?'linear-gradient(135deg,#C9A84C,#A8842F)':'rgba(255,255,255,.08)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${i===0?'#1a1407':'#8893a8'};flex-shrink:0">${i+1}</div>
       <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,${WHEEL_PALETTE[i%WHEEL_PALETTE.length][0]},${WHEEL_PALETTE[i%WHEEL_PALETTE.length][1]});display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(mem.musicianName||mem.musicianEmail||'?').substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mem.musicianName||mem.musicianEmail?.split('@')[0]||'—'}</div>
-        <div style="font-size:11px;color:#8893a8">${mem.instrument||'—'}</div>
+        <div style="font-size:11px;color:#8893a8">${mem.instrument||'—'} · ${statusBadge}</div>
       </div>
+      ${(mem.musicianEmail&&!joined)?`<button onclick="inviteOne('${fid}','${mem.id}')" title="${invited?'Invited — tap to resend':'Invite to join Vivace'}" style="background:${invited?'rgba(201,168,76,.12)':'rgba(29,158,117,.12)'};border:none;border-radius:8px;color:${invited?'#C9A84C':'#5DCAA5'};cursor:pointer;font-size:14px;padding:6px 8px;flex-shrink:0">${invited?'↻':'✉️'}</button>`:''}
       <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
         <button onclick="queueMove('${fid}','${mem.id}',${i},-1)" style="background:rgba(255,255,255,.08);border:none;border-radius:6px;width:26px;height:22px;cursor:pointer;font-size:12px;color:${i===0?'#444f63':'#cdd5e3'}" ${i===0?'disabled':''}>▲</button>
         <button onclick="queueMove('${fid}','${mem.id}',${i},1)" style="background:rgba(255,255,255,.08);border:none;border-radius:6px;width:26px;height:22px;cursor:pointer;font-size:12px;color:${i===members.length-1?'#444f63':'#cdd5e3'}" ${i===members.length-1?'disabled':''}>▼</button>
       </div>
       <button onclick="removeFromFolder('${fid}','${mem.id}')" style="background:none;border:none;color:#F09595;cursor:pointer;font-size:16px;padding:4px 2px;flex-shrink:0">✕</button>
-    </div>`).join('')}
+    </div>`;}).join('')}
     <button class="bt" style="width:100%;padding:13px;font-weight:600;margin-top:14px" onclick="showAddToFolder('${fid}')">+ Add Musician</button>`;
 }
 
@@ -7235,6 +7295,161 @@ async function commitCsvImport(fid,records,dupesSkipped,errorCount){
   if(_wheel.fid===fid){await reloadWheelMembers();}
   renderRosterFolders();
 }
+
+// ─── INVITE TO JOIN — link-first (safe), throttled optional email ────
+// Gmail/Workspace limits: ~500/day, ~20/hour, bans on bulk. So we:
+//  • PRIMARY: generate a unique invite link the manager shares themselves (zero send risk)
+//  • OPTIONAL: send branded email, but CAP per session to protect sending reputation
+const INVITE_EMAIL_CAP_PER_BATCH=25;  // never blast more than this many emails at once
+let _inviteEmailsSentThisSession=0;
+
+// Build a unique invite token for a roster member (ties their future signup to this manager+folder)
+function makeInviteToken(fid,memberId){
+  return btoa(fid+'|'+memberId+'|'+CU.uid).replace(/=/g,'').substring(0,32);
+}
+function inviteLinkFor(fid,memberId){
+  return 'https://vivaceevents.com/?inv='+makeInviteToken(fid,memberId);
+}
+
+// Invite ONE musician — shows link + copy + optional send-email
+window.inviteOne=async function(fid,memberId){
+  let mem=null;
+  try{const d=await getDoc(doc(db,'rosterMembers',memberId));if(d.exists())mem={id:d.id,...d.data()};}catch(e){}
+  if(!mem){ts('Could not load this musician');return;}
+  const link=inviteLinkFor(fid,memberId);
+  const myName=(UP&&UP.name)||CU.displayName||'A manager';
+  // store the invite token on the member doc so signup can match it
+  try{await setDoc(doc(db,'rosterMembers',memberId),{inviteToken:makeInviteToken(fid,memberId),invitedAt:new Date()},{merge:true});}catch(e){}
+  const m=document.createElement('div');m.className='modal-bg';m.id='invite-modal';
+  m.innerHTML=`<div class="modal" style="max-width:440px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">✉️ Invite ${mem.musicianName||'musician'}</div>
+      <button onclick="document.getElementById('invite-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">Share this private link. When they sign up through it, they're automatically connected to your roster — no duplicate.</div>
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:11px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;color:#0F6E56;font-weight:700;margin-bottom:6px">🔗 Invite link</div>
+      <div style="font-size:11px;color:#444;font-family:monospace;background:#fff;border:1px solid #e1f0ea;border-radius:8px;padding:8px;word-break:break-all;margin-bottom:8px" id="invite-link-text">${link}</div>
+      <button onclick="copyInviteLink('${link.replace(/'/g,"\\'")}')" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:600">📋 Copy link</button>
+    </div>
+    <div style="font-size:11px;color:#aaa;text-align:center;margin:10px 0">— or —</div>
+    ${mem.musicianEmail?`<button onclick="sendInviteEmail('${fid}','${memberId}','${(mem.musicianEmail||'').replace(/'/g,"\\'")}','${(mem.musicianName||'').replace(/'/g,"\\'")}')" style="width:100%;padding:12px;border:1px solid #C9A84C;border-radius:11px;background:#FBF8EC;color:#9c7a1e;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📧 Email the invite to ${mem.musicianEmail}</button>`:`<div style="font-size:12px;color:#aaa;text-align:center">No email on file — use the link above</div>`}
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.copyInviteLink=function(link){
+  try{
+    navigator.clipboard.writeText(link).then(()=>ts('🔗 Link copied! Paste it in WhatsApp, text, anywhere.'),()=>fallbackCopy(link));
+  }catch(e){fallbackCopy(link);}
+};
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');ts('🔗 Link copied!');}catch(e){ts('Copy failed — long-press the link to copy');}
+  document.body.removeChild(ta);
+}
+
+// Send a SINGLE invite email (throttled, counts toward session cap)
+window.sendInviteEmail=async function(fid,memberId,email,name){
+  if(_inviteEmailsSentThisSession>=INVITE_EMAIL_CAP_PER_BATCH){
+    ts('⚠️ Email limit reached for now. Use the copy-link option, or try more emails later.');
+    return;
+  }
+  if(!email){ts('No email on file');return;}
+  const link=inviteLinkFor(fid,memberId);
+  const myName=(UP&&UP.name)||CU.displayName||'A manager';
+  try{
+    await addDoc(collection(db,'mail'),{
+      to:email,
+      message:{
+        subject:`🎻 ${myName} added you on Vivace Events`,
+        html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#f7faf9">
+          <div style="background:#0d0d0d;padding:22px;border-radius:12px 12px 0 0;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div>
+          </div>
+          <div style="background:#fff;padding:26px 22px;border:1px solid #eee;border-top:none">
+            <p style="font-size:17px;font-weight:700;color:#111;margin:0 0 8px">You've been added to a roster 🎻</p>
+            <p style="font-size:14px;color:#444;line-height:1.6;margin:0 0 16px"><strong>${myName}</strong> added you to their musician roster on Vivace Events — a platform for booking, gigs, and ensemble management. Join to see your gigs and stay connected.</p>
+            <a href="${link}" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:14px;border-radius:10px;text-align:center;font-weight:700;font-size:15px;margin-bottom:14px">Join Vivace Events →</a>
+            <p style="font-size:11px;color:#aaa;line-height:1.5;margin:0">This is a personal invitation. If you weren't expecting it, you can ignore this email. A one-time $1 verification applies at signup to keep the platform safe and spam-free.</p>
+          </div>
+          <div style="text-align:center;padding:14px;font-size:11px;color:#aaa">vivaceevents.com · Washington DC</div>
+        </div>`
+      }
+    });
+    await setDoc(doc(db,'rosterMembers',memberId),{inviteEmailSentAt:new Date(),inviteToken:makeInviteToken(fid,memberId)},{merge:true});
+    _inviteEmailsSentThisSession++;
+    document.getElementById('invite-modal')?.remove();
+    ts('📧 Invite emailed to '+name+'!');
+  }catch(e){console.error('invite email:',e);ts('Could not send — try the copy-link option');}
+};
+
+// Invite ALL pending (not-yet-joined) members — link-first, throttled email
+window.inviteAllPending=async function(fid){
+  let pending=[];
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{const m={id:d.id,...d.data()};if(m.musicianEmail&&!m.musicianId&&!m.inviteEmailSentAt)pending.push(m);});
+  }catch(e){}
+  if(pending.length===0){ts('Everyone here has already joined! 🎉');return;}
+  const withEmail=pending.filter(m=>m.musicianEmail).length;
+  const m=document.createElement('div');m.className='modal-bg';m.id='inviteall-modal';
+  m.innerHTML=`<div class="modal" style="max-width:440px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">✉️ Invite all pending</div>
+      <button onclick="document.getElementById('inviteall-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:14px"><strong>${pending.length}</strong> people in this folder haven't joined yet.</div>
+    <div style="background:#FFF7E6;border:1px solid #F4D27A;border-radius:11px;padding:13px;margin-bottom:14px">
+      <div style="font-size:12px;color:#7a5a14;line-height:1.6">
+        📧 To protect everyone's email reputation, we send a <strong>maximum of ${INVITE_EMAIL_CAP_PER_BATCH} invite emails at a time</strong>. ${pending.length>INVITE_EMAIL_CAP_PER_BATCH?`We'll email the first ${INVITE_EMAIL_CAP_PER_BATCH} now — invite the rest later or share links directly.`:''}
+      </div>
+    </div>
+    <button onclick="confirmInviteAll('${fid}')" class="bt" style="width:100%;padding:14px;font-size:14px;font-weight:700;margin-bottom:8px">📧 Email ${Math.min(withEmail,INVITE_EMAIL_CAP_PER_BATCH)} invites now</button>
+    <button onclick="document.getElementById('inviteall-modal').remove()" class="bg" style="width:100%;padding:12px;font-size:13px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.confirmInviteAll=async function(fid){
+  document.getElementById('inviteall-modal')?.remove();
+  ts('Sending invites…');
+  let pending=[];
+  try{
+    const s=await getDocs(query(collection(db,'rosterMembers'),where('folderId','==',fid),where('managerId','==',CU.uid)));
+    s.docs.forEach(d=>{const m={id:d.id,...d.data()};if(m.musicianEmail&&!m.musicianId&&!m.inviteEmailSentAt)pending.push(m);});
+  }catch(e){}
+  const myName=(UP&&UP.name)||CU.displayName||'A manager';
+  let sent=0;
+  for(const mem of pending){
+    if(sent>=INVITE_EMAIL_CAP_PER_BATCH)break;
+    const link=inviteLinkFor(fid,mem.id);
+    try{
+      await addDoc(collection(db,'mail'),{
+        to:mem.musicianEmail,
+        message:{
+          subject:`🎻 ${myName} added you on Vivace Events`,
+          html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#f7faf9"><div style="background:#0d0d0d;padding:22px;border-radius:12px 12px 0 0;text-align:center"><div style="font-size:22px;font-weight:700;color:#fff">Vivace<span style="color:#1D9E75">Events</span></div></div><div style="background:#fff;padding:26px 22px;border:1px solid #eee;border-top:none"><p style="font-size:17px;font-weight:700;color:#111;margin:0 0 8px">You've been added to a roster 🎻</p><p style="font-size:14px;color:#444;line-height:1.6;margin:0 0 16px"><strong>${myName}</strong> added you to their musician roster on Vivace Events. Join to see your gigs and stay connected.</p><a href="${link}" style="display:block;background:#1D9E75;color:#fff;text-decoration:none;padding:14px;border-radius:10px;text-align:center;font-weight:700;font-size:15px;margin-bottom:14px">Join Vivace Events →</a><p style="font-size:11px;color:#aaa;line-height:1.5;margin:0">A one-time $1 verification applies at signup to keep the platform spam-free.</p></div><div style="text-align:center;padding:14px;font-size:11px;color:#aaa">vivaceevents.com · Washington DC</div></div>`
+        }
+      });
+      await setDoc(doc(db,'rosterMembers',mem.id),{inviteEmailSentAt:new Date(),inviteToken:makeInviteToken(fid,mem.id)},{merge:true});
+      sent++;
+    }catch(e){console.log('invite fail:',mem.musicianEmail,e);}
+  }
+  const remaining=pending.length-sent;
+  const s=document.createElement('div');s.className='modal-bg';s.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:11001;display:flex;align-items:center;justify-content:center;padding:18px';
+  s.innerHTML=`<div class="modal" style="max-width:380px;text-align:center">
+    <div style="font-size:42px;margin-bottom:6px">📬</div>
+    <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:10px">Invites sent!</div>
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:11px;padding:13px;margin-bottom:14px;text-align:left;font-size:13px;color:#0F6E56;line-height:1.8">
+      ✅ Emailed: <strong>${sent}</strong> invites<br>
+      ${remaining>0?`⏳ Remaining: <strong>${remaining}</strong> (invite later or share links)`:''}
+    </div>
+    <button class="bt" style="width:100%;padding:13px" onclick="this.parentElement.parentElement.remove()">Done</button>
+  </div>`;
+  document.getElementById('app').appendChild(s);
+};
 
 window.removeFromFolder=async function(fid,memberId){
   if(!confirm('Remove from this queue?'))return;
@@ -8392,11 +8607,14 @@ window.applyGiftCode=async function(code,userId){
   }catch(e){console.error('Apply gift:',e);}
 };
 
-// Handle ?g=CODE in URL on load
+// Handle ?g=CODE and ?inv=TOKEN in URL on load
 (function(){
   const p=new URLSearchParams(window.location.search);
   const gc=p.get('g');
   if(gc)window._pendingGiftCode=gc.toUpperCase();
+  // Invite token — ties a new signup to the manager's roster placeholder (no duplicate)
+  const inv=p.get('inv');
+  if(inv)window._pendingInvite=inv;
 })();
 // ─── END GIFT SYSTEM ────────────────────────────────────────────────────────
 // ─── STRIPE CHECKOUT ────────────────────────────────────────────

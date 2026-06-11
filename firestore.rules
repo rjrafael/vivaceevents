@@ -162,9 +162,24 @@ service cloud.firestore {
 
     // ─── ROSTER MEMBERS (locked — only the manager who owns reads) ────
     match /rosterMembers/{memberId} {
+      // Manager (owner) has full access to their roster
       allow read: if signedIn() && resource.data.managerId == request.auth.uid;
       allow create: if signedIn() && request.resource.data.managerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.managerId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.managerId == request.auth.uid;
+      // Manager updates freely. An invited user may claim an unlinked placeholder
+      // ONLY if it matches their own email AND they set musicianId to their own uid.
+      allow update: if signedIn() && (
+        resource.data.managerId == request.auth.uid
+        || (
+          resource.data.musicianId == ''
+          && resource.data.musicianEmail == request.auth.token.email
+          && request.resource.data.musicianId == request.auth.uid
+        )
+      );
+      // An invited user may read a placeholder ONLY if it's addressed to their own email.
+      allow read: if signedIn()
+        && resource.data.musicianId == ''
+        && resource.data.musicianEmail == request.auth.token.email;
     }
 
     // ─── USERNAMES (unique handle reservations) ────────────────
