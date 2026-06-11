@@ -766,7 +766,9 @@ function render(){
 function go(s){
   // Safety: remove any leftover full-screen overlays that could lock the screen
   ['cal-action','avail-modal','phone-modal','guests-modal'].forEach(id=>{var o=document.getElementById(id);if(o)o.remove();});
-  CS=s;var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;
+  CS=s;
+  try{sessionStorage.setItem('vv_lastScreen',s);}catch(e){}
+  var scr=document.getElementById('scr');scr.innerHTML=getScr();scr.scrollTop=0;
 }
 window.go=go;window.ts=ts;
 
@@ -11782,7 +11784,10 @@ window.doSignOut=async function(){
 onAuthStateChanged(auth,async user=>{
   CU=user;
   if(user){
-    CS='feed';
+    // Restore the last page they were on (instead of always jumping to feed)
+    let lastScreen='feed';
+    try{const s=sessionStorage.getItem('vv_lastScreen');if(s)lastScreen=s;}catch(e){}
+    CS=lastScreen;
     await loadUP();await loadGroups();await loadVenues();
     render();
     // Prompt to claim a username if they don't have one yet
