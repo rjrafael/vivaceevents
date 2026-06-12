@@ -10534,9 +10534,11 @@ function organizerHTML(){
 async function loadOrganizerEvents(){
   if(!CU)return;
   try{
-    var snap=await getDocs(query(collection(db,'organizer_events'),where('userId','==',CU.uid),orderBy('timestamp','desc')));
-    window._orgEvents=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-  }catch(e){window._orgEvents=[];}
+    var snap=await getDocs(query(collection(db,'organizer_events'),where('userId','==',CU.uid)));
+    var evs=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    evs.sort(function(a,b){return (b.timestamp&&b.timestamp.seconds?b.timestamp.seconds:0)-(a.timestamp&&a.timestamp.seconds?a.timestamp.seconds:0);});
+    window._orgEvents=evs;
+  }catch(e){console.error('loadOrganizerEvents:',e.code,e.message);window._orgEvents=[];}
 }
 
 window.showCreateEvent=function(){
