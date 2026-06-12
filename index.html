@@ -11274,6 +11274,7 @@ function showSeatActions(tableIdx,seatIdx){
     <button onclick="seatMove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E8F3EF'};color:${locked?'#bbb':'#0F6E56'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">↔️ Move to another seat</button>
     <button onclick="seatSwap(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E9EFF7'};color:${locked?'#bbb':'#0C447C'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">🔄 Swap with another guest</button>
     <button onclick="seatSetGroup(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#F3EEF9;color:#7B3FBF;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">🏷️ ${guestGroups(g).length?'Edit tags':'Add tags'}</button>
+    <button onclick="seatEditContact(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#E9EFF7;color:#0C447C;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">📇 ${(g.email||g.phone)?'Edit contact':'Add email / phone'}</button>
     <button onclick="seatToggleLock(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#FFF8E6;color:#9c7a1e;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">${locked?'🔓 Unlock seat':'🔒 Lock this seat'}</button>
     <button onclick="seatRemove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#FEF2F2'};color:${locked?'#bbb':'#E24B4A'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:10px">↩️ Remove from seat (to waiting)</button>
     <button onclick="document.getElementById('seat-actions').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Cancel</button>
@@ -11294,6 +11295,36 @@ window.seatSetGroup=function(tableIdx,seatIdx){
   const g=window._seating.tables[tableIdx].guests[seatIdx];
   document.getElementById('seat-actions')?.remove();
   renderGroupPicker(tableIdx,seatIdx);
+};
+
+window.seatEditContact=function(tableIdx,seatIdx){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  document.getElementById('seat-actions')?.remove();
+  document.getElementById('seat-contact')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-contact';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:330px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Contact for ${g.name}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">So you can send their seat link. Both optional.</div>
+    <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px">📧 Email</div>
+    <input id="sc-email" class="finp" value="${g.email||''}" placeholder="name@example.com" style="font-size:13px;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px">📱 Phone (with country code)</div>
+    <input id="sc-phone" class="finp" value="${g.phone||''}" placeholder="+1 555 123 4567" style="font-size:13px;margin-bottom:16px">
+    <button onclick="saveSeatContact(${tableIdx},${seatIdx})" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">Save contact</button>
+    <button onclick="document.getElementById('seat-contact').remove();showSeatActions(${tableIdx},${seatIdx})" class="bg" style="width:100%;padding:11px;font-size:13px">Back</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.saveSeatContact=function(tableIdx,seatIdx){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  const email=(document.getElementById('sc-email')?.value||'').trim();
+  const phone=(document.getElementById('sc-phone')?.value||'').trim();
+  if(email)g.email=email; else delete g.email;
+  if(phone)g.phone=phone; else delete g.phone;
+  markDirty();
+  document.getElementById('seat-contact')?.remove();
+  renderSeating();
+  ts('📇 Contact saved');
 };
 
 function renderGroupPicker(tableIdx,seatIdx){
@@ -11617,7 +11648,7 @@ window.showGuestLinks=async function(){
   if(added){markDirty();await saveSeating(true);}
   // build list of seated guests with their links
   const rows=[];
-  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push({name:g.name,table:t.name,code:g.code});}));
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push({name:g.name,table:t.name,code:g.code,email:g.email,phone:g.phone});}));
   document.getElementById('guest-links')?.remove();
   const p=document.createElement('div');p.className='modal-bg';p.id='guest-links';p.style.zIndex='10001';
   const base='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId)+'&g=';
@@ -11625,12 +11656,13 @@ window.showGuestLinks=async function(){
     ? '<div style="font-size:13px;color:#aaa;text-align:center;padding:20px">Seat some guests first.</div>'
     : rows.map((r,i)=>`<div style="background:#f7faf9;border:1px solid #eee;border-radius:11px;padding:11px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-size:13px;font-weight:700;color:#111">${r.name}</div>
+          <div style="font-size:13px;font-weight:700;color:#111">${r.name} ${r.email?'<span title="has email">📧</span>':''}${r.phone?'<span title="has phone">📱</span>':''}</div>
           <div style="font-size:11px;color:#888">${r.table}</div>
         </div>
         <div style="display:flex;gap:6px">
           <input readonly value="${base}${r.code}" onclick="this.select();this.setSelectionRange(0,99999)" style="flex:1;font-size:10px;padding:7px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#555;box-sizing:border-box">
           <button onclick="copyGuestLink('${base}${r.code}')" class="bt" style="padding:6px 10px;font-size:11px">Copy</button>
+          ${r.phone?`<button onclick="waGuestLink('${r.phone}','${base}${r.code}','${r.name.replace(/'/g,"")}')" style="padding:6px 10px;font-size:11px;background:#25D366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit" title="WhatsApp">💬</button>`:''}
           ${navigator.share?`<button onclick="shareGuestLink('${base}${r.code}','${r.name.replace(/'/g,"")}')" style="padding:6px 10px;font-size:11px;background:#1D9E75;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit">📤</button>`:''}
         </div>
       </div>`).join('');
@@ -11641,7 +11673,7 @@ window.showGuestLinks=async function(){
     </div>
     <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Each guest has a private link that opens straight to <b>their own seat only</b>. Nobody can see anyone else's seat.</div>
     <button onclick="printAllGuestCards()" class="bt" style="width:100%;padding:13px;font-size:13px;font-weight:700;background:#0C447C;margin-bottom:8px">🖨️ Print all QR cards (one per guest)</button>
-    ${navigator.share?`<button onclick="shareAllGuestLinks()" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#fff;color:#1D9E75;border:1.5px solid #B7E0D2;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:14px">📤 Share the full list</button>`:'<div style="margin-bottom:8px"></div>'}
+    <button onclick="sendAllSeatEmails()" style="width:100%;padding:13px;font-size:13px;font-weight:700;background:#1D9E75;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:14px">📧 Email everyone their seat link</button>
     <div style="font-size:11px;font-weight:700;color:#999;margin-bottom:8px">OR SEND INDIVIDUALLY:</div>
     ${list}
   </div>`;
@@ -11677,11 +11709,54 @@ window.printAllGuestCards=function(){
   setTimeout(()=>w.print(),700);
 };
 
-window.shareAllGuestLinks=function(){
+// Bulk email each guest their OWN secure link
+window.sendAllSeatEmails=async function(){
   const base='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId)+'&g=';
-  const rows=[];
-  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push(g.name+': '+base+g.code);}));
-  if(navigator.share){navigator.share({title:'Guest seat links',text:rows.join('\n')}).catch(()=>{});}
+  const withEmail=[];const phoneOnly=[];const noContact=[];
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{
+    if(!g||!g.code)return;
+    if(g.email)withEmail.push({name:g.name,email:g.email,table:t.name,code:g.code});
+    else if(g.phone)phoneOnly.push(g.name);
+    else noContact.push(g.name);
+  }));
+  if(withEmail.length===0&&phoneOnly.length===0){ts('No guests have email or phone yet — add contacts first');return;}
+  if(!confirm('Email each of the '+withEmail.length+' guest'+(withEmail.length!==1?'s':'')+' with an email their own seat link now?'+(phoneOnly.length?'\n\n('+phoneOnly.length+' have phone only — use the 💬 button on their row.)':'')+(noContact.length?'\n('+noContact.length+' have no contact — print their cards.)':'')))return;
+  let sent=0;
+  for(const r of withEmail){
+    try{
+      await addDoc(collection(db,'mail'),{
+        to:r.email,
+        message:{
+          subject:'📍 Your seat — '+(window._seatingTitle||'the event'),
+          html:`<div style="font-family:sans-serif;max-width:460px;margin:0 auto">
+            <div style="background:#1D9E75;padding:22px;border-radius:12px 12px 0 0;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#fff">Vivace<span style="color:#9FE8CC">Events</span></div>
+            </div>
+            <div style="background:#fff;padding:26px 22px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px">
+              <p style="font-size:17px;font-weight:700;color:#111;margin:0 0 6px">Hello ${r.name},</p>
+              <p style="font-size:14px;color:#444;line-height:1.6;margin:0 0 18px">Here is your personal seat for <b>${window._seatingTitle||'the event'}</b>. Tap below to see your table when you arrive:</p>
+              <div style="text-align:center;margin:0 0 18px">
+                <a href="${base}${r.code}" style="display:inline-block;background:#1D9E75;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 28px;border-radius:10px">📍 Find my seat</a>
+              </div>
+              <p style="font-size:12px;color:#999;line-height:1.5;margin:0">This link is just for you. Please don't share it. See you there! 🎶</p>
+            </div>
+          </div>`
+        }
+      });
+      sent++;
+    }catch(e){console.error('seat email:',e);}
+  }
+  let msg='📧 Sent '+sent+' email'+(sent!==1?'s':'');
+  if(phoneOnly.length)msg+=' · '+phoneOnly.length+' phone-only (use 💬)';
+  if(noContact.length)msg+=' · '+noContact.length+' need printed cards';
+  ts(msg);
+};
+
+// WhatsApp a single guest their link (free, opens WhatsApp)
+window.waGuestLink=function(phone,url,name){
+  const clean=phone.replace(/[^0-9]/g,'');
+  const text=encodeURIComponent(name+', here is your seat for the event: '+url);
+  window.open('https://wa.me/'+clean+'?text='+text,'_blank');
 };
 
 window.copyGuestLink=function(url){
