@@ -10377,26 +10377,29 @@ async function loadFindSeat(){
     try{const es=await getDocs(query(collection(db,'organizer_events'),where('__name__','==',window._findSeatEventId)));}catch(_){}
     body.innerHTML=`
       <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:4px">Find your seat</div>
-      <div style="font-size:13px;color:#888;text-align:center;margin-bottom:18px">Type your name to see your table</div>
-      <input id="find-seat-input" class="finp" placeholder="Your name…" style="font-size:15px;padding:13px;margin-bottom:14px" oninput="doFindSeat()">
+      <div style="font-size:13px;color:#888;text-align:center;margin-bottom:18px">Type your <b>full name</b> exactly as on your invitation</div>
+      <input id="find-seat-input" class="finp" placeholder="Your full name…" style="font-size:15px;padding:13px;margin-bottom:10px" onkeydown="if(event.key==='Enter')doFindSeat()">
+      <button onclick="doFindSeat()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:14px">Find my seat</button>
       <div id="find-seat-results"></div>`;
     document.getElementById('find-seat-input')?.focus();
   }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
 }
 
 window.doFindSeat=function(){
-  const q=(document.getElementById('find-seat-input')?.value||'').trim().toLowerCase();
+  const raw=(document.getElementById('find-seat-input')?.value||'').trim();
+  const q=raw.toLowerCase();
   const box=document.getElementById('find-seat-results');
   if(!box)return;
   if(q.length<2){box.innerHTML='';return;}
   const plan=window._findSeatPlan;
+  // EXACT full-name match only (privacy: no partial fishing, can't browse the guest list)
   const hits=[];
-  plan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.name.toLowerCase().includes(q))hits.push({name:g.name,table:t.name,seat:si+1});}));
-  if(hits.length===0){box.innerHTML=`<div style="text-align:center;padding:24px 0;color:#bbb;font-size:14px">No match yet — keep typing, or check with the host.</div>`;return;}
-  box.innerHTML=hits.slice(0,8).map(h=>`<div style="background:#E8F3EF;border:1px solid #B7E0D2;border-radius:14px;padding:16px;margin-bottom:10px;text-align:center">
-    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:6px">${h.name}</div>
-    <div style="font-size:26px;font-weight:800;color:#1D9E75">${h.table}</div>
-    <div style="font-size:13px;color:#888;margin-top:2px">Seat ${h.seat}</div>
+  plan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.name.trim().toLowerCase()===q)hits.push({name:g.name,table:t.name,seat:si+1});}));
+  if(hits.length===0){box.innerHTML=`<div style="text-align:center;padding:24px 0;color:#bbb;font-size:14px">No exact match found.<br>Type your <b>full name</b> exactly as on your invitation, or check with the host.</div>`;return;}
+  box.innerHTML=hits.map(h=>`<div style="background:#E8F3EF;border:1px solid #B7E0D2;border-radius:14px;padding:20px 16px;margin-bottom:10px;text-align:center">
+    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:8px">${h.name}</div>
+    <div style="font-size:30px;font-weight:800;color:#1D9E75">${h.table}</div>
+    <div style="font-size:14px;color:#888;margin-top:4px">Seat ${h.seat}</div>
   </div>`).join('');
 };
 
