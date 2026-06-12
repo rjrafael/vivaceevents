@@ -10499,10 +10499,12 @@ function organizerHTML(){
           +'<div style="font-size:12px;color:#888;margin-top:2px">📅 '+e.date+' · 📍 '+(e.venue||'TBD')+'</div></div>'
           +'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:'+(e.status==='upcoming'?'#E1F5EE':'#f0f0f0')+';color:'+(e.status==='upcoming'?'#1D9E75':'#888')+';font-weight:600">'+(e.status==='upcoming'?'Upcoming':'Past')+'</span>'
           +'</div>'
-          +'<div style="display:flex;gap:8px">'
+          +'<div style="display:flex;gap:8px;margin-bottom:8px">'
           +'<button onclick="go(&quot;discover&quot;)" style="flex:1;background:#1D9E75;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#127925; Find Musicians</button>'
           +'<button onclick="manageGuests(&quot;'+e.id+'&quot;,&quot;'+(e.title||'').replace(/"/g,'&quot;').replace(/'/g,"\\'")+'&quot;)" style="flex:1;background:#0C447C;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#128101; Manage Guests</button>'
-          +'</div></div>';
+          +'</div>'
+          +'<button onclick="openSeating(&quot;'+e.id+'&quot;,&quot;'+(e.title||'').replace(/"/g,'&quot;').replace(/'/g,"\\'")+'&quot;)" style="width:100%;background:#BA7517;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#129681; Seating Floor Plan</button>'
+          +'</div>';
       }).join('');
   return '<div class="hdr"><div class="logo" style="font-size:15px">🎪 My Events</div>'
     +'<button onclick="showCreateEvent()" style="background:#1D9E75;color:#fff;border:none;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ New Event</button></div>'
@@ -10662,6 +10664,232 @@ window.removeGuest=async function(guestId,eventId,name){
     ts('Guest removed');
     manageGuests(eventId,'');
   }catch(e){ts('Could not remove');}
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 🪑 GUEST SEATING FLOOR PLAN (Event Production Suite — Organizers)
+// Visual table layout: shapes, seats, click-to-assign guests, stats.
+// Saves to event_seating collection (one doc per event).
+// ═══════════════════════════════════════════════════════════════
+window._seating=null;        // current seating data {tables:[], unassigned:[]}
+window._seatingEventId=null;
+window._seatingPickTable=null; // table id awaiting a guest pick
+
+const SEAT_TABLE_COLORS=['#1D9E75','#0C447C','#BA7517','#9C4DCC','#E24B4A','#0F9AA8','#C9A84C','#5B8C2A'];
+
+window.openSeating=async function(eventId,eventTitle){
+  document.getElementById('seating-modal')?.remove();
+  window._seatingEventId=eventId;
+  // Load saved seating, or build fresh from event guests
+  let data=null;
+  try{
+    const s=await getDocs(query(collection(db,'event_seating'),where('eventId','==',eventId),where('organizerId','==',CU.uid)));
+    if(!s.empty){data=s.docs[0].data().plan; window._seatingDocId=s.docs[0].id;}
+  }catch(e){}
+  if(!data){
+    // seed unassigned from existing event guests
+    let guests=[];
+    try{
+      const g=await getDocs(query(collection(db,'event_guests'),where('eventId','==',eventId),where('organizerId','==',CU.uid)));
+      guests=g.docs.map(d=>({name:(d.data().guestName||d.data().guestEmail?.split('@')[0]||'Guest')}));
+    }catch(e){}
+    data={tables:[],unassigned:guests.map((g,i)=>({id:'g'+Date.now()+i,name:g.name}))};
+    window._seatingDocId=null;
+  }
+  window._seating=data;
+  window._seatingTitle=eventTitle||'Event';
+  renderSeating();
+};
+
+function seatingStats(){
+  const d=window._seating;
+  const tables=d.tables.length;
+  const totalSeats=d.tables.reduce((s,t)=>s+t.seats,0);
+  const assigned=d.tables.reduce((s,t)=>s+t.guests.filter(Boolean).length,0);
+  const unassigned=d.unassigned.length;
+  return {tables,totalSeats,assigned,unassigned};
+}
+
+function tableShapeSVG(t,idx){
+  // Returns an SVG block representing one table with its seats around it
+  const color=t.color||SEAT_TABLE_COLORS[idx%SEAT_TABLE_COLORS.length];
+  const filled=t.guests.filter(Boolean).length;
+  let inner='';
+  const W=150,H=150,cx=W/2,cy=H/2;
+  // draw seats around shape
+  const n=t.seats;
+  for(let i=0;i<n;i++){
+    const ang=(i/n)*2*Math.PI - Math.PI/2;
+    const rx=t.shape==='rectangle'?64:52, ry=t.shape==='rectangle'?40:52;
+    const sx=cx+Math.cos(ang)*(rx+12), sy=cy+Math.sin(ang)*(ry+12);
+    const g=t.guests[i];
+    const seatColor=g?color:'#e5e5e5';
+    const initials=g?g.name.substring(0,2).toUpperCase():'';
+    inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
+      <circle cx="${sx}" cy="${sy}" r="11" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
+      ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${initials}</text>`:''}
+    </g>`;
+  }
+  // table shape
+  let shape='';
+  if(t.shape==='round') shape=`<circle cx="${cx}" cy="${cy}" r="40" fill="${color}22" stroke="${color}" stroke-width="2"></circle>`;
+  else if(t.shape==='square') shape=`<rect x="${cx-38}" y="${cy-38}" width="76" height="76" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
+  else shape=`<rect x="${cx-56}" y="${cy-32}" width="112" height="64" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
+  return `<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:8px;text-align:center">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:160px;height:auto">${shape}
+      <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="13" font-weight="800" fill="${color}">${t.name}</text>
+      <text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="9" fill="#999">${filled}/${t.seats}</text>
+      ${inner}</svg>
+    <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
+      <button onclick="renameTable(${idx})" style="background:#f0f0f0;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">✏️</button>
+      <button onclick="deleteTable(${idx})" style="background:#FEF2F2;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#E24B4A;font-family:inherit">🗑️</button>
+    </div></div>`;
+}
+
+function renderSeating(){
+  document.getElementById('seating-modal')?.remove();
+  const d=window._seating, st=seatingStats();
+  const m=document.createElement('div');m.className='modal-bg';m.id='seating-modal';
+  const tablesHTML = d.tables.length===0
+    ? `<div style="text-align:center;padding:30px 10px;color:#aaa"><div style="font-size:40px;margin-bottom:10px">🪑</div><div style="font-size:14px;font-weight:600;color:#888;margin-bottom:4px">No tables yet</div><div style="font-size:12px">Add your first table below.</div></div>`
+    : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">${d.tables.map((t,i)=>tableShapeSVG(t,i)).join('')}</div>`;
+  const unassignedHTML = d.unassigned.length===0
+    ? `<div style="font-size:12px;color:#aaa;text-align:center;padding:10px">All guests seated 🎉</div>`
+    : d.unassigned.map((g,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #ddd;border-radius:20px;padding:5px 10px;margin:0 5px 6px 0;font-size:12px">
+        <span style="font-weight:600;color:#111">${g.name}</span>
+        <span onclick="seatRemoveGuest(${i})" style="color:#F09595;cursor:pointer;font-weight:700">✕</span></span>`).join('');
+
+  m.innerHTML=`<div class="modal" style="max-width:480px;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🪑 Seating — ${window._seatingTitle}</div>
+      <button onclick="document.getElementById('seating-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Lay out tables, then tap a seat to assign a guest.</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+      <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#1D9E75">${st.tables}</div><div style="font-size:10px;color:#888">tables</div></div>
+      <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#0C447C">${st.totalSeats}</div><div style="font-size:10px;color:#888">seats</div></div>
+      <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#BA7517">${st.assigned}</div><div style="font-size:10px;color:#888">seated</div></div>
+      <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#E24B4A">${st.unassigned}</div><div style="font-size:10px;color:#888">waiting</div></div>
+    </div>
+
+    ${tablesHTML}
+
+    <div style="background:#F7FBF9;border:1px solid #B7E0D2;border-radius:12px;padding:12px;margin:12px 0">
+      <div style="font-size:12px;font-weight:700;color:#0F6E56;margin-bottom:8px">➕ Add a table</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <select id="seat-shape" class="finp" style="flex:1;font-size:12px"><option value="round">⭕ Round</option><option value="square">⬛ Square</option><option value="rectangle">▬ Rectangle</option></select>
+        <select id="seat-count" class="finp" style="width:90px;font-size:12px">${[2,4,6,8,10,12].map(n=>`<option value="${n}"${n===8?' selected':''}>${n} seats</option>`).join('')}</select>
+      </div>
+      <button onclick="addTable()" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:600">Add table</button>
+    </div>
+
+    <div style="background:#FFFDF5;border:1px solid #E8D69A;border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#9c7a1e;margin-bottom:6px">👥 Guests waiting to be seated — ${d.unassigned.length}</div>
+      <div style="margin-bottom:10px">${unassignedHTML}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:4px">Add guests (one per line, or comma-separated):</div>
+      <textarea id="seat-add-guests" class="finp" rows="2" placeholder="Jane Smith&#10;Carlos Vega, Aisha Khan" style="resize:none;font-size:12px;margin-bottom:8px"></textarea>
+      <button onclick="addSeatGuests()" class="bg" style="width:100%;padding:10px;font-size:12px;font-weight:600">+ Add guests to waiting list</button>
+    </div>
+
+    <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700">💾 Save seating plan</button>
+  </div>`;
+  document.getElementById('app').appendChild(m);
+};
+
+window.addTable=function(){
+  const shape=document.getElementById('seat-shape').value;
+  const seats=parseInt(document.getElementById('seat-count').value,10);
+  const d=window._seating;
+  const num=d.tables.length+1;
+  d.tables.push({name:'Table '+num,shape:shape,seats:seats,guests:new Array(seats).fill(null),color:SEAT_TABLE_COLORS[d.tables.length%SEAT_TABLE_COLORS.length]});
+  renderSeating();
+};
+
+window.deleteTable=function(idx){
+  const d=window._seating, t=d.tables[idx];
+  if(!confirm('Delete '+t.name+'? Seated guests go back to the waiting list.'))return;
+  // return seated guests to unassigned
+  t.guests.filter(Boolean).forEach(g=>d.unassigned.push(g));
+  d.tables.splice(idx,1);
+  renderSeating();
+};
+
+window.renameTable=function(idx){
+  const d=window._seating, t=d.tables[idx];
+  const nm=prompt('Table name:',t.name);
+  if(nm&&nm.trim()){t.name=nm.trim();renderSeating();}
+};
+
+window.seatClick=function(tableIdx,seatIdx){
+  const d=window._seating, t=d.tables[tableIdx];
+  const occupant=t.guests[seatIdx];
+  if(occupant){
+    // remove this guest back to waiting list
+    if(confirm('Remove '+occupant.name+' from this seat?')){
+      d.unassigned.push(occupant);
+      t.guests[seatIdx]=null;
+      renderSeating();
+    }
+    return;
+  }
+  // empty seat → pick a guest to assign
+  if(d.unassigned.length===0){ts('No guests waiting — add some below first');return;}
+  showSeatPicker(tableIdx,seatIdx);
+};
+
+function showSeatPicker(tableIdx,seatIdx){
+  const d=window._seating;
+  document.getElementById('seat-picker')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-picker';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:340px;max-height:70vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Seat at ${d.tables[tableIdx].name}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Pick a guest for this seat:</div>
+    ${d.unassigned.map((g,i)=>`<button onclick="assignSeat(${tableIdx},${seatIdx},${i})" style="width:100%;text-align:left;background:#f7faf9;border:1px solid #eee;border-radius:9px;padding:11px;margin-bottom:6px;font-size:13px;font-weight:600;color:#111;cursor:pointer;font-family:inherit">${g.name}</button>`).join('')}
+    <button onclick="document.getElementById('seat-picker').remove()" class="bg" style="width:100%;padding:10px;font-size:12px;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+}
+
+window.assignSeat=function(tableIdx,seatIdx,guestIdx){
+  const d=window._seating;
+  const g=d.unassigned.splice(guestIdx,1)[0];
+  d.tables[tableIdx].guests[seatIdx]=g;
+  document.getElementById('seat-picker')?.remove();
+  renderSeating();
+};
+
+window.seatRemoveGuest=function(idx){
+  const d=window._seating;
+  d.unassigned.splice(idx,1);
+  renderSeating();
+};
+
+window.addSeatGuests=function(){
+  const raw=(document.getElementById('seat-add-guests')?.value||'').trim();
+  if(!raw){ts('Type at least one guest name');return;}
+  // split by newline OR comma
+  const names=raw.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+  const d=window._seating;
+  names.forEach((n,i)=>d.unassigned.push({id:'g'+Date.now()+i,name:n}));
+  ts(names.length+' guest'+(names.length>1?'s':'')+' added');
+  renderSeating();
+};
+
+window.saveSeating=async function(){
+  const btn=document.getElementById('seat-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  try{
+    const payload={eventId:window._seatingEventId,organizerId:CU.uid,plan:window._seating,updatedAt:new Date()};
+    if(window._seatingDocId){
+      await setDoc(doc(db,'event_seating',window._seatingDocId),payload,{merge:true});
+    }else{
+      const ref=await addDoc(collection(db,'event_seating'),payload);
+      window._seatingDocId=ref.id;
+    }
+    ts('🪑 Seating plan saved!');
+    if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}
+  }catch(e){console.error('saveSeating:',e);ts('Could not save: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}}
 };
 
 function dmcaHTML(){
