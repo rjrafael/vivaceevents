@@ -11525,6 +11525,7 @@ window.showSeatingQR=async function(){
     if(!ok){ts('Save failed — try again');return;}
   }
   const url='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId);
+  window._seatLinkUrl=url;
   const qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(url);
   document.getElementById('seat-qr')?.remove();
   const p=document.createElement('div');p.className='modal-bg';p.id='seat-qr';p.style.zIndex='10001';
@@ -11537,15 +11538,27 @@ window.showSeatingQR=async function(){
     <div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:16px;display:inline-block;margin-bottom:14px">
       <img src="${qrSrc}" alt="QR code" style="width:240px;height:240px;display:block" id="qr-img">
     </div>
-    <div style="font-size:11px;color:#aaa;word-break:break-all;margin-bottom:14px">${url}</div>
-    <button onclick="copySeatLink('${url}')" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">🔗 Copy guest link</button>
-    <button onclick="printSeatingQR('${qrSrc}','${url}')" style="width:100%;padding:12px;font-size:13px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print the QR poster</button>
+    <div style="font-size:11px;color:#888;word-break:break-all;margin-bottom:14px;background:#f7f7f7;padding:8px;border-radius:8px;user-select:all">${url}</div>
+    <button onclick="copySeatLink(window._seatLinkUrl)" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">🔗 Copy guest link</button>
+    <button onclick="printSeatingQR(document.getElementById('qr-img').src,window._seatLinkUrl)" style="width:100%;padding:12px;font-size:13px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print the QR poster</button>
   </div>`;
   document.getElementById('app').appendChild(p);
 };
 
 window.copySeatLink=function(url){
-  navigator.clipboard?.writeText(url).then(()=>ts('🔗 Link copied!')).catch(()=>ts('Copy failed — long-press the link'));
+  function fallback(){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=url;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.focus();ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      ts(ok?'🔗 Link copied!':'Tap the link to copy it manually');
+    }catch(e){ts('Tap and hold the link to copy');}
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>ts('🔗 Link copied!')).catch(fallback);
+  }else{fallback();}
 };
 
 window.printSeatingQR=function(qrSrc,url){
