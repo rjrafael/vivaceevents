@@ -10685,6 +10685,28 @@ window._seatingPickTable=null; // table id awaiting a guest pick
 
 const SEAT_TABLE_COLORS=['#1D9E75','#0C447C','#BA7517','#9C4DCC','#E24B4A','#0F9AA8','#C9A84C','#5B8C2A'];
 
+// Guest groups (color-coded tags — a guest can have MULTIPLE)
+const SEAT_GROUPS=[
+  {id:'special',label:'Special Guest',color:'#E8419B'},
+  {id:'vip',label:'VIP',color:'#C9A84C'},
+  {id:'speaker',label:'Speaker',color:'#9C4DCC'},
+  {id:'sponsor',label:'Sponsor',color:'#0C447C'},
+  {id:'family',label:'Family',color:'#E24B4A'},
+  {id:'staff',label:'Staff',color:'#0F9AA8'},
+  {id:'press',label:'Press',color:'#BA7517'}
+];
+function groupById(gid){return allGroups().find(x=>x.id===gid);}
+// All groups = built-in SEAT_GROUPS + custom tags saved in this event's plan
+function allGroups(){
+  const custom=(window._seating&&window._seating.customTags)||[];
+  return SEAT_GROUPS.concat(custom);
+}
+// palette for new custom tags (cycles)
+const CUSTOM_TAG_COLORS=['#16A085','#D35400','#2980B9','#8E44AD','#C0392B','#27AE60','#E67E22','#2C3E50','#16A085','#7F8C8D'];
+function hexToRgb(hex){const h=hex.replace('#','');return [parseInt(h.substring(0,2),16),parseInt(h.substring(2,4),16),parseInt(h.substring(4,6),16)];}
+// Normalize: a guest's groups can be a single string (old) or an array (new)
+function guestGroups(g){if(!g)return [];if(Array.isArray(g.groups))return g.groups;if(g.group)return [g.group];return [];}
+
 window.openSeating=async function(eventId,eventTitle){
   document.getElementById('seating-modal')?.remove();
   window._seatingEventId=eventId;
@@ -10744,8 +10766,13 @@ function tableShapeSVG(t,idx){
     const g=t.guests[i];
     const seatColor=g?(g.locked?'#C9A84C':color):'#e5e5e5';
     const initials=g?smartInitials(g.name):'';
+    const grps=guestGroups(g).map(gid=>groupById(gid)).filter(Boolean);
+    let rings='';
+    grps.forEach((grp,ri)=>{rings+=`<circle cx="${sx}" cy="${sy}" r="${14.5+ri*2.5}" fill="none" stroke="${grp.color}" stroke-width="2.2"></circle>`;});
+    const tip=g?(g.name+(grps.length?' · '+grps.map(x=>x.label).join(', '):'')+(g.locked?' 🔒':'')):'';
     inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
-      ${g?`<title>${g.name}${g.locked?' 🔒':''}</title>`:''}
+      ${g?`<title>${tip}</title>`:''}
+      ${rings}
       <circle cx="${sx}" cy="${sy}" r="12" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
       ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">${initials}</text>`:''}
       ${g&&g.locked?`<text x="${sx+9}" y="${sy-7}" font-size="9">🔒</text>`:''}
@@ -10798,6 +10825,8 @@ function renderSeating(){
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#BA7517">${st.assigned}</div><div style="font-size:10px;color:#888">seated</div></div>
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#E24B4A">${st.unassigned}</div><div style="font-size:10px;color:#888">waiting</div></div>
     </div>
+
+    ${(()=>{const used=new Set();d.tables.forEach(t=>t.guests.forEach(g=>{guestGroups(g).forEach(gid=>used.add(gid));}));if(used.size===0)return '';const chips=allGroups().filter(grp=>used.has(grp.id)).map(grp=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#555;margin-right:10px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid ${grp.color}"></span>${grp.label}</span>`).join('');return `<div style="background:#fafafa;border-radius:9px;padding:8px 10px;margin-bottom:12px">${chips}</div>`;})()}
 
     ${tablesHTML}
 
@@ -10990,10 +11019,12 @@ function showSeatActions(tableIdx,seatIdx){
       <div style="width:46px;height:46px;border-radius:50%;background:${t.color};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin-bottom:8px">${smartInitials(g.name)}</div>
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;text-align:center">${g.name} ${locked?'🔒':''}</div>
-    <div style="font-size:12px;color:#888;text-align:center;margin-bottom:16px">${t.name} · Seat ${seatIdx+1}</div>
+    <div style="font-size:12px;color:#888;text-align:center;margin-bottom:${guestGroups(g).length?'8':'16'}px">${t.name} · Seat ${seatIdx+1}</div>
+    ${guestGroups(g).length?`<div style="text-align:center;margin-bottom:14px">${guestGroups(g).map(gid=>{const grp=groupById(gid);return grp?`<span style="display:inline-block;background:${grp.color};color:#fff;font-size:11px;font-weight:600;padding:3px 12px;border-radius:20px;margin:0 3px 4px 0">${grp.label}</span>`:'';}).join('')}</div>`:''}
     ${locked?`<div style="background:#FFF8E6;border:1px solid #F0D98A;border-radius:9px;padding:9px;font-size:12px;color:#8a6d1a;text-align:center;margin-bottom:12px">🔒 This seat is locked. Unlock it to move or swap.</div>`:''}
     <button onclick="seatMove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E8F3EF'};color:${locked?'#bbb':'#0F6E56'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">↔️ Move to another seat</button>
     <button onclick="seatSwap(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E9EFF7'};color:${locked?'#bbb':'#0C447C'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">🔄 Swap with another guest</button>
+    <button onclick="seatSetGroup(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#F3EEF9;color:#7B3FBF;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">🏷️ ${guestGroups(g).length?'Edit tags':'Add tags'}</button>
     <button onclick="seatToggleLock(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#FFF8E6;color:#9c7a1e;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">${locked?'🔓 Unlock seat':'🔒 Lock this seat'}</button>
     <button onclick="seatRemove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#FEF2F2'};color:${locked?'#bbb':'#E24B4A'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:10px">↩️ Remove from seat (to waiting)</button>
     <button onclick="document.getElementById('seat-actions').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Cancel</button>
@@ -11009,6 +11040,94 @@ window.seatToggleLock=function(tableIdx,seatIdx){
   renderSeating();
   ts(g.locked?'🔒 Seat locked':'🔓 Seat unlocked');
 };
+
+window.seatSetGroup=function(tableIdx,seatIdx){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  document.getElementById('seat-actions')?.remove();
+  renderGroupPicker(tableIdx,seatIdx);
+};
+
+function renderGroupPicker(tableIdx,seatIdx){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  const current=guestGroups(g);
+  document.getElementById('seat-group-pick')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-group-pick';p.style.zIndex='10001';
+  const custom=(window._seating.customTags)||[];
+  const builtinOpts=SEAT_GROUPS.map(grp=>groupRow(grp,current.includes(grp.id),tableIdx,seatIdx,false)).join('');
+  const customOpts=custom.map(grp=>groupRow(grp,current.includes(grp.id),tableIdx,seatIdx,true)).join('');
+  p.innerHTML=`<div class="modal" style="max-width:330px;max-height:82vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Tags for ${g.name}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Tap to add/remove. A guest can have several (e.g. Special Guest + Donor):</div>
+    ${builtinOpts}
+    ${customOpts?`<div style="font-size:11px;font-weight:700;color:#999;margin:10px 0 6px">YOUR CUSTOM TAGS</div>${customOpts}`:''}
+    <div style="background:#f7faf9;border:1px dashed #ccc;border-radius:9px;padding:10px;margin:10px 0 6px">
+      <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:6px">➕ Create a custom tag</div>
+      <div style="display:flex;gap:6px">
+        <input id="new-tag-name" class="finp" placeholder="e.g. Musician, Donor, Dancer" style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter')addCustomTag(${tableIdx},${seatIdx})">
+        <button onclick="addCustomTag(${tableIdx},${seatIdx})" class="bt" style="padding:8px 12px;font-size:12px">Add</button>
+      </div>
+    </div>
+    <button onclick="document.getElementById('seat-group-pick').remove();showSeatActions(${tableIdx},${seatIdx})" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-top:6px">Done</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+}
+
+function groupRow(grp,on,tableIdx,seatIdx,isCustom){
+  return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+    <button onclick="toggleSeatGroup(${tableIdx},${seatIdx},'${grp.id}')" style="display:flex;align-items:center;gap:10px;flex:1;text-align:left;background:${on?grp.color+'18':'#f7faf9'};border:2px solid ${on?grp.color:'#eee'};border-radius:9px;padding:11px;font-size:13px;font-weight:600;color:#111;cursor:pointer;font-family:inherit">
+      <span style="width:16px;height:16px;border-radius:50%;background:${grp.color};flex-shrink:0"></span>
+      <span style="flex:1">${grp.label}</span>
+      ${on?`<span style="color:${grp.color};font-weight:700">✓</span>`:''}</button>
+    ${isCustom?`<button onclick="deleteCustomTag('${grp.id}',${tableIdx},${seatIdx})" title="Delete tag" style="background:#FEF2F2;border:none;border-radius:8px;padding:9px 10px;font-size:13px;color:#E24B4A;cursor:pointer;font-family:inherit">🗑️</button>`:''}
+  </div>`;
+}
+
+window.addCustomTag=function(tableIdx,seatIdx){
+  const inp=document.getElementById('new-tag-name');
+  const name=(inp?.value||'').trim();
+  if(!name){ts('Type a tag name');return;}
+  if(!window._seating.customTags)window._seating.customTags=[];
+  // avoid duplicate label
+  const exists=allGroups().find(x=>x.label.toLowerCase()===name.toLowerCase());
+  if(exists){ts('That tag already exists');return;}
+  const id='cust_'+Date.now();
+  const color=CUSTOM_TAG_COLORS[window._seating.customTags.length%CUSTOM_TAG_COLORS.length];
+  window._seating.customTags.push({id,label:name,color});
+  window._seatingDirty=true;
+  renderGroupPicker(tableIdx,seatIdx);
+  ts('🏷️ Custom tag "'+name+'" created');
+};
+
+window.deleteCustomTag=function(tagId,tableIdx,seatIdx){
+  if(!confirm('Delete this custom tag? It will be removed from any guests who have it.'))return;
+  // remove from customTags
+  window._seating.customTags=(window._seating.customTags||[]).filter(t=>t.id!==tagId);
+  // remove from all guests
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&Array.isArray(g.groups)){g.groups=g.groups.filter(x=>x!==tagId);if(!g.groups.length)delete g.groups;}}));
+  window._seatingDirty=true;
+  renderGroupPicker(tableIdx,seatIdx);
+  renderSeatingSilent();
+  ts('Tag deleted');
+};
+
+window.toggleSeatGroup=function(tableIdx,seatIdx,groupId){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  let arr=guestGroups(g).slice();
+  if(arr.includes(groupId)){arr=arr.filter(x=>x!==groupId);}else{arr.push(groupId);}
+  if(arr.length){g.groups=arr;}else{delete g.groups;}
+  delete g.group; // migrate away from old single-group field
+  window._seatingDirty=true;
+  renderGroupPicker(tableIdx,seatIdx); // re-render picker with updated state
+  renderSeatingSilent(); // update chart behind
+};
+
+// re-render the chart without closing the picker
+function renderSeatingSilent(){
+  // just re-render; the picker is re-appended on top by renderGroupPicker
+  const open=document.getElementById('seat-group-pick');
+  renderSeating();
+  if(open){document.getElementById('app').appendChild(open);}
+}
 
 window.seatRemove=function(tableIdx,seatIdx){
   const d=window._seating, t=d.tables[tableIdx], g=t.guests[seatIdx];
@@ -11179,6 +11298,17 @@ window.openSeatingPrint=function(){
       <span style="flex:1">${t.name}</span>
       <span style="font-size:11px;color:#999">${t.guests.filter(Boolean).length}/${t.seats}</span>
     </label>`).join('');
+  // tags actually in use, for the by-tag filter
+  const usedTags=new Set();d.tables.forEach(t=>t.guests.forEach(g=>{guestGroups(g).forEach(gid=>usedTags.add(gid));}));
+  const tagChecks=allGroups().filter(grp=>usedTags.has(grp.id)).map(grp=>{
+    const count=(()=>{let c=0;d.tables.forEach(t=>t.guests.forEach(g=>{if(guestGroups(g).includes(grp.id))c++;}));return c;})();
+    return `<label style="display:flex;align-items:center;gap:8px;padding:7px 4px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f5f5">
+      <input type="checkbox" class="print-tag" value="${grp.id}" checked style="width:16px;height:16px;accent-color:#1D9E75">
+      <span style="width:13px;height:13px;border-radius:50%;background:${grp.color};flex-shrink:0"></span>
+      <span style="flex:1">${grp.label}</span>
+      <span style="font-size:11px;color:#999">${count}</span>
+    </label>`;
+  }).join('') || '<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No tagged guests yet</div>';
   p.innerHTML=`<div class="modal" style="max-width:380px;max-height:88vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div style="font-size:17px;font-weight:700;color:#111">🖨️ Print / Export</div>
@@ -11188,10 +11318,12 @@ window.openSeatingPrint=function(){
 
     <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px">1. Format</div>
     <div style="display:flex;gap:6px;margin-bottom:14px">
-      <label style="flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF" id="fmt-visual-lbl">
-        <input type="radio" name="print-fmt" value="visual" checked style="display:none" onchange="seatPrintFmtUI()">🪑 Visual layout</label>
-      <label style="flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600" id="fmt-list-lbl">
-        <input type="radio" name="print-fmt" value="list" style="display:none" onchange="seatPrintFmtUI()">📋 Name list</label>
+      <label style="flex:1;text-align:center;padding:9px 4px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:11px;font-weight:600;background:#E8F3EF" id="fmt-visual-lbl">
+        <input type="radio" name="print-fmt" value="visual" checked style="display:none" onchange="seatPrintFmtUI()">🪑 Visual</label>
+      <label style="flex:1;text-align:center;padding:9px 4px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:11px;font-weight:600" id="fmt-list-lbl">
+        <input type="radio" name="print-fmt" value="list" style="display:none" onchange="seatPrintFmtUI()">📋 By table</label>
+      <label style="flex:1;text-align:center;padding:9px 4px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:11px;font-weight:600" id="fmt-tag-lbl">
+        <input type="radio" name="print-fmt" value="tag" style="display:none" onchange="seatPrintFmtUI()">🏷️ By tag</label>
     </div>
 
     <div id="print-names-opt" style="margin-bottom:14px">
@@ -11202,11 +11334,18 @@ window.openSeatingPrint=function(){
       </label>
     </div>
 
-    <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px;display:flex;justify-content:space-between">
-      <span>3. Which tables</span>
-      <span style="font-weight:400;color:#1D9E75;cursor:pointer" onclick="seatPrintToggleAll()">Select all / none</span>
+    <div id="print-tables-sec">
+      <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px;display:flex;justify-content:space-between">
+        <span>3. Which tables</span>
+        <span style="font-weight:400;color:#1D9E75;cursor:pointer" onclick="seatPrintToggleAll()">Select all / none</span>
+      </div>
+      <div style="border:1px solid #eee;border-radius:9px;padding:4px 10px;margin-bottom:16px;max-height:180px;overflow-y:auto">${tableChecks}</div>
     </div>
-    <div style="border:1px solid #eee;border-radius:9px;padding:4px 10px;margin-bottom:16px;max-height:180px;overflow-y:auto">${tableChecks}</div>
+
+    <div id="print-tags-sec" style="display:none">
+      <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px">3. Which tags</div>
+      <div style="border:1px solid #eee;border-radius:9px;padding:4px 10px;margin-bottom:16px;max-height:200px;overflow-y:auto">${tagChecks}</div>
+    </div>
 
     <button onclick="generateSeatingPDF()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C">📄 Create PDF — print or save</button>
   </div>`;
@@ -11215,10 +11354,16 @@ window.openSeatingPrint=function(){
 
 window.seatPrintFmtUI=function(){
   const fmt=document.querySelector('input[name="print-fmt"]:checked').value;
-  document.getElementById('fmt-visual-lbl').style.cssText=fmt==='visual'?'flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF':'flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600';
-  document.getElementById('fmt-list-lbl').style.cssText=fmt==='list'?'flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF':'flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600';
+  const sel='flex:1;text-align:center;padding:9px 4px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:11px;font-weight:600;background:#E8F3EF';
+  const unsel='flex:1;text-align:center;padding:9px 4px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:11px;font-weight:600';
+  document.getElementById('fmt-visual-lbl').style.cssText=fmt==='visual'?sel:unsel;
+  document.getElementById('fmt-list-lbl').style.cssText=fmt==='list'?sel:unsel;
+  document.getElementById('fmt-tag-lbl').style.cssText=fmt==='tag'?sel:unsel;
   // names option only relevant for visual
   document.getElementById('print-names-opt').style.opacity=fmt==='visual'?'1':'0.4';
+  // toggle table-picker vs tag-picker
+  document.getElementById('print-tables-sec').style.display=(fmt==='tag')?'none':'block';
+  document.getElementById('print-tags-sec').style.display=(fmt==='tag')?'block':'none';
 };
 
 window.seatPrintToggleAll=function(){
@@ -11232,7 +11377,9 @@ window.generateSeatingPDF=function(){
   const fmt=document.querySelector('input[name="print-fmt"]:checked').value;
   const withNames=document.getElementById('print-with-names').checked;
   const picked=Array.from(document.querySelectorAll('.print-tbl:checked')).map(b=>parseInt(b.value,10));
-  if(picked.length===0){ts('Pick at least one table');return;}
+  const pickedTags=Array.from(document.querySelectorAll('.print-tag:checked')).map(b=>b.value);
+  if(fmt==='tag'){ if(pickedTags.length===0){ts('Pick at least one tag');return;} }
+  else if(picked.length===0){ts('Pick at least one table');return;}
   try{
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
@@ -11247,7 +11394,25 @@ window.generateSeatingPDF=function(){
     pdf.text('Generated '+new Date().toLocaleDateString(),M,36);
     let y=46;
 
-    if(fmt==='list'){
+    if(fmt==='tag'){
+      // ── BY TAG format: a section per tag listing its guests ──
+      pickedTags.forEach(tagId=>{
+        const grp=groupById(tagId);if(!grp)return;
+        // gather all guests with this tag, with their table+seat
+        const rows=[];
+        d.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&guestGroups(g).includes(tagId))rows.push({name:g.name,table:t.name,seat:si+1});}));
+        if(y>262){pdf.addPage();y=20;}
+        // colored heading bar
+        const rgb=hexToRgb(grp.color);
+        pdf.setFillColor(rgb[0],rgb[1],rgb[2]);pdf.roundedRect(M,y-5,W-M*2,9,1.5,1.5,'F');
+        pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(255,255,255);
+        pdf.text(grp.label+'  ('+rows.length+')',M+3,y+1.5);y+=12;
+        pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(40,40,40);
+        if(rows.length===0){pdf.setTextColor(150,150,150);pdf.text('  (none)',M,y);y+=6;}
+        else rows.forEach(r=>{if(y>285){pdf.addPage();y=20;}pdf.text('  • '+r.name+'  —  '+r.table+', Seat '+r.seat,M,y);y+=5.5;});
+        y+=5;
+      });
+    }else if(fmt==='list'){
       // ── NAME LIST format ──
       picked.forEach(ti=>{
         const t=d.tables[ti];
@@ -11287,6 +11452,7 @@ window.generateSeatingPDF=function(){
           const sx=ccx+Math.cos(ang)*rx, sy=ccy+Math.sin(ang)*ry;
           const g=t.guests[i];
           if(g){pdf.setFillColor(g.locked?201:29,g.locked?168:158,g.locked?76:117);}else{pdf.setFillColor(220,220,220);}
+          if(g){guestGroups(g).forEach((gid,gi)=>{const grp=groupById(gid);if(grp){const rgb=hexToRgb(grp.color);pdf.setDrawColor(rgb[0],rgb[1],rgb[2]);pdf.setLineWidth(0.6);pdf.circle(sx,sy,4.2+gi*0.9,'S');}});pdf.setLineWidth(0.5);}
           pdf.circle(sx,sy,3.2,'F');
           if(g&&withNames){pdf.setFontSize(5);pdf.setTextColor(255,255,255);pdf.text(smartInitials(g.name),sx,sy+1,{align:'center'});}
         }
