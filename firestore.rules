@@ -245,17 +245,37 @@ service cloud.firestore {
         && resource.data.guestEmail == request.auth.token.email;
     }
 
-    // ─── EVENT SEATING (floor plans — organizer owns) ──────────
+    // ─── EVENT SEATING (full plan — has contacts + codes — PRIVATE, owner-only) ──
     match /event_seating/{seatingId} {
-      allow read: if true;
+      allow read: if signedIn() && resource.data.organizerId == request.auth.uid;
       allow create: if signedIn() && request.resource.data.organizerId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.organizerId == request.auth.uid;
     }
 
-    // ─── Event RSVP — guests (not logged in) write their own response ───
-    match /event_rsvp/{rsvpId} {
+    // ─── SEAT LOOKUP (public, minimal — one doc per guest code) ────────
+    // Holds ONLY {name, table, seat} so a guest with their code sees their own seat.
+    // No emails, no phones, no other guests, no full plan. Doc id = eventId_code (unguessable).
+    match /seat_lookup/{lookupId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update, delete: if signedIn() && request.resource.data.organizerId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.organizerId == request.auth.uid;
+    }
+
+    // ─── EVENT PUBLIC (public event details only — venue/time/parking) ──
+    // Same info you'd print on an invitation. No guest data.
+    match /event_public/{eventId} {
+      allow read: if true;
+      allow create, update: if signedIn() && request.resource.data.organizerId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.organizerId == request.auth.uid;
+    }
+
+    // ─── Event RSVP — guest writes/reads own response (by unguessable id); organizer reads all ──
+    // Single-doc read is public (needs exact eventId_code, which is unguessable) so a guest
+    // can see their prior answer. LIST/query reads require auth (only the organizer queries all).
+    match /event_rsvp/{rsvpId} {
+      allow get: if true;
+      allow list: if signedIn();
+      allow create, update: if rsvpId == (request.resource.data.eventId + '_' + request.resource.data.code);
       allow delete: if signedIn();
     }
 

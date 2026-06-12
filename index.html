@@ -10369,10 +10369,6 @@ async function loadFindSeat(){
   const body=document.getElementById('find-seat-body');
   if(!body)return;
   try{
-    const snap=await getDocs(query(collection(db,'event_seating'),where('eventId','==',window._findSeatEventId)));
-    if(snap.empty){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Seating not found.<br>Please check with the event host.</div>`;return;}
-    const data=snap.docs[0].data();
-    window._findSeatPlan=data.plan;
     const code=(window._findSeatCode||'').trim();
     if(!code){
       // No personal code → secure: cannot browse. Must use personal link.
@@ -10383,9 +10379,12 @@ async function loadFindSeat(){
       </div>`;
       return;
     }
-    // Find the guest whose code matches
+    // SECURE: read ONLY this guest's own tiny lookup doc (no access to the full plan, other guests, or contacts)
     let found=null;
-    window._findSeatPlan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.code===code)found={name:g.name,table:t.name,seat:si+1,code:g.code};}));
+    try{
+      const lk=await getDoc(doc(db,'seat_lookup',window._findSeatEventId+'_'+code));
+      if(lk.exists()){const d=lk.data();found={name:d.name,table:d.table,seat:d.seat,code:code};}
+    }catch(_){}
     if(!found){
       body.innerHTML=`<div style="text-align:center;padding:30px 6px">
         <div style="font-size:36px;margin-bottom:12px">🤔</div>
@@ -10394,7 +10393,9 @@ async function loadFindSeat(){
       </div>`;
       return;
     }
-    const dt=window._findSeatPlan.details||{};
+    // Event details come from a separate PUBLIC doc (safe info only — same as an invitation)
+    let dt={};
+    try{const ed=await getDoc(doc(db,'event_public',window._findSeatEventId));if(ed.exists())dt=ed.data().details||{};}catch(_){}
     function detailRow(icon,label,val){return val?`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:left"><span style="font-size:16px">${icon}</span><div><div style="font-size:11px;color:#999">${label}</div><div style="font-size:14px;color:#222;font-weight:600">${val}</div></div></div>`:'';}
     const mapLink=dt.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dt.address):'';
     const detailsBlock=(dt.venue||dt.address||dt.date||dt.time||dt.building||dt.dress||dt.parking||dt.notes)?`
@@ -11817,6 +11818,7 @@ window.saveSeating=async function(silent){
   const btn=document.getElementById('seat-save-btn');
   if(btn&&!silent){btn.disabled=true;btn.textContent='Saving...';}
   try{
+    // Full plan (with contacts + codes) stays PRIVATE — owner-only read
     const payload={eventId:window._seatingEventId,organizerId:CU.uid,plan:window._seating,updatedAt:new Date()};
     if(window._seatingDocId){
       await setDoc(doc(db,'event_seating',window._seatingDocId),payload,{merge:true});
@@ -11824,12 +11826,35 @@ window.saveSeating=async function(silent){
       const ref=await addDoc(collection(db,'event_seating'),payload);
       window._seatingDocId=ref.id;
     }
+    // Publish SAFE public docs for the guest page (no contacts, no other guests, no full plan)
+    await publishSeatLookup();
     if(!silent)ts('🪑 Seating plan saved!');
     window._seatingDirty=false;
     if(btn&&!silent){btn.disabled=false;btn.textContent='💾 Save seating plan';}
     return true;
   }catch(e){console.error('saveSeating:',e);if(!silent)ts('Could not save: '+e.message);if(btn&&!silent){btn.disabled=false;btn.textContent='💾 Save seating plan';}return false;}
 };
+
+// Publish the minimal PUBLIC docs the guest page reads:
+//  - seat_lookup/{eventId}_{code}: ONLY {name, table, seat, eventId} per guest (no email/phone, no other guests)
+//  - event_public/{eventId}: ONLY the event details (venue/time/parking — same info as an invitation)
+async function publishSeatLookup(){
+  const eid=window._seatingEventId;
+  try{
+    // event details (public, safe)
+    await setDoc(doc(db,'event_public',eid),{eventId:eid,organizerId:CU.uid,details:(window._seating.details||{}),updatedAt:new Date()},{merge:true});
+  }catch(e){console.error('event_public:',e);}
+  // one tiny lookup doc per seated guest with a code
+  const writes=[];
+  window._seating.tables.forEach(t=>t.guests.forEach((g,si)=>{
+    if(g&&g.code){
+      writes.push(setDoc(doc(db,'seat_lookup',eid+'_'+g.code),{
+        eventId:eid,organizerId:CU.uid,code:g.code,name:g.name,table:t.name,seat:si+1,updatedAt:new Date()
+      }));
+    }
+  }));
+  try{await Promise.all(writes);}catch(e){console.error('seat_lookup:',e);}
+}
 
 // ═══════════════════════════════════════════════════════════
 // 🖨️ PRINT / EXPORT PDF — choose tables + format + names
