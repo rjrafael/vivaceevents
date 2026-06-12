@@ -10731,6 +10731,7 @@ function tableShapeSVG(t,idx){
     const seatColor=g?(g.locked?'#C9A84C':color):'#e5e5e5';
     const initials=g?g.name.substring(0,2).toUpperCase():'';
     inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
+      ${g?`<title>${g.name}${g.locked?' 🔒':''}</title>`:''}
       <circle cx="${sx}" cy="${sy}" r="12" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
       ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">${initials}</text>`:''}
       ${g&&g.locked?`<text x="${sx+9}" y="${sy-7}" font-size="9">🔒</text>`:''}
@@ -10741,12 +10742,16 @@ function tableShapeSVG(t,idx){
   if(t.shape==='round') shape=`<circle cx="${cx}" cy="${cy}" r="38" fill="${color}22" stroke="${color}" stroke-width="2"></circle>`;
   else if(t.shape==='square') shape=`<rect x="${cx-36}" y="${cy-36}" width="72" height="72" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
   else shape=`<rect x="${cx-52}" y="${cy-30}" width="104" height="60" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
+  // compact full-name list of who's seated here
+  const seatedNames=t.guests.map((g,si)=>g?`<div onclick="seatClick(${idx},${si})" style="font-size:10px;color:#444;padding:2px 4px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:3px;text-align:left" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'"><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${g.locked?'#C9A84C':color};flex-shrink:0"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.name}${g.locked?' 🔒':''}</span></div>`:'').filter(Boolean).join('');
+  const namesBlock=seatedNames?`<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:5px;text-align:left">${seatedNames}</div>`:'';
   return `<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:6px;text-align:center;overflow:hidden">
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:170px;height:auto;display:block;margin:0 auto">${shape}
       <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="13" font-weight="800" fill="${color}">${t.name}</text>
       <text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="9" fill="#999">${filled}/${t.seats}</text>
       ${inner}</svg>
-    <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
+    ${namesBlock}
+    <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
       <button onclick="renameTable(${idx})" style="background:#f0f0f0;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">✏️</button>
       <button onclick="deleteTable(${idx})" style="background:#FEF2F2;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#E24B4A;font-family:inherit">🗑️</button>
     </div></div>`;
