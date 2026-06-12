@@ -9050,12 +9050,12 @@ window.selectPlan=async function(planId){
   if(planId===UP.plan){ts('This is your current plan');return;}
 
   const currentPlan=UP.plan||'free';
-  const planOrder=['free','pro','studio','agency','teacher_basic','teacher_pro','teacher_studio'];
+  const planOrder=['free','participant','pro','teacher_pro','studio','teacher_studio','event_organizer','agency','event_master'];
   const currentIdx=planOrder.indexOf(currentPlan);
   const newIdx=planOrder.indexOf(planId);
   const isUpgrade=newIdx>currentIdx;
-  const isDowngrade=newIdx<currentIdx&&planId!=='free';
-  const isFree=planId==='free';
+  const isDowngrade=newIdx<currentIdx&&planId!=='free'&&planId!=='participant';
+  const isFree=planId==='free'||planId==='participant';
 
   if(isFree){
     // Cancel subscription — downgrade to free at period end
@@ -9246,6 +9246,9 @@ const PRICE_IDS={
   teacher_pro:'price_1TgC3QR49hhPnbuaB8YUeaK4',
   teacher_studio:'price_1TgC7ER49hhPnbuaZu5LFZIt',
   verification:'price_1TgBLGR49hhPnbuatwgoTbTA',
+  participant:'free',
+  event_organizer:'price_1ThKOBR49hhPnbuaOzdcT4L4',
+  event_master:'price_1ThKQHR49hhPnbuaPQql5bE2',
 };
 const CF_URL='https://us-central1-vivaceevents-1a8ff.cloudfunctions.net/createCheckoutSession';
 
