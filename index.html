@@ -1264,7 +1264,7 @@ function authHTML(){return `
     <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px;font-size:10px;color:#085041;line-height:1.6">
       <strong>Vivace Events · Virtual Studio Orchestra LLC</strong><br>
       Terms version 1.0 · Last updated: June 2026<br>
-      Contact: rafael.javadov@gmail.com · vivaceevents.com
+      Contact: virtualstudioorchestra@gmail.com · vivaceevents.com
     </div>
 
     <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">
@@ -5124,7 +5124,7 @@ window.demoRespond=async function(type){
         // Notify manager
         try{
           await addDoc(collection(db,'notifications'),{
-            toEmail:'manager@vivaceevents.com',
+            toEmail:'virtualstudioorchestra@gmail.com',
             type:'response_changed',
             message:`⚠️ ${CU.email?.split('@')[0]||'A musician'} changed their response from "${_responseLabel(_currentDemoResponse)}" to "${_responseLabel(type)}" — less than 72 hours before the gig.`,
             read:false,timestamp:new Date()
@@ -8418,7 +8418,7 @@ ${organizerPlans.map(p=>`
   <div style="font-weight:600;color:#333;margin-bottom:8px">📋 Billing & Refund Policy</div>
   <p style="margin-bottom:6px"><strong>Auto-renewal:</strong> Your subscription renews monthly until cancelled. You authorize recurring charges to your payment method.</p>
   <p style="margin-bottom:6px"><strong>Cancellation:</strong> Cancel anytime using the "Cancel plan" button above. Access continues until end of billing period.</p>
-  <p style="margin-bottom:6px"><strong>No refunds:</strong> All fees are non-refundable. Exceptions only for verified billing errors — email support@vivaceevents.com within 30 days.</p>
+  <p style="margin-bottom:6px"><strong>No refunds:</strong> All fees are non-refundable. Exceptions only for verified billing errors — email virtualstudioorchestra@gmail.com within 30 days.</p>
   <p style="margin-bottom:6px"><strong>Free trial:</strong> Promotional trial terms (such as months of free access) are available to new members only, limited to one per person, and may be changed, limited, or withdrawn at any time at Vivace's discretion. Creating multiple accounts to obtain additional trials is prohibited.</p>
   <p style="margin-bottom:0"><strong>Your data:</strong> Profile, network and history kept forever — even on free plan. <span onclick="go('policy')" style="color:#1D9E75;cursor:pointer;text-decoration:underline">Read full policy →</span></p>
 </div>
@@ -8453,7 +8453,7 @@ window.confirmCancel=async function(){
       to:CU.email,
       message:{
         subject:'Your Vivace Events subscription has been cancelled',
-        html:'<div style="font-family:sans-serif;max-width:500px;margin:0 auto"><h2 style="color:#1D9E75">Subscription Cancelled</h2><p>Hi '+(UP.name||'there')+',</p><p>Your Vivace Events subscription has been cancelled. You will retain full access until the end of your current billing period.</p><p style="background:#E1F5EE;padding:12px;border-radius:8px;color:#085041"><strong>✅ Your data is safe.</strong> Your profile, network, contracts, and history are kept forever. You can resubscribe anytime and everything will be waiting for you.</p><p>Questions? Email <a href="mailto:support@vivaceevents.com">support@vivaceevents.com</a></p><p>— The Vivace Events Team 🎶</p></div>'
+        html:'<div style="font-family:sans-serif;max-width:500px;margin:0 auto"><h2 style="color:#1D9E75">Subscription Cancelled</h2><p>Hi '+(UP.name||'there')+',</p><p>Your Vivace Events subscription has been cancelled. You will retain full access until the end of your current billing period.</p><p style="background:#E1F5EE;padding:12px;border-radius:8px;color:#085041"><strong>✅ Your data is safe.</strong> Your profile, network, contracts, and history are kept forever. You can resubscribe anytime and everything will be waiting for you.</p><p>Questions? Email <a href="mailto:virtualstudioorchestra@gmail.com">virtualstudioorchestra@gmail.com</a></p><p>— The Vivace Events Team 🎶</p></div>'
       }
     });
     if(modal)modal.remove();
@@ -8466,7 +8466,7 @@ window.confirmCancel=async function(){
     },1500);
     await loadUP();render();
   }catch(e){
-    ts('Error: '+e.message+'. Email support@vivaceevents.com');
+    ts('Error: '+e.message+'. Email virtualstudioorchestra@gmail.com');
     btns.forEach(b=>{b.disabled=false;});
     if(btns[0])btns[0].textContent='Yes, cancel my subscription';
   }
@@ -10290,7 +10290,7 @@ window.toggleHolidayWishes=async function(){
 
 // Test greeting (for development)
 window.testGreeting=function(type){
-  const name=UP.name||CU?.displayName||'Rafael';
+  const name=UP.name||CU?.displayName||'there';
   showGreetingPopup(type,name);
 }
 window.toggleRole=async function(role){
@@ -10446,9 +10446,9 @@ function policyHTML(){
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:12px">3. Refund Policy</div>
     <div style="font-size:13px;color:#444;line-height:1.7">
       <p style="margin-bottom:10px"><strong>No refunds:</strong> All subscription fees are non-refundable. When you cancel, you retain access until the end of your current billing period. We do not offer prorated refunds for unused time.</p>
-      <p style="margin-bottom:10px"><strong>Billing errors:</strong> If you are charged incorrectly due to a technical error or duplicate charge, we will refund the erroneous charge promptly. Please contact support@vivaceevents.com within 30 days of the charge.</p>
+      <p style="margin-bottom:10px"><strong>Billing errors:</strong> If you are charged incorrectly due to a technical error or duplicate charge, we will refund the erroneous charge promptly. Please contact virtualstudioorchestra@gmail.com within 30 days of the charge.</p>
       <p style="margin-bottom:10px"><strong>Exceptions:</strong> Vivace Events reserves the right to issue credits or refunds at its sole discretion in exceptional circumstances.</p>
-      <p><strong>Chargebacks:</strong> If you initiate a chargeback without first contacting us, we reserve the right to suspend or terminate your account. Please always contact us first at support@vivaceevents.com.</p>
+      <p><strong>Chargebacks:</strong> If you initiate a chargeback without first contacting us, we reserve the right to suspend or terminate your account. Please always contact us first at virtualstudioorchestra@gmail.com.</p>
     </div>
   </div>
 
@@ -10461,7 +10461,7 @@ function policyHTML(){
       <p style="margin-bottom:10px"><strong>We never sell your data.</strong> Your personal information is never sold to third parties.</p>
       <p style="margin-bottom:10px"><strong>Data retention:</strong> Your data is kept indefinitely while your account is active. If you delete your account, your data is removed from our systems within 30 days.</p>
       <p style="margin-bottom:10px"><strong>Firebase / Google:</strong> Our platform uses Google Firebase for data storage and authentication. Data is stored on Google's secure servers.</p>
-      <p><strong>Contact:</strong> For privacy concerns, email support@vivaceevents.com</p>
+      <p><strong>Contact:</strong> For privacy concerns, email virtualstudioorchestra@gmail.com</p>
     </div>
   </div>
 
@@ -10471,7 +10471,7 @@ function policyHTML(){
     <div style="font-size:13px;color:#555;line-height:1.7">
       <p>Virtual Studio Orchestra LLC</p>
       <p>Washington, DC, United States</p>
-      <p>Email: <a href="mailto:support@vivaceevents.com" style="color:#1D9E75">support@vivaceevents.com</a></p>
+      <p>Email: <a href="mailto:virtualstudioorchestra@gmail.com" style="color:#1D9E75">virtualstudioorchestra@gmail.com</a></p>
       <p style="margin-top:8px;font-size:12px;color:#888">These policies were last updated June 2026. We recommend you review them periodically. Continued use of the platform constitutes acceptance of any updates.</p>
     </div>
   </div>
@@ -10684,7 +10684,7 @@ function dmcaHTML(){
     <div style="font-size:12px;color:#555;line-height:1.9">1. Your signature (electronic or physical)<br>2. Description of the copyrighted work<br>3. URL of the infringing content<br>4. Your contact information<br>5. Good faith belief statement<br>6. Accuracy statement under penalty of perjury</div>
     <div style="margin-top:12px;padding:12px;background:#E1F5EE;border-radius:10px">
       <div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:4px">DMCA Agent — Vivace Events LLC</div>
-      <div style="font-size:14px;color:#085041;font-weight:600">📧 dmca@vivaceevents.com</div>
+      <div style="font-size:14px;color:#085041;font-weight:600">📧 virtualstudioorchestra@gmail.com</div>
     </div>
   </div>
   <div class="card" style="margin-bottom:12px">
