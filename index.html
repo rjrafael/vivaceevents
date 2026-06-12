@@ -10385,7 +10385,7 @@ async function loadFindSeat(){
     }
     // Find the guest whose code matches
     let found=null;
-    window._findSeatPlan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.code===code)found={name:g.name,table:t.name,seat:si+1};}));
+    window._findSeatPlan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.code===code)found={name:g.name,table:t.name,seat:si+1,code:g.code};}));
     if(!found){
       body.innerHTML=`<div style="text-align:center;padding:30px 6px">
         <div style="font-size:36px;margin-bottom:12px">🤔</div>
@@ -10416,9 +10416,71 @@ async function loadFindSeat(){
         <div style="font-size:15px;color:#888;margin-top:8px">Seat ${found.seat}</div>
       </div>
       ${detailsBlock}
+      <div id="rsvp-section" style="background:#fff;border:1px solid #eee;border-radius:16px;padding:18px 16px;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:4px">Will you attend?</div>
+        <div style="font-size:12px;color:#888;margin-bottom:14px">Please let the host know</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <button onclick="setRsvp('yes')" id="rsvp-yes" style="flex:1;padding:12px 6px;font-size:13px;font-weight:700;background:#E8F3EF;color:#0F6E56;border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit">✅ Yes</button>
+          <button onclick="setRsvp('maybe')" id="rsvp-maybe" style="flex:1;padding:12px 6px;font-size:13px;font-weight:700;background:#FFF4E6;color:#B26B00;border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit">🤔 Maybe</button>
+          <button onclick="setRsvp('no')" id="rsvp-no" style="flex:1;padding:12px 6px;font-size:13px;font-weight:700;background:#FEF2F2;color:#C0392B;border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit">❌ No</button>
+        </div>
+        <div id="rsvp-extra" style="display:none;margin-top:12px">
+          <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px;text-align:left">🍽️ Dietary needs (optional)</div>
+          <input id="rsvp-diet" class="finp" placeholder="e.g. vegetarian, no nuts" style="font-size:13px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px;text-align:left">👥 Guests with you (optional)</div>
+          <input id="rsvp-plus" type="number" min="0" class="finp" placeholder="0" style="font-size:13px;margin-bottom:12px">
+          <button onclick="submitRsvp()" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700">Send my response</button>
+        </div>
+        <div id="rsvp-done" style="display:none;font-size:13px;color:#0F6E56;font-weight:700;padding:8px 0">✓ Thank you! Your response was sent.</div>
+      </div>
       <div style="font-size:12px;color:#aaa">Have a wonderful evening 🎶</div>
     </div>`;
+    window._rsvpData={eventId:window._findSeatEventId,code:found.code||window._findSeatCode,name:found.name,table:found.table};
+    loadExistingRsvp();
   }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
+}
+
+window._rsvpChoice=null;
+window.setRsvp=function(choice){
+  window._rsvpChoice=choice;
+  ['yes','maybe','no'].forEach(c=>{
+    const b=document.getElementById('rsvp-'+c);
+    if(b)b.style.border='2px solid '+(c===choice?(c==='yes'?'#1D9E75':c==='maybe'?'#B26B00':'#C0392B'):'transparent');
+  });
+  const extra=document.getElementById('rsvp-extra');
+  if(extra)extra.style.display=choice==='no'?'none':'block';
+  if(choice==='no')submitRsvp();
+};
+
+window.submitRsvp=async function(){
+  if(!window._rsvpChoice)return;
+  const r=window._rsvpData;
+  const diet=(document.getElementById('rsvp-diet')?.value||'').trim();
+  const plus=parseInt(document.getElementById('rsvp-plus')?.value||'0',10)||0;
+  try{
+    const id=r.eventId+'_'+r.code;
+    await setDoc(doc(db,'event_rsvp',id),{
+      eventId:r.eventId,code:r.code,name:r.name,table:r.table,
+      response:window._rsvpChoice,dietary:diet,plusOnes:plus,at:new Date().toISOString()
+    });
+    const sec=document.getElementById('rsvp-section');
+    if(sec){['rsvp-yes','rsvp-maybe','rsvp-no','rsvp-extra'].forEach(i=>{const el=document.getElementById(i);if(el)el.style.display='none';});
+      const done=document.getElementById('rsvp-done');if(done)done.style.display='block';}
+  }catch(e){console.error('rsvp:',e);alert('Could not send — please try again.');}
+};
+
+async function loadExistingRsvp(){
+  const r=window._rsvpData;if(!r)return;
+  try{
+    const snap=await getDoc(doc(db,'event_rsvp',r.eventId+'_'+r.code));
+    if(snap.exists()){
+      const d=snap.data();
+      window._rsvpChoice=d.response;
+      setRsvp(d.response);
+      if(d.dietary&&document.getElementById('rsvp-diet'))document.getElementById('rsvp-diet').value=d.dietary;
+      if(d.plusOnes&&document.getElementById('rsvp-plus'))document.getElementById('rsvp-plus').value=d.plusOnes;
+    }
+  }catch(e){}
 }
 
 window.doFindSeat=function(){
@@ -10970,6 +11032,8 @@ function renderSeating(){
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#BA7517">${st.assigned}</div><div style="font-size:10px;color:#888">seated</div></div>
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#E24B4A">${st.unassigned}</div><div style="font-size:10px;color:#888">waiting</div></div>
     </div>
+
+    <button onclick="showRsvpDashboard()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#FFF4E6;color:#B26B00;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">📋 RSVP responses (who's coming)</button>
 
     <button onclick="openEventDetails()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:${(d.details&&d.details.venue)?'#E8F3EF':'#FFF4E6'};color:${(d.details&&d.details.venue)?'#0F6E56':'#B26B00'};border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">📍 ${(d.details&&d.details.venue)?'Event details ✓ ('+d.details.venue+')':'Add event details (venue, time, parking)'}</button>
 
@@ -11556,6 +11620,52 @@ window.addSeatGuests=function(){
 };
 
 // ✨ AUTO-FILL: seat all waiting guests into empty seats, in order
+// ─── RSVP DASHBOARD (organizer view) ───
+window.showRsvpDashboard=async function(){
+  document.getElementById('rsvp-dash')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='rsvp-dash';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:400px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:#111">📋 RSVP responses</div>
+      <button onclick="document.getElementById('rsvp-dash').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div id="rsvp-dash-body"><div style="text-align:center;padding:30px 0;color:#aaa">⏳ Loading responses…</div></div>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+  try{
+    const snap=await getDocs(query(collection(db,'event_rsvp'),where('eventId','==',window._seatingEventId)));
+    const all=snap.docs.map(d=>d.data());
+    // total seated guests for "no response" count
+    let totalGuests=0;window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g)totalGuests++;}));
+    const yes=all.filter(r=>r.response==='yes');
+    const maybe=all.filter(r=>r.response==='maybe');
+    const no=all.filter(r=>r.response==='no');
+    const responded=all.length;
+    const noResponse=Math.max(0,totalGuests-responded);
+    const plusTotal=yes.reduce((s,r)=>s+(r.plusOnes||0),0);
+    const diets=all.filter(r=>r.dietary&&r.dietary.trim());
+    const body=document.getElementById('rsvp-dash-body');
+    if(!body)return;
+    const card=(n,label,color,bg)=>`<div style="flex:1;text-align:center;background:${bg};border-radius:10px;padding:12px 4px"><div style="font-size:24px;font-weight:800;color:${color}">${n}</div><div style="font-size:10px;color:#777;margin-top:2px">${label}</div></div>`;
+    const list=(arr,color)=>arr.length?arr.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f7faf9;border-radius:8px;margin-bottom:5px">
+        <div><span style="font-size:13px;font-weight:600;color:#111">${r.name}</span>${r.plusOnes?`<span style="font-size:11px;color:#888"> +${r.plusOnes}</span>`:''}${r.dietary?`<div style="font-size:11px;color:#B26B00">🍽️ ${r.dietary}</div>`:''}</div>
+        <span style="font-size:11px;color:#999">${r.table||''}</span>
+      </div>`).join(''):'<div style="font-size:12px;color:#bbb;padding:8px;text-align:center">None yet</div>';
+    body.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        ${card(yes.length,'Coming','#0F6E56','#E8F3EF')}
+        ${card(maybe.length,'Maybe','#B26B00','#FFF4E6')}
+        ${card(no.length,'Can\\'t','#C0392B','#FEF2F2')}
+        ${card(noResponse,'No reply','#888','#f0f0f0')}
+      </div>
+      <div style="text-align:center;font-size:12px;color:#666;margin-bottom:16px">${responded} of ${totalGuests} responded${plusTotal?` · +${plusTotal} extra guests coming`:''}</div>
+      ${diets.length?`<div style="background:#FFF8EE;border:1px solid #F0D9B5;border-radius:10px;padding:10px 12px;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#8A5A00;margin-bottom:6px">🍽️ ${diets.length} dietary need${diets.length>1?'s':''}</div>${diets.map(r=>`<div style="font-size:12px;color:#6B4A00">• ${r.name}: ${r.dietary}</div>`).join('')}</div>`:''}
+      <div style="font-size:12px;font-weight:700;color:#0F6E56;margin:0 0 6px">✅ Coming (${yes.length})</div>${list(yes)}
+      <div style="font-size:12px;font-weight:700;color:#B26B00;margin:12px 0 6px">🤔 Maybe (${maybe.length})</div>${list(maybe)}
+      <div style="font-size:12px;font-weight:700;color:#C0392B;margin:12px 0 6px">❌ Can't make it (${no.length})</div>${list(no)}`;
+  }catch(e){const body=document.getElementById('rsvp-dash-body');if(body)body.innerHTML='<div style="text-align:center;padding:30px 0;color:#aaa">Could not load responses.</div>';}
+};
+
 // ─── EVENT DETAILS (shown on guest seat page) ───
 window.openEventDetails=function(){
   const d=window._seating;
