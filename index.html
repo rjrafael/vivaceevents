@@ -13878,6 +13878,15 @@ window.doSignOut=async function(){
 
 onAuthStateChanged(auth,async user=>{
   CU=user;
+  // GUEST SEAT LINK always wins — even if the viewer is logged in
+  const _sp=new URLSearchParams(window.location.search);
+  if(_sp.get('seat')){
+    window._findSeatEventId=_sp.get('seat');
+    window._findSeatCode=_sp.get('g')||'';
+    CS='find-seat';
+    render();
+    return;
+  }
   if(user){
     // Restore the last page they were on (instead of always jumping to feed)
     let lastScreen='feed';
