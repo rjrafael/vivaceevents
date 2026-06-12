@@ -2748,7 +2748,7 @@ window.showNotifications=async function(){
         <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#111">🔕 Mute group messages</div><div style="font-size:11px;color:#888">Silence chatter — emergencies still alert you</div></div>
         <button onclick="toggleMuteGroup()" style="position:relative;width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;background:${muted?'#1D9E75':'#ccc'};transition:background .2s"><span style="position:absolute;top:3px;left:${muted?'23px':'3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s"></span></button>
       </div>
-      ${notifs.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('noNotifications')}</p>':
+      ${notifs.length===0?'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">'+t('noNotifications')+'</p>':
         notifs.map(n=>`
         <div style="padding:12px${n.type==='ensemble_msg'?' 12px':' 0'};border-bottom:1px solid #f5f5f5;opacity:${n.read?0.6:1}${n.type==='ensemble_msg'?';background:linear-gradient(135deg,#FBF8EC,#fff);border:1.5px solid #E8D69A;border-radius:12px;margin-bottom:8px':''}">
           ${n.type==='ensemble_msg'?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:14px">📣</span><span style="font-size:11px;font-weight:700;color:#9c7a1e;letter-spacing:0.3px">${n.fromName?('From '+n.fromName):'Ensemble message'}${n.scope?' · '+n.scope:''}</span></div>`:''}
@@ -4936,7 +4936,7 @@ window.showCarpoolModal=async function(gigId, gigTitle){
     const snap=await getDocs(query(collection(db,'carpool'),where('gigId','==',gigId)));
     const entries=snap.docs.map(d=>d.data());
     const el=document.getElementById('carpool-list');if(!el)return;
-    if(entries.length===0){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:6px 0">${t('carpoolNone')}</div>';return;}
+    if(entries.length===0){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:6px 0">'+t('carpoolNone')+'</div>';return;}
     const offers=entries.filter(e=>e.type==='offer');
     const needs=entries.filter(e=>e.type==='need');
     let html='';
@@ -6080,7 +6080,7 @@ window.openGroup=function(id){
     </div>
     <div style="font-size:13px;color:#888;margin-bottom:16px">${g.type} · ${g.memberCount||0} members</div>
     <button class="bt" style="width:100%;margin-bottom:12px" onclick="document.getElementById('gdetail').remove();go('discover');ts('Tap ○ next to artists to select, then tap + Group')">+ Add artists from Find</button>
-    ${g.members&&g.members.length>0?g.members.map(mem=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div class="av" style="background:#E1F5EE;color:#085041">${mem.substring(0,2).toUpperCase()}</div><span style="flex:1;font-size:14px;color:#111">${mem}</span><span class="tag tg">Member</span></div>`).join(''):'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">${t('noMembersYet')}</p>'}
+    ${g.members&&g.members.length>0?g.members.map(mem=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div class="av" style="background:#E1F5EE;color:#085041">${mem.substring(0,2).toUpperCase()}</div><span style="flex:1;font-size:14px;color:#111">${mem}</span><span class="tag tg">Member</span></div>`).join(''):'<p style="color:#aaa;font-size:13px;text-align:center;padding:20px 0">'+t('noMembersYet')+'</p>'}
     <button class="bt" style="width:100%;margin-top:16px" onclick="showBroadcast('${g.id}','${g.name.replace(/'/g,"\\'")}');document.getElementById('gdetail').remove()">📢 Broadcast to group</button>
   </div>`;
   document.getElementById('app').appendChild(m);
