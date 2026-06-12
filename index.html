@@ -136,7 +136,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
-<div id="app"><div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:9999" id="boot-splash"><div style="font-size:26px;font-weight:800;color:#1D9E75;letter-spacing:-0.5px;margin-bottom:10px">Vivace<span style="color:#C9A84C">Events</span></div><div style="width:28px;height:28px;border:3px solid #E1F5EE;border-top-color:#1D9E75;border-radius:50%;animation:bootspin 0.7s linear infinite"></div></div></div>
+<div id="app"><div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#1D9E75,#13795a);z-index:9999" id="boot-splash"><div style="font-size:30px;font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:14px;text-shadow:0 2px 20px rgba(0,0,0,0.15)">Vivace<span style="color:#9FE8CC"> Events</span></div><div style="width:26px;height:26px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:bootspin 0.7s linear infinite"></div></div></div>
 <style>@keyframes bootspin{to{transform:rotate(360deg)}}</style>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -10749,7 +10749,7 @@ function tableShapeSVG(t,idx){
   // compact full-name list of who's seated here
   const seatedNames=t.guests.map((g,si)=>g?`<div onclick="seatClick(${idx},${si})" style="font-size:10px;color:#444;padding:2px 4px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:3px;text-align:left" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'"><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${g.locked?'#C9A84C':color};flex-shrink:0"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.name}${g.locked?' 🔒':''}</span></div>`:'').filter(Boolean).join('');
   const namesBlock=seatedNames?`<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:5px;text-align:left">${seatedNames}</div>`:'';
-  return `<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:6px;text-align:center;overflow:hidden">
+  return `<div class="seat-table-card" data-tableidx="${idx}" style="background:#fff;border:1px solid #eee;border-radius:14px;padding:6px;text-align:center;overflow:hidden;transition:box-shadow .15s,border-color .15s">
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:170px;height:auto;display:block;margin:0 auto">${shape}
       <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="13" font-weight="800" fill="${color}">${t.name}</text>
       <text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="9" fill="#999">${filled}/${t.seats}</text>
@@ -10770,8 +10770,9 @@ function renderSeating(){
     : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">${d.tables.map((t,i)=>tableShapeSVG(t,i)).join('')}</div>`;
   const unassignedHTML = d.unassigned.length===0
     ? `<div style="font-size:12px;color:#aaa;text-align:center;padding:10px">All guests seated 🎉</div>`
-    : d.unassigned.map((g,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #ddd;border-radius:20px;padding:5px 10px;margin:0 5px 6px 0;font-size:12px">
-        <span style="font-weight:600;color:#111">${g.name}</span>
+    : d.unassigned.map((g,i)=>`<span class="seat-chip" data-guestidx="${i}" style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #ddd;border-radius:20px;padding:5px 10px;margin:0 5px 6px 0;font-size:12px;cursor:grab;touch-action:none;user-select:none">
+        <span style="font-size:10px;color:#bbb">⠿</span>
+        <span style="font-weight:600;color:#111;pointer-events:none">${g.name}</span>
         <span onclick="seatRemoveGuest(${i})" style="color:#F09595;cursor:pointer;font-weight:700">✕</span></span>`).join('');
 
   m.innerHTML=`<div class="modal" style="max-width:480px;max-height:92vh;overflow-y:auto">
@@ -10800,7 +10801,7 @@ function renderSeating(){
     </div>
 
     <div style="background:#FFFDF5;border:1px solid #E8D69A;border-radius:12px;padding:12px;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:#9c7a1e;margin-bottom:6px">👥 Guests waiting to be seated — ${d.unassigned.length}</div>
+      <div style="font-size:12px;font-weight:700;color:#9c7a1e;margin-bottom:6px">👥 Guests waiting to be seated — ${d.unassigned.length}${d.unassigned.length>0?' <span style="font-weight:400;color:#b89a4e">· drag a name onto a table</span>':''}</div>
       <div style="margin-bottom:10px">${unassignedHTML}</div>
       ${d.unassigned.length>0&&st.totalSeats-st.assigned>0?`<button onclick="autoFillSeats()" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#0F9AA8;margin-bottom:10px">✨ Auto-seat all waiting guests (${Math.min(d.unassigned.length,st.totalSeats-st.assigned)})</button>`:''}
       <div style="font-size:11px;color:#888;margin-bottom:4px">Add guests (one per line, or comma-separated):</div>
@@ -10811,6 +10812,71 @@ function renderSeating(){
     <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700">💾 Save seating plan</button>
   </div>`;
   document.getElementById('app').appendChild(m);
+  setupSeatingDrag();
+};
+
+// ─── DRAG & DROP: drag a waiting guest chip onto a table ───
+function setupSeatingDrag(){
+  const modal=document.getElementById('seating-modal');
+  if(!modal)return;
+  let dragging=null, ghost=null, curTarget=null;
+  modal.querySelectorAll('.seat-chip').forEach(chip=>{
+    chip.addEventListener('pointerdown',e=>{
+      if(e.target.textContent==='✕')return;
+      e.preventDefault();
+      const guestIdx=parseInt(chip.dataset.guestidx,10);
+      const nameEl=chip.querySelector('span:nth-child(2)');
+      dragging={guestIdx,name:nameEl?nameEl.textContent:'Guest'};
+      try{chip.setPointerCapture(e.pointerId);}catch(_){}
+      chip.style.opacity='0.4';
+      ghost=document.createElement('div');
+      ghost.textContent='🪑 '+dragging.name;
+      ghost.style.cssText='position:fixed;z-index:10005;background:#1D9E75;color:#fff;padding:7px 12px;border-radius:20px;font-size:13px;font-weight:600;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.25);transform:translate(-50%,-150%)';
+      ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
+      document.body.appendChild(ghost);
+    });
+    chip.addEventListener('pointermove',e=>{
+      if(!dragging||!ghost)return;
+      ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
+      ghost.style.display='none';
+      const el=document.elementFromPoint(e.clientX,e.clientY);
+      ghost.style.display='';
+      const card=el?el.closest('.seat-table-card'):null;
+      if(card!==curTarget){
+        if(curTarget){curTarget.style.boxShadow='';curTarget.style.borderColor='#eee';}
+        curTarget=card;
+        if(curTarget){curTarget.style.boxShadow='0 0 0 3px #1D9E75';curTarget.style.borderColor='#1D9E75';}
+      }
+    });
+    chip.addEventListener('pointerup',e=>{
+      if(!dragging)return;
+      chip.style.opacity='1';
+      if(ghost){ghost.remove();ghost=null;}
+      if(curTarget){
+        const tIdx=parseInt(curTarget.dataset.tableidx,10);
+        curTarget.style.boxShadow='';curTarget.style.borderColor='#eee';
+        dropGuestOnTable(dragging.guestIdx,tIdx);
+      }
+      dragging=null;curTarget=null;
+    });
+    chip.addEventListener('pointercancel',()=>{
+      chip.style.opacity='1';
+      if(ghost){ghost.remove();ghost=null;}
+      if(curTarget){curTarget.style.boxShadow='';curTarget.style.borderColor='#eee';}
+      dragging=null;curTarget=null;
+    });
+  });
+}
+
+window.dropGuestOnTable=function(guestIdx,tableIdx){
+  const d=window._seating, t=d.tables[tableIdx];
+  const seatIdx=t.guests.findIndex(s=>!s);
+  if(seatIdx===-1){ts(t.name+' is full');return;}
+  const g=d.unassigned.splice(guestIdx,1)[0];
+  t.guests[seatIdx]=g;
+  window._seatingDirty=true;
+  renderSeating();
+  ts(g.name+' seated at '+t.name);
 };
 
 window.addTable=function(){
