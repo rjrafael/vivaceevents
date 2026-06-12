@@ -1386,7 +1386,7 @@ function bindAuth(){
       const r=await signInWithPopup(auth,fp);CU=r.user;
       await saveTOS(CU.uid);
       await loadUP();await loadGroups();await loadVenues();await loadOrganizerEvents();render();
-    }catch(e){ts('Facebook sign-in failed: '+e.message);}
+    }catch(e){console.error('FACEBOOK LOGIN ERROR — code:',e.code,'| message:',e.message,'| email:',e.customData?.email,'| full:',e);ts('Facebook sign-in failed: '+(e.code||e.message));}
     finally{btn.disabled=false;btn.textContent='Continue with Facebook';}
   };
   document.getElementById('btn-phone').onclick=()=>showPhoneModal();
@@ -2649,7 +2649,7 @@ async function loadMyMessages(){
         </div>
       </div>`;
     }).join('');
-  }catch(e){}
+  }catch(e){console.error('loadMyMessages error:',e.code,e.message);el.innerHTML=`<div style="padding:12px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:13px;color:#aaa">No messages yet</div>`;}
 }
 
 // ─── NOTIFICATIONS ───────────────────────────────────────────────
