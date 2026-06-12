@@ -10707,6 +10707,40 @@ function hexToRgb(hex){const h=hex.replace('#','');return [parseInt(h.substring(
 // Normalize: a guest's groups can be a single string (old) or an array (new)
 function guestGroups(g){if(!g)return [];if(Array.isArray(g.groups))return g.groups;if(g.group)return [g.group];return [];}
 
+// ═══ AUTO-SAVE engine (Google Docs style: debounced 3s after last change) ═══
+window._seatingAutosave = (localStorage.getItem('vv_seating_autosave')!=='off'); // default ON
+function markDirty(){
+  window._seatingDirty=true;
+  if(window._seatingAutosave)scheduleAutoSave();
+}
+function scheduleAutoSave(){
+  clearTimeout(window._autoSaveTimer);
+  setSaveStatus('pending');
+  window._autoSaveTimer=setTimeout(()=>{ doAutoSave(); }, 3000);
+}
+async function doAutoSave(){
+  if(!window._seating||!window._seatingDirty)return;
+  setSaveStatus('saving');
+  const ok=await saveSeating(true); // silent=true
+  setSaveStatus(ok?'saved':'error');
+}
+function setSaveStatus(state){
+  const el=document.getElementById('seat-save-status');
+  if(!el)return;
+  if(state==='pending'){el.innerHTML='<span style="color:#bbb">● Editing…</span>';}
+  else if(state==='saving'){el.innerHTML='<span style="color:#C9A84C">⟳ Saving…</span>';}
+  else if(state==='saved'){el.innerHTML='<span style="color:#1D9E75">✓ Saved</span>';}
+  else if(state==='error'){el.innerHTML='<span style="color:#E24B4A">⚠ Not saved</span>';}
+  else{el.innerHTML='';}
+}
+window.toggleAutoSave=function(){
+  window._seatingAutosave=!window._seatingAutosave;
+  localStorage.setItem('vv_seating_autosave', window._seatingAutosave?'on':'off');
+  ts(window._seatingAutosave?'✓ Auto-save ON':'Auto-save OFF');
+  if(window._seatingAutosave&&window._seatingDirty)scheduleAutoSave();
+  renderSeating();
+};
+
 window.openSeating=async function(eventId,eventTitle){
   document.getElementById('seating-modal')?.remove();
   window._seatingEventId=eventId;
@@ -10817,7 +10851,13 @@ function renderSeating(){
       <div style="font-size:17px;font-weight:700;color:#111">🪑 Seating — ${window._seatingTitle}</div>
       <button onclick="safeCloseSeating()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:12px">Lay out tables, then tap a seat to assign a guest.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:12px;color:#888">Lay out tables, then tap a seat to assign.</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="seat-save-status" style="font-size:11px;font-weight:600">${window._seatingDirty?'<span style="color:#bbb">● Editing…</span>':(window._seatingDocId?'<span style="color:#1D9E75">✓ Saved</span>':'')}</span>
+        <span onclick="toggleAutoSave()" style="font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:${window._seatingAutosave?'#E8F3EF':'#f0f0f0'};color:${window._seatingAutosave?'#0F6E56':'#999'};padding:3px 9px;border-radius:20px;font-weight:600">${window._seatingAutosave?'🟢':'⚪'} Auto-save</span>
+      </div>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#1D9E75">${st.tables}</div><div style="font-size:10px;color:#888">tables</div></div>
@@ -10922,7 +10962,7 @@ window.dropGuestOnTable=function(guestIdx,tableIdx){
   if(seatIdx===-1){ts(t.name+' is full');return;}
   const g=d.unassigned.splice(guestIdx,1)[0];
   t.guests[seatIdx]=g;
-  window._seatingDirty=true;
+  markDirty();
   renderSeating();
   ts(g.name+' seated at '+t.name);
 };
@@ -10933,7 +10973,7 @@ window.addTable=function(){
   const d=window._seating;
   const num=d.tables.length+1;
   d.tables.push({name:'Table '+num,shape:shape,seats:seats,guests:new Array(seats).fill(null),color:SEAT_TABLE_COLORS[d.tables.length%SEAT_TABLE_COLORS.length]});
-  window._seatingDirty=true;
+  markDirty();
   renderSeating();
 };
 
@@ -10983,7 +11023,7 @@ window.confirmDeleteTable=function(idx){
   // return seated guests to unassigned
   t.guests.filter(Boolean).forEach(g=>d.unassigned.push(g));
   d.tables.splice(idx,1);
-  window._seatingDirty=true;
+  markDirty();
   document.getElementById('del-table-dialog')?.remove();
   renderSeating();
   ts(t.name+' deleted');
@@ -10992,7 +11032,7 @@ window.confirmDeleteTable=function(idx){
 window.renameTable=function(idx){
   const d=window._seating, t=d.tables[idx];
   const nm=prompt('Table name:',t.name);
-  if(nm&&nm.trim()){t.name=nm.trim();window._seatingDirty=true;renderSeating();}
+  if(nm&&nm.trim()){t.name=nm.trim();markDirty();renderSeating();}
 };
 
 window.seatClick=function(tableIdx,seatIdx){
@@ -11035,7 +11075,7 @@ function showSeatActions(tableIdx,seatIdx){
 window.seatToggleLock=function(tableIdx,seatIdx){
   const g=window._seating.tables[tableIdx].guests[seatIdx];
   g.locked=!g.locked;
-  window._seatingDirty=true;
+  markDirty();
   document.getElementById('seat-actions')?.remove();
   renderSeating();
   ts(g.locked?'🔒 Seat locked':'🔓 Seat unlocked');
@@ -11093,7 +11133,7 @@ window.addCustomTag=function(tableIdx,seatIdx){
   const id='cust_'+Date.now();
   const color=CUSTOM_TAG_COLORS[window._seating.customTags.length%CUSTOM_TAG_COLORS.length];
   window._seating.customTags.push({id,label:name,color});
-  window._seatingDirty=true;
+  markDirty();
   renderGroupPicker(tableIdx,seatIdx);
   ts('🏷️ Custom tag "'+name+'" created');
 };
@@ -11104,7 +11144,7 @@ window.deleteCustomTag=function(tagId,tableIdx,seatIdx){
   window._seating.customTags=(window._seating.customTags||[]).filter(t=>t.id!==tagId);
   // remove from all guests
   window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&Array.isArray(g.groups)){g.groups=g.groups.filter(x=>x!==tagId);if(!g.groups.length)delete g.groups;}}));
-  window._seatingDirty=true;
+  markDirty();
   renderGroupPicker(tableIdx,seatIdx);
   renderSeatingSilent();
   ts('Tag deleted');
@@ -11116,7 +11156,7 @@ window.toggleSeatGroup=function(tableIdx,seatIdx,groupId){
   if(arr.includes(groupId)){arr=arr.filter(x=>x!==groupId);}else{arr.push(groupId);}
   if(arr.length){g.groups=arr;}else{delete g.groups;}
   delete g.group; // migrate away from old single-group field
-  window._seatingDirty=true;
+  markDirty();
   renderGroupPicker(tableIdx,seatIdx); // re-render picker with updated state
   renderSeatingSilent(); // update chart behind
 };
@@ -11133,7 +11173,7 @@ window.seatRemove=function(tableIdx,seatIdx){
   const d=window._seating, t=d.tables[tableIdx], g=t.guests[seatIdx];
   d.unassigned.push({id:g.id,name:g.name});
   t.guests[seatIdx]=null;
-  window._seatingDirty=true;
+  markDirty();
   document.getElementById('seat-actions')?.remove();
   renderSeating();
   ts(g.name+' moved to waiting list');
@@ -11166,7 +11206,7 @@ window.doSeatMove=function(fromT,fromS,toT,toS){
   const d=window._seating;
   d.tables[toT].guests[toS]=d.tables[fromT].guests[fromS];
   d.tables[fromT].guests[fromS]=null;
-  window._seatingDirty=true;
+  markDirty();
   document.getElementById('seat-move')?.remove();
   renderSeating();
   ts('Moved to '+d.tables[toT].name);
@@ -11199,7 +11239,7 @@ window.doSeatSwap=function(fromT,fromS,toT,toS){
   const tmp=d.tables[fromT].guests[fromS];
   d.tables[fromT].guests[fromS]=d.tables[toT].guests[toS];
   d.tables[toT].guests[toS]=tmp;
-  window._seatingDirty=true;
+  markDirty();
   document.getElementById('seat-swap')?.remove();
   renderSeating();
   ts('Guests swapped');
@@ -11223,14 +11263,14 @@ window.assignSeat=function(tableIdx,seatIdx,guestIdx){
   const g=d.unassigned.splice(guestIdx,1)[0];
   d.tables[tableIdx].guests[seatIdx]=g;
   document.getElementById('seat-picker')?.remove();
-  window._seatingDirty=true;
+  markDirty();
   renderSeating();
 };
 
 window.seatRemoveGuest=function(idx){
   const d=window._seating;
   d.unassigned.splice(idx,1);
-  window._seatingDirty=true;
+  markDirty();
   renderSeating();
 };
 
@@ -11241,7 +11281,7 @@ window.addSeatGuests=function(){
   const names=raw.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
   const d=window._seating;
   names.forEach((n,i)=>d.unassigned.push({id:'g'+Date.now()+i,name:n}));
-  window._seatingDirty=true;
+  markDirty();
   ts(names.length+' guest'+(names.length>1?'s':'')+' added');
   renderSeating();
 };
@@ -11260,16 +11300,16 @@ window.autoFillSeats=function(){
       }
     }
   }
-  window._seatingDirty=true;
+  markDirty();
   renderSeating();
   if(seated===0){ts('No empty seats available');}
   else if(d.unassigned.length>0){ts('✨ Seated '+seated+' — '+d.unassigned.length+' still waiting (need more seats)');}
   else{ts('✨ All guests seated!');}
 };
 
-window.saveSeating=async function(){
+window.saveSeating=async function(silent){
   const btn=document.getElementById('seat-save-btn');
-  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  if(btn&&!silent){btn.disabled=true;btn.textContent='Saving...';}
   try{
     const payload={eventId:window._seatingEventId,organizerId:CU.uid,plan:window._seating,updatedAt:new Date()};
     if(window._seatingDocId){
@@ -11278,11 +11318,11 @@ window.saveSeating=async function(){
       const ref=await addDoc(collection(db,'event_seating'),payload);
       window._seatingDocId=ref.id;
     }
-    ts('🪑 Seating plan saved!');
+    if(!silent)ts('🪑 Seating plan saved!');
     window._seatingDirty=false;
-    if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}
+    if(btn&&!silent){btn.disabled=false;btn.textContent='💾 Save seating plan';}
     return true;
-  }catch(e){console.error('saveSeating:',e);ts('Could not save: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}return false;}
+  }catch(e){console.error('saveSeating:',e);if(!silent)ts('Could not save: '+e.message);if(btn&&!silent){btn.disabled=false;btn.textContent='💾 Save seating plan';}return false;}
 };
 
 // ═══════════════════════════════════════════════════════════
