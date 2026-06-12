@@ -26,6 +26,7 @@ exports.createCheckoutSession = functions.https.onRequest({secrets:[stripeSecret
       mode:'subscription',
       customer_email:email,
       line_items:[{price:priceId,quantity:1}],
+      subscription_data:{ trial_period_days: 90 },
       success_url:'https://vivaceevents.com/?payment=success',
       cancel_url:'https://vivaceevents.com/?payment=cancelled',
       metadata:{userId,plan},
@@ -267,12 +268,14 @@ exports.createSubscription = functions.https.onRequest({secrets:[stripeSecret]},
     for (const sub of existingSubs.data) {
       await stripe.subscriptions.cancel(sub.id);
     }
-    // Create new subscription
+    // Create new subscription with 90-day free trial (card saved, charged on day 91)
     const subscription = await stripe.subscriptions.create({
       customer: custId,
       items: [{ price: priceId }],
+      trial_period_days: 90,
       payment_behavior: 'default_incomplete',
       payment_settings: { save_default_payment_method: 'on_subscription' },
+      trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
       expand: ['latest_invoice.payment_intent'],
     });
     if (subscription.status === 'active' || subscription.status === 'trialing') {
@@ -330,3 +333,85 @@ exports.cancelSubscription = functions.https.onRequest({secrets:[stripeSecret]},
   }
 });
 // ─── END Subscription Functions ───────────────────────────────────────────────
+
+// ─── Push Notifications (Ensemble Messaging) ──────────────────────────────────
+// v2 Firestore trigger. Listens for new docs in "pushQueue" and sends push to
+// recipient's devices — works even when the app is closed. FREE (Firebase Cloud Messaging).
+const {onDocumentCreated} = require('firebase-functions/v2/firestore');
+
+exports.sendEnsemblePush = onDocumentCreated('pushQueue/{docId}', async (event) => {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) admin.initializeApp();
+
+  const snap = event.data;
+  if (!snap) return null;
+  const data = snap.data() || {};
+  const toEmail = data.toEmail;
+  const title = data.title || 'Vivace Events';
+  const body = data.body || '';
+  const emergency = data.emergency ? 'true' : 'false';
+  const muteBypass = !!data.emergency; // emergencies pierce mute
+
+  if (!toEmail) { try { await snap.ref.delete(); } catch(e){} return null; }
+
+  try {
+    const usersSnap = await admin.firestore()
+      .collection('users')
+      .where('email', '==', toEmail)
+      .limit(1)
+      .get();
+
+    if (usersSnap.empty) { await snap.ref.delete(); return null; }
+
+    const userDoc = usersSnap.docs[0];
+    const user = userDoc.data() || {};
+
+    // Respect mute — but emergencies always pierce through
+    if (user.muteGroupMessages && !muteBypass) {
+      await snap.ref.delete();
+      return null;
+    }
+
+    const tokens = user.pushTokens || [];
+    if (tokens.length === 0) { await snap.ref.delete(); return null; }
+
+    const message = {
+      tokens: tokens,
+      notification: { title: title, body: body },
+      data: { emergency: emergency, title: title, body: body },
+      webpush: {
+        headers: { Urgency: emergency === 'true' ? 'high' : 'normal' },
+        notification: {
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          requireInteraction: emergency === 'true',
+          vibrate: emergency === 'true' ? [300,100,300,100,300] : [200,100,200]
+        }
+      }
+    };
+
+    const resp = await admin.messaging().sendEachForMulticast(message);
+
+    // Remove dead tokens
+    const bad = [];
+    resp.responses.forEach((r, i) => {
+      if (!r.success) {
+        const code = r.error && r.error.code;
+        if (code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/invalid-registration-token') {
+          bad.push(tokens[i]);
+        }
+      }
+    });
+    if (bad.length) {
+      const good = tokens.filter(t => !bad.includes(t));
+      await userDoc.ref.update({ pushTokens: good });
+    }
+  } catch (e) {
+    console.error('sendEnsemblePush error:', e);
+  }
+
+  try { await snap.ref.delete(); } catch(e){}
+  return null;
+});
+// ─── END Push Notifications ───────────────────────────────────────────────────
