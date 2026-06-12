@@ -10728,11 +10728,12 @@ function tableShapeSVG(t,idx){
     const rx=t.shape==='rectangle'?58:48, ry=t.shape==='rectangle'?36:48;
     const sx=cx+Math.cos(ang)*(rx+14), sy=cy+Math.sin(ang)*(ry+14);
     const g=t.guests[i];
-    const seatColor=g?color:'#e5e5e5';
+    const seatColor=g?(g.locked?'#C9A84C':color):'#e5e5e5';
     const initials=g?g.name.substring(0,2).toUpperCase():'';
     inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
       <circle cx="${sx}" cy="${sy}" r="12" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
       ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">${initials}</text>`:''}
+      ${g&&g.locked?`<text x="${sx+9}" y="${sy-7}" font-size="9">🔒</text>`:''}
     </g>`;
   }
   // table shape
@@ -10814,12 +10815,54 @@ window.addTable=function(){
 
 window.deleteTable=function(idx){
   const d=window._seating, t=d.tables[idx];
-  if(!confirm('Delete '+t.name+'? Seated guests go back to the waiting list.'))return;
+  const seated=t.guests.filter(Boolean);
+  if(seated.length===0){
+    // LEVEL 1 — empty table: gentle confirm
+    showDeleteTableDialog(idx,false,[]);
+  }else{
+    // LEVEL 2 — table has people: strong warning
+    showDeleteTableDialog(idx,true,seated);
+  }
+};
+
+function showDeleteTableDialog(idx,hasPeople,seated){
+  const d=window._seating, t=d.tables[idx];
+  document.getElementById('del-table-dialog')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='del-table-dialog';p.style.zIndex='10001';
+  let body;
+  if(!hasPeople){
+    // LEVEL 1 — empty table
+    body=`<div style="font-size:30px;text-align:center;margin-bottom:8px">🗑️</div>
+      <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:6px">Delete ${t.name}?</div>
+      <div style="font-size:13px;color:#888;text-align:center;line-height:1.5;margin-bottom:18px">This table is empty, so nothing will be lost. You can always add it back.</div>
+      <button onclick="confirmDeleteTable(${idx})" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#E24B4A;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">Delete table</button>
+      <button onclick="document.getElementById('del-table-dialog').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Keep table</button>`;
+  }else{
+    // LEVEL 2 — table with people: strong warning + show who
+    const names=seated.map(g=>g.name).join(', ');
+    body=`<div style="font-size:32px;text-align:center;margin-bottom:8px">⚠️</div>
+      <div style="font-size:17px;font-weight:700;color:#C0392B;text-align:center;margin-bottom:8px">Wait — ${t.name} has ${seated.length} guest${seated.length>1?'s':''} seated</div>
+      <div style="background:#FEF6F6;border:1px solid #F5C6C6;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#C0392B;margin-bottom:4px">These guests will be un-seated:</div>
+        <div style="font-size:13px;color:#7B2D2D;line-height:1.5">${names}</div>
+      </div>
+      <div style="font-size:13px;color:#888;text-align:center;line-height:1.5;margin-bottom:18px">They won't be deleted — they'll move back to the waiting list, so you can re-seat them at another table.</div>
+      <button onclick="confirmDeleteTable(${idx})" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#E24B4A;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">Yes, delete &amp; un-seat ${seated.length} guest${seated.length>1?'s':''}</button>
+      <button onclick="document.getElementById('del-table-dialog').remove()" class="bt" style="width:100%;padding:12px;font-size:14px;font-weight:700;margin-bottom:0">No, keep the table</button>`;
+  }
+  p.innerHTML=`<div class="modal" style="max-width:360px">${body}</div>`;
+  document.getElementById('app').appendChild(p);
+}
+
+window.confirmDeleteTable=function(idx){
+  const d=window._seating, t=d.tables[idx];
   // return seated guests to unassigned
   t.guests.filter(Boolean).forEach(g=>d.unassigned.push(g));
   d.tables.splice(idx,1);
   window._seatingDirty=true;
+  document.getElementById('del-table-dialog')?.remove();
   renderSeating();
+  ts(t.name+' deleted');
 };
 
 window.renameTable=function(idx){
@@ -10832,18 +10875,120 @@ window.seatClick=function(tableIdx,seatIdx){
   const d=window._seating, t=d.tables[tableIdx];
   const occupant=t.guests[seatIdx];
   if(occupant){
-    // remove this guest back to waiting list
-    if(confirm('Remove '+occupant.name+' from this seat?')){
-      d.unassigned.push(occupant);
-      t.guests[seatIdx]=null;
-      window._seatingDirty=true;
-      renderSeating();
-    }
+    // seated person → open action menu (move / swap / remove / lock)
+    showSeatActions(tableIdx,seatIdx);
     return;
   }
   // empty seat → pick a guest to assign
   if(d.unassigned.length===0){ts('No guests waiting — add some below first');return;}
   showSeatPicker(tableIdx,seatIdx);
+};
+
+// Action menu for a seated guest
+function showSeatActions(tableIdx,seatIdx){
+  const d=window._seating, t=d.tables[tableIdx], g=t.guests[seatIdx];
+  const locked=!!g.locked;
+  document.getElementById('seat-actions')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-actions';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:340px">
+    <div style="text-align:center;margin-bottom:4px">
+      <div style="width:46px;height:46px;border-radius:50%;background:${t.color};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin-bottom:8px">${g.name.substring(0,2).toUpperCase()}</div>
+    </div>
+    <div style="font-size:16px;font-weight:700;color:#111;text-align:center">${g.name} ${locked?'🔒':''}</div>
+    <div style="font-size:12px;color:#888;text-align:center;margin-bottom:16px">${t.name} · Seat ${seatIdx+1}</div>
+    ${locked?`<div style="background:#FFF8E6;border:1px solid #F0D98A;border-radius:9px;padding:9px;font-size:12px;color:#8a6d1a;text-align:center;margin-bottom:12px">🔒 This seat is locked. Unlock it to move or swap.</div>`:''}
+    <button onclick="seatMove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E8F3EF'};color:${locked?'#bbb':'#0F6E56'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">↔️ Move to another seat</button>
+    <button onclick="seatSwap(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#E9EFF7'};color:${locked?'#bbb':'#0C447C'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">🔄 Swap with another guest</button>
+    <button onclick="seatToggleLock(${tableIdx},${seatIdx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#FFF8E6;color:#9c7a1e;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">${locked?'🔓 Unlock seat':'🔒 Lock this seat'}</button>
+    <button onclick="seatRemove(${tableIdx},${seatIdx})" ${locked?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${locked?'#f0f0f0':'#FEF2F2'};color:${locked?'#bbb':'#E24B4A'};border:none;border-radius:9px;cursor:${locked?'not-allowed':'pointer'};font-family:inherit;margin-bottom:10px">↩️ Remove from seat (to waiting)</button>
+    <button onclick="document.getElementById('seat-actions').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+}
+
+window.seatToggleLock=function(tableIdx,seatIdx){
+  const g=window._seating.tables[tableIdx].guests[seatIdx];
+  g.locked=!g.locked;
+  window._seatingDirty=true;
+  document.getElementById('seat-actions')?.remove();
+  renderSeating();
+  ts(g.locked?'🔒 Seat locked':'🔓 Seat unlocked');
+};
+
+window.seatRemove=function(tableIdx,seatIdx){
+  const d=window._seating, t=d.tables[tableIdx], g=t.guests[seatIdx];
+  d.unassigned.push({id:g.id,name:g.name});
+  t.guests[seatIdx]=null;
+  window._seatingDirty=true;
+  document.getElementById('seat-actions')?.remove();
+  renderSeating();
+  ts(g.name+' moved to waiting list');
+};
+
+// MOVE: pick an empty seat (any table) to move this person to
+window.seatMove=function(fromT,fromS){
+  const d=window._seating;
+  document.getElementById('seat-actions')?.remove();
+  // build list of empty seats across all tables
+  let opts='';
+  d.tables.forEach((t,ti)=>{
+    t.guests.forEach((g,si)=>{
+      if(!g){opts+=`<button onclick="doSeatMove(${fromT},${fromS},${ti},${si})" style="width:100%;text-align:left;background:#f7faf9;border:1px solid #eee;border-radius:9px;padding:11px;margin-bottom:6px;font-size:13px;font-weight:600;color:#111;cursor:pointer;font-family:inherit">${t.name} · Seat ${si+1} <span style="color:#1D9E75;font-size:11px">(empty)</span></button>`;}
+    });
+  });
+  if(!opts)opts=`<div style="font-size:13px;color:#aaa;text-align:center;padding:14px">No empty seats anywhere. Add a table or remove someone first.</div>`;
+  const g=d.tables[fromT].guests[fromS];
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-move';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:340px;max-height:75vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Move ${g.name}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Choose an empty seat:</div>
+    ${opts}
+    <button onclick="document.getElementById('seat-move').remove()" class="bg" style="width:100%;padding:11px;font-size:13px;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.doSeatMove=function(fromT,fromS,toT,toS){
+  const d=window._seating;
+  d.tables[toT].guests[toS]=d.tables[fromT].guests[fromS];
+  d.tables[fromT].guests[fromS]=null;
+  window._seatingDirty=true;
+  document.getElementById('seat-move')?.remove();
+  renderSeating();
+  ts('Moved to '+d.tables[toT].name);
+};
+
+// SWAP: pick another seated guest to swap places with
+window.seatSwap=function(fromT,fromS){
+  const d=window._seating;
+  document.getElementById('seat-actions')?.remove();
+  let opts='';
+  d.tables.forEach((t,ti)=>{
+    t.guests.forEach((g,si)=>{
+      if(g&&!(ti===fromT&&si===fromS)&&!g.locked){opts+=`<button onclick="doSeatSwap(${fromT},${fromS},${ti},${si})" style="width:100%;text-align:left;background:#f7faf9;border:1px solid #eee;border-radius:9px;padding:11px;margin-bottom:6px;font-size:13px;font-weight:600;color:#111;cursor:pointer;font-family:inherit">${g.name} <span style="color:#888;font-size:11px">— ${t.name}, Seat ${si+1}</span></button>`;}
+    });
+  });
+  if(!opts)opts=`<div style="font-size:13px;color:#aaa;text-align:center;padding:14px">No other seated guests to swap with (locked guests can't be swapped).</div>`;
+  const g=d.tables[fromT].guests[fromS];
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-swap';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:340px;max-height:75vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Swap ${g.name} with…</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">They'll trade seats:</div>
+    ${opts}
+    <button onclick="document.getElementById('seat-swap').remove()" class="bg" style="width:100%;padding:11px;font-size:13px;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.doSeatSwap=function(fromT,fromS,toT,toS){
+  const d=window._seating;
+  const tmp=d.tables[fromT].guests[fromS];
+  d.tables[fromT].guests[fromS]=d.tables[toT].guests[toS];
+  d.tables[toT].guests[toS]=tmp;
+  window._seatingDirty=true;
+  document.getElementById('seat-swap')?.remove();
+  renderSeating();
+  ts('Guests swapped');
 };
 
 function showSeatPicker(tableIdx,seatIdx){
