@@ -8875,14 +8875,14 @@ window.showUpgradeConfirm=function(planId){
     <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:6px">Upgrade to ${PLAN_NAMES[planId]}</div>
     <div style="font-size:13px;color:#888;margin-bottom:16px">${PLAN_PRICES[planId]} · billed monthly · cancel anytime</div>
     <div style="background:#E1F5EE;border-radius:10px;padding:12px;margin-bottom:16px">
-      <div style="font-size:12px;color:#085041;font-weight:600;margin-bottom:4px">✅ Card on file</div>
-      <div style="font-size:12px;color:#085041">Your verified card will be charged ${PLAN_PRICES[planId]} immediately.</div>
+      <div style="font-size:12px;color:#085041;font-weight:600;margin-bottom:4px">🎁 90-day free trial</div>
+      <div style="font-size:12px;color:#085041">Your card stays on file but you won't be charged today. After your 90-day free trial, ${PLAN_PRICES[planId]} begins. Cancel anytime before then and you won't be charged.</div>
     </div>
     <div style="background:#f9f9f9;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:#888">
-      By upgrading you agree to our Terms of Service. Subscription auto-renews monthly. Cancel anytime from billing settings.
+      By upgrading you agree to our Terms of Service. After the free trial, your subscription auto-renews monthly. Cancel anytime from billing settings.
     </div>
     <button class="bt" id="upgrade-btn" onclick="processUpgrade('${planId}')" style="width:100%;padding:14px;font-size:15px;margin-bottom:8px">
-      Confirm upgrade — ${PLAN_PRICES[planId]}
+      Start 90-day free trial
     </button>
     <button class="bg" onclick="document.getElementById('upgrade-modal').remove()" style="width:100%;padding:12px">Cancel</button>
   </div>`;
@@ -8917,7 +8917,7 @@ window.processUpgrade=async function(planId){
     }
   }catch(e){
     ts('Error: '+e.message);
-    if(btn){btn.textContent='Confirm upgrade';btn.disabled=false;}
+    if(btn){btn.textContent='Start 90-day free trial';btn.disabled=false;}
   }
 };
 
