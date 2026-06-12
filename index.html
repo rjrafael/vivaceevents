@@ -10833,7 +10833,7 @@ function tableShapeSVG(t,idx){
       ${inner}</svg>
     ${namesBlock}
     <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
-      <button onclick="renameTable(${idx})" style="background:#f0f0f0;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">✏️</button>
+      <button onclick="showTableMenu(${idx})" style="background:#f0f0f0;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">✏️</button>
       <button onclick="deleteTable(${idx})" style="background:#FEF2F2;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#E24B4A;font-family:inherit">🗑️</button>
     </div></div>`;
 }
@@ -11039,6 +11039,129 @@ window.renameTable=function(idx){
   const d=window._seating, t=d.tables[idx];
   const nm=prompt('Table name:',t.name);
   if(nm&&nm.trim()){t.name=nm.trim();markDirty();renderSeating();}
+};
+
+// Table menu (the ✏️ button) — rename, clear, move, swap, rotate
+window.showTableMenu=function(idx){
+  const d=window._seating, t=d.tables[idx];
+  const seated=t.guests.filter(Boolean).length;
+  document.getElementById('table-menu')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='table-menu';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:330px">
+    <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:2px">${t.name}</div>
+    <div style="font-size:12px;color:#888;text-align:center;margin-bottom:16px">${seated}/${t.seats} seated</div>
+    <button onclick="document.getElementById('table-menu').remove();renameTable(${idx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#f0f0f0;color:#333;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">✏️ Rename table</button>
+    <button onclick="tableRotate(${idx})" ${seated<2?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${seated<2?'#f5f5f5':'#FFF4E6'};color:${seated<2?'#bbb':'#B26B00'};border:none;border-radius:9px;cursor:${seated<2?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">🔁 Rotate seats (shift everyone 1)</button>
+    <button onclick="tableMoveAll(${idx})" ${seated===0?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${seated===0?'#f5f5f5':'#E8F3EF'};color:${seated===0?'#bbb':'#0F6E56'};border:none;border-radius:9px;cursor:${seated===0?'not-allowed':'pointer'};font-family:inherit;margin-bottom:7px">➡️ Move everyone to another table</button>
+    <button onclick="tableSwap(${idx})" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#E9EFF7;color:#0C447C;border:none;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:7px">🔄 Swap with another table</button>
+    <button onclick="tableClear(${idx})" ${seated===0?'disabled':''} style="width:100%;padding:12px;font-size:13px;font-weight:600;background:${seated===0?'#f5f5f5':'#FEF2F2'};color:${seated===0?'#bbb':'#E24B4A'};border:none;border-radius:9px;cursor:${seated===0?'not-allowed':'pointer'};font-family:inherit;margin-bottom:10px">🧹 Clear table (all → waiting)</button>
+    <button onclick="document.getElementById('table-menu').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+// T3.1 — Clear table (respects locked seats)
+window.tableClear=function(idx){
+  const d=window._seating, t=d.tables[idx];
+  const movable=t.guests.filter(g=>g&&!g.locked).length;
+  const locked=t.guests.filter(g=>g&&g.locked).length;
+  if(movable===0){ts('No movable guests (locked seats stay)');return;}
+  if(!confirm('Send '+movable+' guest'+(movable>1?'s':'')+' back to the waiting list?'+(locked?' ('+locked+' locked seat'+(locked>1?'s':'')+' will stay)':'')))return;
+  t.guests=t.guests.map(g=>{if(g&&!g.locked){d.unassigned.push({id:g.id,name:g.name,groups:g.groups});return null;}return g;});
+  markDirty();
+  document.getElementById('table-menu')?.remove();
+  renderSeating();
+  ts('🧹 '+t.name+' cleared');
+};
+
+// T3.4 — Rotate seats (shift everyone one seat, wrapping)
+window.tableRotate=function(idx){
+  const d=window._seating, t=d.tables[idx];
+  if(t.guests.filter(Boolean).length<2){ts('Need 2+ guests to rotate');return;}
+  // rotate the array by one (last becomes first)
+  const arr=t.guests.slice();
+  const last=arr.pop();
+  arr.unshift(last);
+  t.guests=arr;
+  markDirty();
+  document.getElementById('table-menu')?.remove();
+  renderSeating();
+  ts('🔁 Seats rotated');
+};
+
+// T3.2 — Move everyone from this table to another (fills empty seats there)
+window.tableMoveAll=function(fromIdx){
+  const d=window._seating;
+  document.getElementById('table-menu')?.remove();
+  const movers=d.tables[fromIdx].guests.filter(g=>g&&!g.locked);
+  if(movers.length===0){ts('No movable guests');return;}
+  let opts='';
+  d.tables.forEach((t,ti)=>{
+    if(ti===fromIdx)return;
+    const empty=t.guests.filter(s=>!s).length;
+    opts+=`<button onclick="doTableMoveAll(${fromIdx},${ti})" ${empty<movers.length?'disabled':''} style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:${empty<movers.length?'#f5f5f5':'#f7faf9'};border:1px solid #eee;border-radius:9px;padding:11px;margin-bottom:6px;font-size:13px;font-weight:600;color:${empty<movers.length?'#bbb':'#111'};cursor:${empty<movers.length?'not-allowed':'pointer'};font-family:inherit">
+      <span>${t.name}</span><span style="font-size:11px;color:#999">${empty} empty${empty<movers.length?' (not enough)':''}</span></button>`;
+  });
+  const p=document.createElement('div');p.className='modal-bg';p.id='table-moveall';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:330px;max-height:75vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Move ${movers.length} guest${movers.length>1?'s':''}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Pick a table with enough empty seats:</div>
+    ${opts}
+    <button onclick="document.getElementById('table-moveall').remove()" class="bg" style="width:100%;padding:11px;font-size:13px;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.doTableMoveAll=function(fromIdx,toIdx){
+  const d=window._seating, from=d.tables[fromIdx], to=d.tables[toIdx];
+  from.guests.forEach((g,si)=>{
+    if(g&&!g.locked){
+      const empty=to.guests.findIndex(s=>!s);
+      if(empty!==-1){to.guests[empty]=g;from.guests[si]=null;}
+    }
+  });
+  markDirty();
+  document.getElementById('table-moveall')?.remove();
+  renderSeating();
+  ts('➡️ Moved to '+to.name);
+};
+
+// T3.3 — Swap two entire tables (their guest contents)
+window.tableSwap=function(fromIdx){
+  const d=window._seating;
+  document.getElementById('table-menu')?.remove();
+  let opts='';
+  d.tables.forEach((t,ti)=>{
+    if(ti===fromIdx)return;
+    opts+=`<button onclick="doTableSwap(${fromIdx},${ti})" style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:#f7faf9;border:1px solid #eee;border-radius:9px;padding:11px;margin-bottom:6px;font-size:13px;font-weight:600;color:#111;cursor:pointer;font-family:inherit">
+      <span>${t.name}</span><span style="font-size:11px;color:#999">${t.guests.filter(Boolean).length}/${t.seats}</span></button>`;
+  });
+  if(!opts)opts='<div style="font-size:13px;color:#aaa;text-align:center;padding:14px">No other tables</div>';
+  const p=document.createElement('div');p.className='modal-bg';p.id='table-swap';p.style.zIndex='10000';
+  p.innerHTML=`<div class="modal" style="max-width:330px;max-height:75vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Swap ${d.tables[fromIdx].name} with…</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Both tables trade all their guests:</div>
+    ${opts}
+    <button onclick="document.getElementById('table-swap').remove()" class="bg" style="width:100%;padding:11px;font-size:13px;margin-top:4px">Cancel</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.doTableSwap=function(aIdx,bIdx){
+  const d=window._seating, a=d.tables[aIdx], b=d.tables[bIdx];
+  // swap guest arrays; if seat counts differ, keep what fits, overflow → waiting
+  const aG=a.guests.slice(), bG=b.guests.slice();
+  a.guests=new Array(a.seats).fill(null);
+  b.guests=new Array(b.seats).fill(null);
+  // place b's guests into a
+  let overflow=[];
+  bG.filter(Boolean).forEach(g=>{const e=a.guests.findIndex(s=>!s);if(e!==-1)a.guests[e]=g;else overflow.push(g);});
+  aG.filter(Boolean).forEach(g=>{const e=b.guests.findIndex(s=>!s);if(e!==-1)b.guests[e]=g;else overflow.push(g);});
+  overflow.forEach(g=>d.unassigned.push({id:g.id,name:g.name,groups:g.groups}));
+  markDirty();
+  document.getElementById('table-swap')?.remove();
+  renderSeating();
+  ts('🔄 Tables swapped'+(overflow.length?(' ('+overflow.length+' to waiting — size differs)'):''));
 };
 
 window.seatClick=function(tableIdx,seatIdx){
