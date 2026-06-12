@@ -10793,6 +10793,7 @@ function renderSeating(){
     <div style="background:#FFFDF5;border:1px solid #E8D69A;border-radius:12px;padding:12px;margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:#9c7a1e;margin-bottom:6px">👥 Guests waiting to be seated — ${d.unassigned.length}</div>
       <div style="margin-bottom:10px">${unassignedHTML}</div>
+      ${d.unassigned.length>0&&st.totalSeats-st.assigned>0?`<button onclick="autoFillSeats()" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#0F9AA8;margin-bottom:10px">✨ Auto-seat all waiting guests (${Math.min(d.unassigned.length,st.totalSeats-st.assigned)})</button>`:''}
       <div style="font-size:11px;color:#888;margin-bottom:4px">Add guests (one per line, or comma-separated):</div>
       <textarea id="seat-add-guests" class="finp" rows="2" placeholder="Jane Smith&#10;Carlos Vega, Aisha Khan" style="resize:none;font-size:12px;margin-bottom:8px"></textarea>
       <button onclick="addSeatGuests()" class="bg" style="width:100%;padding:10px;font-size:12px;font-weight:600">+ Add guests to waiting list</button>
@@ -11030,6 +11031,27 @@ window.addSeatGuests=function(){
   window._seatingDirty=true;
   ts(names.length+' guest'+(names.length>1?'s':'')+' added');
   renderSeating();
+};
+
+// ✨ AUTO-FILL: seat all waiting guests into empty seats, in order
+window.autoFillSeats=function(){
+  const d=window._seating;
+  // collect empty seats in table order (skip locked — they're empty anyway, but keep tidy)
+  let seated=0;
+  for(let ti=0;ti<d.tables.length && d.unassigned.length>0;ti++){
+    const t=d.tables[ti];
+    for(let si=0;si<t.guests.length && d.unassigned.length>0;si++){
+      if(!t.guests[si]){
+        t.guests[si]=d.unassigned.shift();
+        seated++;
+      }
+    }
+  }
+  window._seatingDirty=true;
+  renderSeating();
+  if(seated===0){ts('No empty seats available');}
+  else if(d.unassigned.length>0){ts('✨ Seated '+seated+' — '+d.unassigned.length+' still waiting (need more seats)');}
+  else{ts('✨ All guests seated!');}
 };
 
 window.saveSeating=async function(){
