@@ -1,0 +1,31 @@
+IMPORTANT: Your firebase.json needs cache headers to stop the old-version problem.
+
+Open firebase.json in your project folder. Find the "hosting" section.
+Add the "headers" block so index.html is never cached.
+
+Your hosting section should look like this:
+
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "/",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      }
+    ]
+  }
+
+(Keep your existing settings — just ADD the "headers" array inside "hosting".)
