@@ -17,6 +17,7 @@
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png"/>
 <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;display:flex;justify-content:center}
@@ -10969,7 +10970,8 @@ function renderSeating(){
       ${d.unassigned.length>0&&st.totalSeats-st.assigned>0?`<button onclick="autoFillSeats()" class="bt" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#0F9AA8;margin-bottom:10px">✨ Auto-seat all waiting guests (${Math.min(d.unassigned.length,st.totalSeats-st.assigned)})</button>`:''}
       <div style="font-size:11px;color:#888;margin-bottom:4px">Add guests (one per line, or comma-separated):</div>
       <textarea id="seat-add-guests" class="finp" rows="2" placeholder="Jane Smith&#10;Carlos Vega, Aisha Khan" style="resize:none;font-size:12px;margin-bottom:8px"></textarea>
-      <button onclick="addSeatGuests()" class="bg" style="width:100%;padding:10px;font-size:12px;font-weight:600">+ Add guests to waiting list</button>
+      <button onclick="addSeatGuests()" class="bg" style="width:100%;padding:10px;font-size:12px;font-weight:600;margin-bottom:8px">+ Add guests to waiting list</button>
+      <button onclick="openGuestUpload()" style="width:100%;padding:10px;font-size:12px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit">📤 Upload guest list (Excel / CSV)</button>
     </div>
 
     <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save seating plan</button>
@@ -11532,6 +11534,86 @@ window.addSeatGuests=function(){
 };
 
 // ✨ AUTO-FILL: seat all waiting guests into empty seats, in order
+// ─── BULK UPLOAD guest list (Excel / CSV) ───
+window.openGuestUpload=function(){
+  document.getElementById('guest-upload')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='guest-upload';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:360px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:#111">📤 Upload guest list</div>
+      <button onclick="document.getElementById('guest-upload').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.6">Upload an Excel or CSV file. Columns (first row = headers):</div>
+    <div style="background:#f7faf9;border:1px solid #eee;border-radius:9px;padding:10px;margin-bottom:6px;font-size:11px;color:#444;font-family:monospace">
+      <b>Name</b> · Email · Phone · Table
+    </div>
+    <div style="font-size:11px;color:#999;margin-bottom:14px;line-height:1.5">Only <b>Name</b> is required. If a <b>Table</b> column exists, guests are auto-seated there; otherwise they go to the waiting list. Email/Phone let you send their seat links.</div>
+    <button onclick="downloadGuestTemplate()" style="width:100%;padding:10px;font-size:12px;font-weight:600;background:#fff;color:#0C447C;border:1.5px solid #B5CCE8;border-radius:9px;cursor:pointer;font-family:inherit;margin-bottom:10px">⬇️ Download template file</button>
+    <input type="file" id="guest-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleGuestFile(event)">
+    <button onclick="document.getElementById('guest-file').click()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700">📁 Choose file to upload</button>
+    <div id="upload-status" style="font-size:12px;color:#888;text-align:center;margin-top:12px"></div>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.downloadGuestTemplate=function(){
+  const csv='Name,Email,Phone,Table\nRafael Javadov,rafael@example.com,+1 555 123 4567,Table 1\nJane Smith,jane@example.com,,Table 1\nCarlos Vega,,+1 555 987 6543,Table 2\n';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vivace-guest-template.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  ts('⬇️ Template downloaded');
+};
+
+window.handleGuestFile=function(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  const status=document.getElementById('upload-status');
+  if(status)status.textContent='⏳ Reading file…';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+      if(!rows.length){if(status)status.textContent='No rows found in file.';return;}
+      processGuestRows(rows);
+    }catch(err){console.error('upload:',err);if(status)status.textContent='Could not read file. Check the format.';}
+  };
+  reader.readAsBinaryString(file);
+};
+
+function processGuestRows(rows){
+  const d=window._seating;
+  // flexible header matching (case-insensitive)
+  function pick(row,keys){for(const k of Object.keys(row)){const lk=k.trim().toLowerCase();if(keys.includes(lk))return String(row[k]).trim();}return '';}
+  let seated=0, waiting=0, tablesMade=0;
+  rows.forEach((row,i)=>{
+    const name=pick(row,['name','guest','full name','guest name']);
+    if(!name)return;
+    const email=pick(row,['email','e-mail','mail']);
+    const phone=pick(row,['phone','mobile','cell','tel','telephone']);
+    const tableName=pick(row,['table','table name','table #','table number','seat table']);
+    const guest={id:'g'+Date.now()+i,name:name};
+    if(email)guest.email=email;
+    if(phone)guest.phone=phone;
+    if(tableName){
+      // find or create the table
+      let t=d.tables.find(x=>x.name.toLowerCase()===tableName.toLowerCase());
+      if(!t){t={name:tableName,shape:'round',seats:10,guests:new Array(10).fill(null),color:SEAT_TABLE_COLORS[d.tables.length%SEAT_TABLE_COLORS.length]};d.tables.push(t);tablesMade++;}
+      // seat at first empty; grow table if full
+      let si=t.guests.findIndex(s=>!s);
+      if(si===-1){t.seats+=2;t.guests.push(null,null);si=t.guests.findIndex(s=>!s);}
+      t.guests[si]=guest;seated++;
+    }else{
+      d.unassigned.push(guest);waiting++;
+    }
+  });
+  markDirty();
+  document.getElementById('guest-upload')?.remove();
+  renderSeating();
+  ts(`✅ Imported: ${seated} seated, ${waiting} waiting${tablesMade?', '+tablesMade+' tables created':''}`);
+}
+
 window.autoFillSeats=function(){
   const d=window._seating;
   // collect empty seats in table order (skip locked — they're empty anyway, but keep tidy)
