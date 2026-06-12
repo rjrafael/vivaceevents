@@ -10719,6 +10719,16 @@ function seatingStats(){
   return {tables,totalSeats,assigned,unassigned};
 }
 
+// Smart initials: first letter of first + first letter of last word.
+// "Rafael Javadov"→"RJ", "Artist 1"→"A1", "Madonna"→"MA"
+function smartInitials(name){
+  if(!name)return '?';
+  const parts=name.trim().split(/\s+/).filter(Boolean);
+  if(parts.length===0)return '?';
+  if(parts.length===1)return parts[0].substring(0,2).toUpperCase();
+  return (parts[0][0]+parts[parts.length-1][0]).toUpperCase();
+}
+
 function tableShapeSVG(t,idx){
   // Returns an SVG block representing one table with its seats around it
   const color=t.color||SEAT_TABLE_COLORS[idx%SEAT_TABLE_COLORS.length];
@@ -10733,7 +10743,7 @@ function tableShapeSVG(t,idx){
     const sx=cx+Math.cos(ang)*(rx+14), sy=cy+Math.sin(ang)*(ry+14);
     const g=t.guests[i];
     const seatColor=g?(g.locked?'#C9A84C':color):'#e5e5e5';
-    const initials=g?g.name.substring(0,2).toUpperCase():'';
+    const initials=g?smartInitials(g.name):'';
     inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
       ${g?`<title>${g.name}${g.locked?' 🔒':''}</title>`:''}
       <circle cx="${sx}" cy="${sy}" r="12" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
@@ -10809,7 +10819,8 @@ function renderSeating(){
       <button onclick="addSeatGuests()" class="bg" style="width:100%;padding:10px;font-size:12px;font-weight:600">+ Add guests to waiting list</button>
     </div>
 
-    <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700">💾 Save seating plan</button>
+    <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save seating plan</button>
+    <button onclick="openSeatingPrint()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print / Export PDF</button>
   </div>`;
   document.getElementById('app').appendChild(m);
   setupSeatingDrag();
@@ -10838,6 +10849,14 @@ function setupSeatingDrag(){
     chip.addEventListener('pointermove',e=>{
       if(!dragging||!ghost)return;
       ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
+      // auto-scroll the modal when dragging near top/bottom edge
+      const scroller=modal.querySelector('.modal');
+      if(scroller){
+        const r=scroller.getBoundingClientRect();
+        const edge=60; // px zone near each edge
+        if(e.clientY < r.top+edge){scroller.scrollTop-=12;}
+        else if(e.clientY > r.bottom-edge){scroller.scrollTop+=12;}
+      }
       ghost.style.display='none';
       const el=document.elementFromPoint(e.clientX,e.clientY);
       ghost.style.display='';
@@ -10968,7 +10987,7 @@ function showSeatActions(tableIdx,seatIdx){
   const p=document.createElement('div');p.className='modal-bg';p.id='seat-actions';p.style.zIndex='10000';
   p.innerHTML=`<div class="modal" style="max-width:340px">
     <div style="text-align:center;margin-bottom:4px">
-      <div style="width:46px;height:46px;border-radius:50%;background:${t.color};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin-bottom:8px">${g.name.substring(0,2).toUpperCase()}</div>
+      <div style="width:46px;height:46px;border-radius:50%;background:${t.color};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin-bottom:8px">${smartInitials(g.name)}</div>
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;text-align:center">${g.name} ${locked?'🔒':''}</div>
     <div style="font-size:12px;color:#888;text-align:center;margin-bottom:16px">${t.name} · Seat ${seatIdx+1}</div>
@@ -11145,6 +11164,154 @@ window.saveSeating=async function(){
     if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}
     return true;
   }catch(e){console.error('saveSeating:',e);ts('Could not save: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}return false;}
+};
+
+// ═══════════════════════════════════════════════════════════
+// 🖨️ PRINT / EXPORT PDF — choose tables + format + names
+// ═══════════════════════════════════════════════════════════
+window.openSeatingPrint=function(){
+  const d=window._seating;
+  if(!d.tables.length){ts('Add tables first');return;}
+  document.getElementById('seat-print')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-print';p.style.zIndex='10001';
+  const tableChecks=d.tables.map((t,i)=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 4px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f5f5">
+      <input type="checkbox" class="print-tbl" value="${i}" checked style="width:16px;height:16px;accent-color:#1D9E75">
+      <span style="flex:1">${t.name}</span>
+      <span style="font-size:11px;color:#999">${t.guests.filter(Boolean).length}/${t.seats}</span>
+    </label>`).join('');
+  p.innerHTML=`<div class="modal" style="max-width:380px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:#111">🖨️ Print / Export</div>
+      <button onclick="document.getElementById('seat-print').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">Choose what to include, then export a PDF.</div>
+
+    <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px">1. Format</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <label style="flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF" id="fmt-visual-lbl">
+        <input type="radio" name="print-fmt" value="visual" checked style="display:none" onchange="seatPrintFmtUI()">🪑 Visual layout</label>
+      <label style="flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600" id="fmt-list-lbl">
+        <input type="radio" name="print-fmt" value="list" style="display:none" onchange="seatPrintFmtUI()">📋 Name list</label>
+    </div>
+
+    <div id="print-names-opt" style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px">2. Names</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="print-with-names" checked style="width:16px;height:16px;accent-color:#1D9E75">
+        Show guest names on the layout
+      </label>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:#0C447C;margin-bottom:6px;display:flex;justify-content:space-between">
+      <span>3. Which tables</span>
+      <span style="font-weight:400;color:#1D9E75;cursor:pointer" onclick="seatPrintToggleAll()">Select all / none</span>
+    </div>
+    <div style="border:1px solid #eee;border-radius:9px;padding:4px 10px;margin-bottom:16px;max-height:180px;overflow-y:auto">${tableChecks}</div>
+
+    <button onclick="generateSeatingPDF()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C">📄 Create PDF — print or save</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.seatPrintFmtUI=function(){
+  const fmt=document.querySelector('input[name="print-fmt"]:checked').value;
+  document.getElementById('fmt-visual-lbl').style.cssText=fmt==='visual'?'flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF':'flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600';
+  document.getElementById('fmt-list-lbl').style.cssText=fmt==='list'?'flex:1;text-align:center;padding:10px;border:2px solid #1D9E75;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;background:#E8F3EF':'flex:1;text-align:center;padding:10px;border:2px solid #eee;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600';
+  // names option only relevant for visual
+  document.getElementById('print-names-opt').style.opacity=fmt==='visual'?'1':'0.4';
+};
+
+window.seatPrintToggleAll=function(){
+  const boxes=document.querySelectorAll('.print-tbl');
+  const allChecked=Array.from(boxes).every(b=>b.checked);
+  boxes.forEach(b=>b.checked=!allChecked);
+};
+
+window.generateSeatingPDF=function(){
+  const d=window._seating;
+  const fmt=document.querySelector('input[name="print-fmt"]:checked').value;
+  const withNames=document.getElementById('print-with-names').checked;
+  const picked=Array.from(document.querySelectorAll('.print-tbl:checked')).map(b=>parseInt(b.value,10));
+  if(picked.length===0){ts('Pick at least one table');return;}
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210, M=15;
+    // Header
+    pdf.setFillColor(29,158,117);pdf.rect(0,0,W,22,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(16);
+    pdf.text('Vivace Events — Seating',M,14);
+    pdf.setTextColor(40,40,40);pdf.setFontSize(12);
+    pdf.text(window._seatingTitle||'Event',M,30);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(120,120,120);
+    pdf.text('Generated '+new Date().toLocaleDateString(),M,36);
+    let y=46;
+
+    if(fmt==='list'){
+      // ── NAME LIST format ──
+      picked.forEach(ti=>{
+        const t=d.tables[ti];
+        if(y>270){pdf.addPage();y=20;}
+        pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(12,68,124);
+        pdf.text(t.name+'  ('+t.guests.filter(Boolean).length+'/'+t.seats+')',M,y);y+=6;
+        pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(40,40,40);
+        const seated=t.guests.map((g,si)=>g?{n:si+1,name:g.name,locked:g.locked}:null).filter(Boolean);
+        if(seated.length===0){pdf.setTextColor(150,150,150);pdf.text('  (no guests seated)',M,y);y+=6;}
+        else seated.forEach(s=>{if(y>285){pdf.addPage();y=20;}pdf.text('  Seat '+s.n+':  '+s.name+(s.locked?'  [locked]':''),M,y);y+=5.5;});
+        y+=4;
+      });
+    }else{
+      // ── VISUAL layout format ──
+      const cols=2, cellW=(W-M*2)/cols, cellH=70;
+      let col=0;
+      picked.forEach(ti=>{
+        const t=d.tables[ti];
+        const cx=M+col*cellW+cellW/2, cyTop=y;
+        if(y>240){pdf.addPage();y=20;col=0;}
+        const ccx=M+col*cellW+cellW/2, ccy=y+28;
+        // table shape
+        pdf.setDrawColor(29,158,117);pdf.setFillColor(232,243,239);pdf.setLineWidth(0.5);
+        if(t.shape==='round')pdf.circle(ccx,ccy,16,'FD');
+        else if(t.shape==='square')pdf.rect(ccx-15,ccy-15,30,30,'FD');
+        else pdf.rect(ccx-20,ccy-12,40,24,'FD');
+        // table name
+        pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(12,68,124);
+        pdf.text(t.name,ccx,ccy-1,{align:'center'});
+        pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(120,120,120);
+        pdf.text(t.guests.filter(Boolean).length+'/'+t.seats,ccx,ccy+4,{align:'center'});
+        // seats around
+        const n=t.seats;
+        for(let i=0;i<n;i++){
+          const ang=(i/n)*2*Math.PI-Math.PI/2;
+          const rx=t.shape==='rectangle'?26:22, ry=t.shape==='rectangle'?18:22;
+          const sx=ccx+Math.cos(ang)*rx, sy=ccy+Math.sin(ang)*ry;
+          const g=t.guests[i];
+          if(g){pdf.setFillColor(g.locked?201:29,g.locked?168:158,g.locked?76:117);}else{pdf.setFillColor(220,220,220);}
+          pdf.circle(sx,sy,3.2,'F');
+          if(g&&withNames){pdf.setFontSize(5);pdf.setTextColor(255,255,255);pdf.text(smartInitials(g.name),sx,sy+1,{align:'center'});}
+        }
+        // names list under table (if withNames)
+        if(withNames){
+          let ny=ccy+24;pdf.setFontSize(6.5);pdf.setTextColor(60,60,60);
+          t.guests.forEach((g,si)=>{if(g){pdf.text((si+1)+'. '+g.name,M+col*cellW+4,ny);ny+=3.4;}});
+        }
+        col++;
+        if(col>=cols){col=0;y+=cellH;}
+      });
+    }
+    pdf.setFontSize(7);pdf.setTextColor(160,160,160);
+    pdf.text('Vivace Events · Virtual Studio Orchestra LLC',M,290);
+    const fname='seating-'+(window._seatingTitle||'event').replace(/[^a-z0-9]/gi,'-')+'.pdf';
+    // Open in a new tab so the user can Print OR Save from their PDF viewer
+    try{
+      const blob=pdf.output('blob');
+      const url=URL.createObjectURL(blob);
+      const win=window.open(url,'_blank');
+      if(!win){ pdf.save(fname); ts('📄 PDF downloaded (pop-up blocked)'); }
+      else{ ts('📄 PDF ready — print or save from the new tab'); }
+    }catch(_){ pdf.save(fname); ts('📄 PDF created!'); }
+    document.getElementById('seat-print')?.remove();
+  }catch(e){console.error('PDF error:',e);ts('Could not make PDF: '+e.message);}
 };
 
 window.safeCloseSeating=async function(){
