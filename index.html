@@ -11538,11 +11538,32 @@ window.showSeatingQR=async function(){
     <div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:16px;display:inline-block;margin-bottom:14px">
       <img src="${qrSrc}" alt="QR code" style="width:240px;height:240px;display:block" id="qr-img">
     </div>
-    <div style="font-size:11px;color:#888;word-break:break-all;margin-bottom:14px;background:#f7f7f7;padding:8px;border-radius:8px;user-select:all">${url}</div>
-    <button onclick="copySeatLink(window._seatLinkUrl)" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">🔗 Copy guest link</button>
+    <div style="font-size:11px;color:#888;margin-bottom:6px;text-align:left">Guest link (tap to select, then copy):</div>
+    <input id="seat-link-field" value="${url}" readonly onclick="this.select();this.setSelectionRange(0,99999)" style="width:100%;font-size:11px;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;background:#f9f9f9;color:#444;box-sizing:border-box">
+    <button onclick="copySeatLink2()" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">🔗 Copy guest link</button>
+    ${navigator.share?`<button onclick="shareSeatLink()" style="width:100%;padding:12px;font-size:13px;font-weight:700;background:#1D9E75;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">📤 Share link</button>`:''}
     <button onclick="printSeatingQR(document.getElementById('qr-img').src,window._seatLinkUrl)" style="width:100%;padding:12px;font-size:13px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print the QR poster</button>
   </div>`;
   document.getElementById('app').appendChild(p);
+};
+
+window.copySeatLink2=function(){
+  const field=document.getElementById('seat-link-field');
+  if(!field)return;
+  field.focus();field.select();field.setSelectionRange(0,99999);
+  let done=false;
+  try{done=document.execCommand('copy');}catch(_){}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(field.value).then(()=>ts('🔗 Link copied!')).catch(()=>{ts(done?'🔗 Link copied!':'Link selected — press Ctrl+C / long-press to copy');});
+  }else{
+    ts(done?'🔗 Link copied!':'Link selected — long-press to copy');
+  }
+};
+
+window.shareSeatLink=function(){
+  if(navigator.share){
+    navigator.share({title:'Find your seat',text:'Find your table at the event:',url:window._seatLinkUrl}).catch(()=>{});
+  }
 };
 
 window.copySeatLink=function(url){
