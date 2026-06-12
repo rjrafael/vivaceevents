@@ -11922,7 +11922,7 @@ window.showGuestLinks=async function(){
         </div>
         <div style="display:flex;gap:6px">
           <input readonly value="${base}${r.code}" onclick="this.select();this.setSelectionRange(0,99999)" style="flex:1;font-size:10px;padding:7px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#555;box-sizing:border-box">
-          <button onclick="copyGuestLink('${base}${r.code}')" class="bt" style="padding:6px 10px;font-size:11px">Copy</button>
+          <button onclick="copyGuestLink('${base}${r.code}',this)" class="bt" style="padding:6px 10px;font-size:11px;min-width:54px">Copy</button>
           ${r.phone?`<button onclick="waGuestLink('${r.phone}','${base}${r.code}','${r.name.replace(/'/g,"")}')" style="padding:6px 10px;font-size:11px;background:#25D366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit" title="WhatsApp">💬</button>`:''}
           ${navigator.share?`<button onclick="shareGuestLink('${base}${r.code}','${r.name.replace(/'/g,"")}')" style="padding:6px 10px;font-size:11px;background:#1D9E75;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit">📤</button>`:''}
         </div>
@@ -12020,13 +12020,19 @@ window.waGuestLink=function(phone,url,name){
   window.open('https://wa.me/'+clean+'?text='+text,'_blank');
 };
 
-window.copyGuestLink=function(url){
+window.copyGuestLink=function(url,btn){
   const tmp=document.createElement('textarea');tmp.value=url;tmp.style.position='fixed';tmp.style.opacity='0';
   document.body.appendChild(tmp);tmp.focus();tmp.select();
   let ok=false;try{ok=document.execCommand('copy');}catch(_){}
   document.body.removeChild(tmp);
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>ts('🔗 Copied!')).catch(()=>ts(ok?'🔗 Copied!':'Tap the link to copy'));}
-  else ts(ok?'🔗 Copied!':'Tap the link to copy');
+  function flash(){
+    if(!btn)return;
+    const orig=btn.textContent,obg=btn.style.background,ocol=btn.style.color;
+    btn.textContent='✓ Copied!';btn.style.background='#1D9E75';btn.style.color='#fff';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background=obg;btn.style.color=ocol;},1400);
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(flash).catch(()=>{flash();if(!ok)ts('Tap the link to copy');});}
+  else {flash();if(!ok)ts('Tap the link to copy');}
 };
 
 window.shareGuestLink=function(url,name){
