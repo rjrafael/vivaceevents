@@ -10372,16 +10372,37 @@ async function loadFindSeat(){
     if(snap.empty){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Seating not found.<br>Please check with the event host.</div>`;return;}
     const data=snap.docs[0].data();
     window._findSeatPlan=data.plan;
-    const evtLabel=document.getElementById('find-seat-event');
-    // try to fetch event title
-    try{const es=await getDocs(query(collection(db,'organizer_events'),where('__name__','==',window._findSeatEventId)));}catch(_){}
-    body.innerHTML=`
-      <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:4px">Find your seat</div>
-      <div style="font-size:13px;color:#888;text-align:center;margin-bottom:18px">Type your <b>full name</b> exactly as on your invitation</div>
-      <input id="find-seat-input" class="finp" placeholder="Your full name…" style="font-size:15px;padding:13px;margin-bottom:10px" onkeydown="if(event.key==='Enter')doFindSeat()">
-      <button onclick="doFindSeat()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:14px">Find my seat</button>
-      <div id="find-seat-results"></div>`;
-    document.getElementById('find-seat-input')?.focus();
+    const code=(window._findSeatCode||'').trim();
+    if(!code){
+      // No personal code → secure: cannot browse. Must use personal link.
+      body.innerHTML=`<div style="text-align:center;padding:30px 6px">
+        <div style="font-size:40px;margin-bottom:12px">🔒</div>
+        <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px">Use your personal link</div>
+        <div style="font-size:13px;color:#888;line-height:1.6">For your privacy, seats can only be viewed with your own personal invitation link.<br><br>Please open the link the host sent you, or ask the host for your seat.</div>
+      </div>`;
+      return;
+    }
+    // Find the guest whose code matches
+    let found=null;
+    window._findSeatPlan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.code===code)found={name:g.name,table:t.name,seat:si+1};}));
+    if(!found){
+      body.innerHTML=`<div style="text-align:center;padding:30px 6px">
+        <div style="font-size:36px;margin-bottom:12px">🤔</div>
+        <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:8px">Seat not found</div>
+        <div style="font-size:13px;color:#888;line-height:1.6">This link may be out of date. Please check with the event host for your current seat.</div>
+      </div>`;
+      return;
+    }
+    body.innerHTML=`<div style="text-align:center;padding:14px 6px">
+      <div style="font-size:13px;color:#888;margin-bottom:4px">Welcome,</div>
+      <div style="font-size:20px;font-weight:800;color:#111;margin-bottom:20px">${found.name}</div>
+      <div style="background:#E8F3EF;border:1px solid #B7E0D2;border-radius:18px;padding:28px 16px;margin-bottom:14px">
+        <div style="font-size:13px;color:#0F6E56;margin-bottom:6px">Your table</div>
+        <div style="font-size:38px;font-weight:800;color:#1D9E75;line-height:1.1">${found.table}</div>
+        <div style="font-size:15px;color:#888;margin-top:8px">Seat ${found.seat}</div>
+      </div>
+      <div style="font-size:12px;color:#aaa">Have a wonderful evening 🎶</div>
+    </div>`;
   }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
 }
 
@@ -10459,7 +10480,7 @@ window.addEventListener('load',()=>{
   const profileId=params.get('profile');
   if(profileId){_publicProfileId=profileId;CS='public-profile';}
   const seatEvent=params.get('seat');
-  if(seatEvent){window._findSeatEventId=seatEvent;CS='find-seat';}
+  if(seatEvent){window._findSeatEventId=seatEvent;window._findSeatCode=params.get('g')||'';CS='find-seat';}
 });
 
 // ─── DMCA PAGE ───────────────────────────────────────────────────
@@ -10953,7 +10974,8 @@ function renderSeating(){
 
     <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save seating plan</button>
     <button onclick="openSeatingPrint()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">🖨️ Print / Export PDF</button>
-    <button onclick="showSeatingQR()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#7B3FBF;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">📱 Guest QR code — find your seat</button>
+    <button onclick="showSeatingQR()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#7B3FBF;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">📱 Guest QR code — find your seat</button>
+    <button onclick="showGuestLinks()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0F9AA8;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🔐 Personal guest links (secure)</button>
   </div>`;
   document.getElementById('app').appendChild(m);
   setupSeatingDrag();
@@ -11520,6 +11542,24 @@ window.saveSeating=async function(silent){
 // ═══════════════════════════════════════════════════════════
 // 🖨️ PRINT / EXPORT PDF — choose tables + format + names
 // ═══════════════════════════════════════════════════════════
+// ─── Secure per-guest codes ───
+function gcode(){
+  // 6-char unguessable code (no ambiguous chars)
+  const chars='abcdefghjkmnpqrstuvwxyz23456789';
+  let s='';for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function ensureGuestCodes(){
+  // give every seated guest a unique code if they don't have one
+  const used=new Set();
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)used.add(g.code);}));
+  let added=false;
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{
+    if(g&&!g.code){let c=gcode();while(used.has(c))c=gcode();g.code=c;used.add(c);added=true;}
+  }));
+  return added;
+}
+
 window.showSeatingQR=async function(){
   // must be saved so guests can load it
   if(!window._seatingDocId||window._seatingDirty){
@@ -11537,7 +11577,7 @@ window.showSeatingQR=async function(){
       <div style="font-size:16px;font-weight:700;color:#111">📱 Guest seat finder</div>
       <button onclick="document.getElementById('seat-qr').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.5">Print this QR at your entrance. Guests scan it, type their name, and instantly see their table — no app, no login.</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.5">This is the general event link. For privacy, guests need their <b>own personal link</b> (see "Personal guest links") to view their seat. Use this QR for staff or a check-in tablet.</div>
     <div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:16px;display:inline-block;margin-bottom:14px">
       <img src="${qrSrc}" alt="QR code" style="width:240px;height:240px;display:block" id="qr-img">
     </div>
@@ -11567,6 +11607,55 @@ window.shareSeatLink=function(){
   if(navigator.share){
     navigator.share({title:'Find your seat',text:'Find your table at the event:',url:window._seatLinkUrl}).catch(()=>{});
   }
+};
+
+// ─── PERSONAL GUEST LINKS (secure per-guest codes) ───
+window.showGuestLinks=async function(){
+  // ensure all seated guests have codes; save if we added any
+  if(!window._seatingDocId||window._seatingDirty){ts('Saving first…');const ok=await saveSeating(true);if(!ok){ts('Save failed');return;}}
+  const added=ensureGuestCodes();
+  if(added){markDirty();await saveSeating(true);}
+  // build list of seated guests with their links
+  const rows=[];
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push({name:g.name,table:t.name,code:g.code});}));
+  document.getElementById('guest-links')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='guest-links';p.style.zIndex='10001';
+  const base='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId)+'&g=';
+  const list=rows.length===0
+    ? '<div style="font-size:13px;color:#aaa;text-align:center;padding:20px">Seat some guests first.</div>'
+    : rows.map((r,i)=>`<div style="background:#f7faf9;border:1px solid #eee;border-radius:11px;padding:11px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:700;color:#111">${r.name}</div>
+          <div style="font-size:11px;color:#888">${r.table}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input readonly value="${base}${r.code}" onclick="this.select();this.setSelectionRange(0,99999)" style="flex:1;font-size:10px;padding:7px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#555;box-sizing:border-box">
+          <button onclick="copyGuestLink('${base}${r.code}')" class="bt" style="padding:6px 10px;font-size:11px">Copy</button>
+          ${navigator.share?`<button onclick="shareGuestLink('${base}${r.code}','${r.name.replace(/'/g,"")}')" style="padding:6px 10px;font-size:11px;background:#1D9E75;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit">📤</button>`:''}
+        </div>
+      </div>`).join('');
+  p.innerHTML=`<div class="modal" style="max-width:380px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:#111">🔐 Personal guest links</div>
+      <button onclick="document.getElementById('guest-links').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Each guest has a private link that opens straight to <b>their own seat only</b>. Send each person their link (text, email, or print on their invitation). Nobody can see anyone else's seat.</div>
+    ${list}
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.copyGuestLink=function(url){
+  const tmp=document.createElement('textarea');tmp.value=url;tmp.style.position='fixed';tmp.style.opacity='0';
+  document.body.appendChild(tmp);tmp.focus();tmp.select();
+  let ok=false;try{ok=document.execCommand('copy');}catch(_){}
+  document.body.removeChild(tmp);
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>ts('🔗 Copied!')).catch(()=>ts(ok?'🔗 Copied!':'Tap the link to copy'));}
+  else ts(ok?'🔗 Copied!':'Tap the link to copy');
+};
+
+window.shareGuestLink=function(url,name){
+  if(navigator.share){navigator.share({title:'Your seat',text:name+', here is your seat:',url:url}).catch(()=>{});}
 };
 
 window.copySeatLink=function(url){
