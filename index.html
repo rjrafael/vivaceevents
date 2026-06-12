@@ -10702,6 +10702,7 @@ window.openSeating=async function(eventId,eventTitle){
   }
   window._seating=data;
   window._seatingTitle=eventTitle||'Event';
+  window._seatingDirty=false;  // track unsaved changes
   renderSeating();
 };
 
@@ -10766,7 +10767,7 @@ function renderSeating(){
   m.innerHTML=`<div class="modal" style="max-width:480px;max-height:92vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div style="font-size:17px;font-weight:700;color:#111">🪑 Seating — ${window._seatingTitle}</div>
-      <button onclick="document.getElementById('seating-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+      <button onclick="safeCloseSeating()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
     <div style="font-size:12px;color:#888;margin-bottom:12px">Lay out tables, then tap a seat to assign a guest.</div>
 
@@ -10807,6 +10808,7 @@ window.addTable=function(){
   const d=window._seating;
   const num=d.tables.length+1;
   d.tables.push({name:'Table '+num,shape:shape,seats:seats,guests:new Array(seats).fill(null),color:SEAT_TABLE_COLORS[d.tables.length%SEAT_TABLE_COLORS.length]});
+  window._seatingDirty=true;
   renderSeating();
 };
 
@@ -10816,13 +10818,14 @@ window.deleteTable=function(idx){
   // return seated guests to unassigned
   t.guests.filter(Boolean).forEach(g=>d.unassigned.push(g));
   d.tables.splice(idx,1);
+  window._seatingDirty=true;
   renderSeating();
 };
 
 window.renameTable=function(idx){
   const d=window._seating, t=d.tables[idx];
   const nm=prompt('Table name:',t.name);
-  if(nm&&nm.trim()){t.name=nm.trim();renderSeating();}
+  if(nm&&nm.trim()){t.name=nm.trim();window._seatingDirty=true;renderSeating();}
 };
 
 window.seatClick=function(tableIdx,seatIdx){
@@ -10833,6 +10836,7 @@ window.seatClick=function(tableIdx,seatIdx){
     if(confirm('Remove '+occupant.name+' from this seat?')){
       d.unassigned.push(occupant);
       t.guests[seatIdx]=null;
+      window._seatingDirty=true;
       renderSeating();
     }
     return;
@@ -10860,12 +10864,14 @@ window.assignSeat=function(tableIdx,seatIdx,guestIdx){
   const g=d.unassigned.splice(guestIdx,1)[0];
   d.tables[tableIdx].guests[seatIdx]=g;
   document.getElementById('seat-picker')?.remove();
+  window._seatingDirty=true;
   renderSeating();
 };
 
 window.seatRemoveGuest=function(idx){
   const d=window._seating;
   d.unassigned.splice(idx,1);
+  window._seatingDirty=true;
   renderSeating();
 };
 
@@ -10876,6 +10882,7 @@ window.addSeatGuests=function(){
   const names=raw.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
   const d=window._seating;
   names.forEach((n,i)=>d.unassigned.push({id:'g'+Date.now()+i,name:n}));
+  window._seatingDirty=true;
   ts(names.length+' guest'+(names.length>1?'s':'')+' added');
   renderSeating();
 };
@@ -10892,8 +10899,45 @@ window.saveSeating=async function(){
       window._seatingDocId=ref.id;
     }
     ts('🪑 Seating plan saved!');
+    window._seatingDirty=false;
     if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}
-  }catch(e){console.error('saveSeating:',e);ts('Could not save: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}}
+    return true;
+  }catch(e){console.error('saveSeating:',e);ts('Could not save: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save seating plan';}return false;}
+};
+
+window.safeCloseSeating=async function(){
+  // If there are unsaved changes, ask diplomatically before closing
+  if(window._seatingDirty){
+    showSeatingCloseDialog();
+    return;
+  }
+  document.getElementById('seating-modal')?.remove();
+};
+
+function showSeatingCloseDialog(){
+  document.getElementById('seat-close-dialog')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-close-dialog';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:340px">
+    <div style="font-size:30px;text-align:center;margin-bottom:8px">💾</div>
+    <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:6px">Save your seating plan?</div>
+    <div style="font-size:13px;color:#888;text-align:center;line-height:1.5;margin-bottom:18px">You have unsaved changes. Would you like to save them before closing?</div>
+    <button onclick="seatingCloseSave()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save &amp; close</button>
+    <button onclick="seatingCloseDiscard()" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#FEF2F2;color:#E24B4A;border:1px solid #FECACA;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">Discard changes</button>
+    <button onclick="document.getElementById('seat-close-dialog').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Keep editing</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+}
+
+window.seatingCloseSave=async function(){
+  const ok=await saveSeating();
+  document.getElementById('seat-close-dialog')?.remove();
+  if(ok){document.getElementById('seating-modal')?.remove();}
+};
+
+window.seatingCloseDiscard=function(){
+  window._seatingDirty=false;
+  document.getElementById('seat-close-dialog')?.remove();
+  document.getElementById('seating-modal')?.remove();
 };
 
 function dmcaHTML(){
