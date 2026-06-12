@@ -1167,6 +1167,8 @@ async function loadVenues(){try{const s=await getDocs(query(collection(db,'venue
 
 function render(){
   const el=document.getElementById('app');
+  // PUBLIC guest seating finder — no login required
+  if(CS==='find-seat'){el.innerHTML=findSeatHTML();setTimeout(loadFindSeat,50);return;}
   if(!CU){window._tosAccepted=false;el.innerHTML=authHTML();bindAuth();setTimeout(checkTOS,50);return;}
   el.innerHTML=`
     <div class="scr" id="scr">${getScr()}</div>
@@ -10348,6 +10350,56 @@ function publicProfileHTML(){
 </div>`;}
 
 let _publicProfileId='';
+
+// ─── PUBLIC GUEST SEATING FINDER (no login) ───
+function findSeatHTML(){
+  return `<div style="min-height:100vh;background:linear-gradient(160deg,#1D9E75,#13795a);padding:0">
+    <div style="text-align:center;padding:28px 20px 18px">
+      <div style="font-size:24px;font-weight:800;color:#fff;margin-bottom:4px">Vivace<span style="color:#9FE8CC"> Events</span></div>
+      <div style="font-size:13px;color:#d4f3e8" id="find-seat-event">Find your seat</div>
+    </div>
+    <div style="background:#fff;border-radius:22px 22px 0 0;min-height:70vh;padding:22px 18px" id="find-seat-body">
+      <div style="text-align:center;padding:40px 0;color:#aaa">⏳ Loading…</div>
+    </div>
+  </div>`;
+}
+
+async function loadFindSeat(){
+  const body=document.getElementById('find-seat-body');
+  if(!body)return;
+  try{
+    const snap=await getDocs(query(collection(db,'event_seating'),where('eventId','==',window._findSeatEventId)));
+    if(snap.empty){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Seating not found.<br>Please check with the event host.</div>`;return;}
+    const data=snap.docs[0].data();
+    window._findSeatPlan=data.plan;
+    const evtLabel=document.getElementById('find-seat-event');
+    // try to fetch event title
+    try{const es=await getDocs(query(collection(db,'organizer_events'),where('__name__','==',window._findSeatEventId)));}catch(_){}
+    body.innerHTML=`
+      <div style="font-size:16px;font-weight:700;color:#111;text-align:center;margin-bottom:4px">Find your seat</div>
+      <div style="font-size:13px;color:#888;text-align:center;margin-bottom:18px">Type your name to see your table</div>
+      <input id="find-seat-input" class="finp" placeholder="Your name…" style="font-size:15px;padding:13px;margin-bottom:14px" oninput="doFindSeat()">
+      <div id="find-seat-results"></div>`;
+    document.getElementById('find-seat-input')?.focus();
+  }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
+}
+
+window.doFindSeat=function(){
+  const q=(document.getElementById('find-seat-input')?.value||'').trim().toLowerCase();
+  const box=document.getElementById('find-seat-results');
+  if(!box)return;
+  if(q.length<2){box.innerHTML='';return;}
+  const plan=window._findSeatPlan;
+  const hits=[];
+  plan.tables.forEach(t=>t.guests.forEach((g,si)=>{if(g&&g.name.toLowerCase().includes(q))hits.push({name:g.name,table:t.name,seat:si+1});}));
+  if(hits.length===0){box.innerHTML=`<div style="text-align:center;padding:24px 0;color:#bbb;font-size:14px">No match yet — keep typing, or check with the host.</div>`;return;}
+  box.innerHTML=hits.slice(0,8).map(h=>`<div style="background:#E8F3EF;border:1px solid #B7E0D2;border-radius:14px;padding:16px;margin-bottom:10px;text-align:center">
+    <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:6px">${h.name}</div>
+    <div style="font-size:26px;font-weight:800;color:#1D9E75">${h.table}</div>
+    <div style="font-size:13px;color:#888;margin-top:2px">Seat ${h.seat}</div>
+  </div>`).join('');
+};
+
 async function loadPublicProfile(uid){
   if(!uid)return;
   try{
@@ -10403,6 +10455,8 @@ window.addEventListener('load',()=>{
   const params=new URLSearchParams(window.location.search);
   const profileId=params.get('profile');
   if(profileId){_publicProfileId=profileId;CS='public-profile';}
+  const seatEvent=params.get('seat');
+  if(seatEvent){window._findSeatEventId=seatEvent;CS='find-seat';}
 });
 
 // ─── DMCA PAGE ───────────────────────────────────────────────────
@@ -10895,7 +10949,8 @@ function renderSeating(){
     </div>
 
     <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save seating plan</button>
-    <button onclick="openSeatingPrint()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print / Export PDF</button>
+    <button onclick="openSeatingPrint()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">🖨️ Print / Export PDF</button>
+    <button onclick="showSeatingQR()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#7B3FBF;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">📱 Guest QR code — find your seat</button>
   </div>`;
   document.getElementById('app').appendChild(m);
   setupSeatingDrag();
@@ -11462,6 +11517,52 @@ window.saveSeating=async function(silent){
 // ═══════════════════════════════════════════════════════════
 // 🖨️ PRINT / EXPORT PDF — choose tables + format + names
 // ═══════════════════════════════════════════════════════════
+window.showSeatingQR=async function(){
+  // must be saved so guests can load it
+  if(!window._seatingDocId||window._seatingDirty){
+    ts('Saving first…');
+    const ok=await saveSeating(true);
+    if(!ok){ts('Save failed — try again');return;}
+  }
+  const url='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId);
+  const qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(url);
+  document.getElementById('seat-qr')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='seat-qr';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:360px;text-align:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:16px;font-weight:700;color:#111">📱 Guest seat finder</div>
+      <button onclick="document.getElementById('seat-qr').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.5">Print this QR at your entrance. Guests scan it, type their name, and instantly see their table — no app, no login.</div>
+    <div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:16px;display:inline-block;margin-bottom:14px">
+      <img src="${qrSrc}" alt="QR code" style="width:240px;height:240px;display:block" id="qr-img">
+    </div>
+    <div style="font-size:11px;color:#aaa;word-break:break-all;margin-bottom:14px">${url}</div>
+    <button onclick="copySeatLink('${url}')" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">🔗 Copy guest link</button>
+    <button onclick="printSeatingQR('${qrSrc}','${url}')" style="width:100%;padding:12px;font-size:13px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🖨️ Print the QR poster</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+
+window.copySeatLink=function(url){
+  navigator.clipboard?.writeText(url).then(()=>ts('🔗 Link copied!')).catch(()=>ts('Copy failed — long-press the link'));
+};
+
+window.printSeatingQR=function(qrSrc,url){
+  const w=window.open('','_blank');
+  if(!w){ts('Pop-up blocked');return;}
+  w.document.write(`<html><head><title>Find Your Seat</title></head>
+    <body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px">
+      <div style="font-size:42px;font-weight:800;color:#1D9E75;margin-bottom:8px">Vivace Events</div>
+      <div style="font-size:30px;font-weight:700;color:#111;margin-bottom:30px">📍 Find Your Seat</div>
+      <img src="${qrSrc}" style="width:340px;height:340px;border:1px solid #eee;border-radius:16px;padding:16px">
+      <div style="font-size:20px;color:#444;margin-top:30px">Scan with your phone camera</div>
+      <div style="font-size:15px;color:#999;margin-top:8px">then type your name</div>
+    </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),500);
+};
+
 window.openSeatingPrint=function(){
   const d=window._seating;
   if(!d.tables.length){ts('Add tables first');return;}
