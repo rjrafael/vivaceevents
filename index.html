@@ -10384,7 +10384,7 @@ async function loadFindSeat(){
     try{
       const lk=await getDoc(doc(db,'seat_lookup',window._findSeatEventId+'_'+code));
       if(lk.exists()){const d=lk.data();found={name:d.name,table:d.table,seat:d.seat,code:code};}
-    }catch(_){}
+    }catch(err){console.error('seat_lookup read:',err);}
     if(!found){
       body.innerHTML=`<div style="text-align:center;padding:30px 6px">
         <div style="font-size:36px;margin-bottom:12px">🤔</div>
@@ -11932,6 +11932,8 @@ window.showGuestLinks=async function(){
   if(!window._seatingDocId||window._seatingDirty){ts('Saving first…');const ok=await saveSeating(true);if(!ok){ts('Save failed');return;}}
   const added=ensureGuestCodes();
   if(added){markDirty();await saveSeating(true);}
+  // ALWAYS publish the secure public lookup docs (so guest links work even if plan wasn't dirty)
+  try{await publishSeatLookup();}catch(e){console.error('publish on links:',e);}
   // build list of seated guests with their links
   const rows=[];
   window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push({name:g.name,table:t.name,code:g.code,email:g.email,phone:g.phone});}));
