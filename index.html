@@ -10485,12 +10485,15 @@ function organizerHTML(){
     m.innerHTML='<div class="card" style="text-align:center;padding:28px"><div style="font-size:36px;margin-bottom:12px">🎪</div><div style="font-size:16px;font-weight:600;margin-bottom:8px">Become an Event Organizer</div><div style="font-size:13px;color:#888;margin-bottom:16px">Plan private events and hire professional musicians for galas, dinners and receptions.</div><button id="enable-org-btn" style="background:#1D9E75;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Enable Event Organizer Role</button></div>';
     setTimeout(function(){var b=document.getElementById('enable-org-btn');if(b)b.onclick=function(){toggleRole('organizer');};},50);
     return '<div class="hdr"><div class="logo" style="font-size:15px">Event Organizer</div></div>'+m.outerHTML;}
+  var loadingEvents=(typeof window._orgEvents==='undefined');
   var myEvents=window._orgEvents||[];
   var stats='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    +'<div class="card" style="text-align:center;padding:12px"><div style="font-size:22px;font-weight:700;color:#1D9E75">'+myEvents.length+'</div><div style="font-size:11px;color:#888">Total Events</div></div>'
-    +'<div class="card" style="text-align:center;padding:12px"><div style="font-size:22px;font-weight:700;color:#C9A84C">'+myEvents.filter(function(e){return e.status==='upcoming';}).length+'</div><div style="font-size:11px;color:#888">Upcoming</div></div>'
+    +'<div class="card" style="text-align:center;padding:12px"><div style="font-size:22px;font-weight:700;color:#1D9E75">'+(loadingEvents?'…':myEvents.length)+'</div><div style="font-size:11px;color:#888">Total Events</div></div>'
+    +'<div class="card" style="text-align:center;padding:12px"><div style="font-size:22px;font-weight:700;color:#C9A84C">'+(loadingEvents?'…':myEvents.filter(function(e){return e.status==='upcoming';}).length)+'</div><div style="font-size:11px;color:#888">Upcoming</div></div>'
     +'</div>';
-  var eventCards = myEvents.length===0
+  var eventCards = loadingEvents
+    ? '<div class="card" style="text-align:center;padding:32px"><div style="font-size:28px;margin-bottom:12px">⏳</div><div style="font-size:14px;color:#888">Loading your events…</div></div>'
+    : myEvents.length===0
     ? '<div class="card" style="text-align:center;padding:32px"><div style="font-size:40px;margin-bottom:12px">🎭</div><div style="font-size:15px;font-weight:600;margin-bottom:8px">No events yet</div><div style="font-size:13px;color:#888;margin-bottom:16px">Create your first private event.</div><button onclick="showCreateEvent()" style="background:#1D9E75;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Create First Event</button></div>'
     : myEvents.map(function(e){
         return '<div class="card" style="margin-bottom:12px">'
