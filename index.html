@@ -10394,6 +10394,19 @@ async function loadFindSeat(){
       </div>`;
       return;
     }
+    const dt=window._findSeatPlan.details||{};
+    function detailRow(icon,label,val){return val?`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:left"><span style="font-size:16px">${icon}</span><div><div style="font-size:11px;color:#999">${label}</div><div style="font-size:14px;color:#222;font-weight:600">${val}</div></div></div>`:'';}
+    const mapLink=dt.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dt.address):'';
+    const detailsBlock=(dt.venue||dt.address||dt.date||dt.time||dt.building||dt.dress||dt.parking||dt.notes)?`
+      <div style="background:#fff;border:1px solid #eee;border-radius:16px;padding:6px 16px;margin-bottom:14px;text-align:left">
+        ${detailRow('🏛️','Venue',dt.venue)}
+        ${detailRow('📅','When',[dt.date,dt.time].filter(Boolean).join(' · '))}
+        ${detailRow('📍','Address',dt.address?(dt.address+(mapLink?` &nbsp;<a href="${mapLink}" target="_blank" style="color:#1D9E75;font-size:12px;font-weight:700">Map ↗</a>`:'')):'')}
+        ${detailRow('🚪','Building',dt.building)}
+        ${detailRow('👔','Dress code',dt.dress)}
+        ${detailRow('🅿️','Parking',dt.parking)}
+        ${dt.notes?`<div style="padding:10px 0;text-align:left"><div style="font-size:11px;color:#999;margin-bottom:2px">Notes</div><div style="font-size:13px;color:#444;line-height:1.5">${dt.notes}</div></div>`:''}
+      </div>`:'';
     body.innerHTML=`<div style="text-align:center;padding:14px 6px">
       <div style="font-size:13px;color:#888;margin-bottom:4px">Welcome,</div>
       <div style="font-size:20px;font-weight:800;color:#111;margin-bottom:20px">${found.name}</div>
@@ -10402,6 +10415,7 @@ async function loadFindSeat(){
         <div style="font-size:38px;font-weight:800;color:#1D9E75;line-height:1.1">${found.table}</div>
         <div style="font-size:15px;color:#888;margin-top:8px">Seat ${found.seat}</div>
       </div>
+      ${detailsBlock}
       <div style="font-size:12px;color:#aaa">Have a wonderful evening 🎶</div>
     </div>`;
   }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
@@ -10829,6 +10843,12 @@ window.toggleAutoSave=function(){
 window.openSeating=async function(eventId,eventTitle){
   document.getElementById('seating-modal')?.remove();
   window._seatingEventId=eventId;
+  // pull parent event's venue + date (so Event Details doesn't double-ask)
+  window._seatingEvent={};
+  try{
+    const ev=await getDocs(query(collection(db,'organizer_events'),where('__name__','==',eventId)));
+    if(!ev.empty){const e=ev.docs[0].data();window._seatingEvent={venue:e.venue||'',date:e.date||'',title:e.title||''};}
+  }catch(e){}
   // Load saved seating, or build fresh from event guests
   let data=null;
   try{
@@ -10950,6 +10970,8 @@ function renderSeating(){
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#BA7517">${st.assigned}</div><div style="font-size:10px;color:#888">seated</div></div>
       <div style="text-align:center;background:#f7faf9;border-radius:9px;padding:8px"><div style="font-size:17px;font-weight:700;color:#E24B4A">${st.unassigned}</div><div style="font-size:10px;color:#888">waiting</div></div>
     </div>
+
+    <button onclick="openEventDetails()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:${(d.details&&d.details.venue)?'#E8F3EF':'#FFF4E6'};color:${(d.details&&d.details.venue)?'#0F6E56':'#B26B00'};border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">📍 ${(d.details&&d.details.venue)?'Event details ✓ ('+d.details.venue+')':'Add event details (venue, time, parking)'}</button>
 
     ${(()=>{const used=new Set();d.tables.forEach(t=>t.guests.forEach(g=>{guestGroups(g).forEach(gid=>used.add(gid));}));if(used.size===0)return '';const chips=allGroups().filter(grp=>used.has(grp.id)).map(grp=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#555;margin-right:10px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid ${grp.color}"></span>${grp.label}</span>`).join('');return `<div style="background:#fafafa;border-radius:9px;padding:8px 10px;margin-bottom:12px">${chips}</div>`;})()}
 
@@ -11534,6 +11556,53 @@ window.addSeatGuests=function(){
 };
 
 // ✨ AUTO-FILL: seat all waiting guests into empty seats, in order
+// ─── EVENT DETAILS (shown on guest seat page) ───
+window.openEventDetails=function(){
+  const d=window._seating;
+  const dt=d.details||{};
+  const ev=window._seatingEvent||{};
+  // pre-fill venue/date from the event you created (no double-typing)
+  const venueVal=dt.venue||ev.venue||'';
+  const dateVal=dt.date||ev.date||'';
+  document.getElementById('event-details')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='event-details';p.style.zIndex='10001';
+  p.innerHTML=`<div class="modal" style="max-width:380px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:#111">📍 Event details</div>
+      <button onclick="document.getElementById('event-details').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Guests see this on their seat page — so they know where to go, when, and how to arrive. ${ev.venue?'<span style="color:#0F6E56">Venue &amp; date pulled from your event — edit if needed.</span>':''}</div>
+    ${edField('Venue name','ed-venue',venueVal,'e.g. Grand Ballroom')}
+    ${edField('Address','ed-address',dt.address,'Street, city, ZIP')}
+    <div style="display:flex;gap:8px">
+      <div style="flex:1">${edField('Date','ed-date',dateVal,'Sat, June 20')}</div>
+      <div style="flex:1">${edField('Time','ed-time',dt.time,'7:00 PM')}</div>
+    </div>
+    ${edField('Building / Floor / Room','ed-building',dt.building,'e.g. Tower B, 3rd floor')}
+    ${edField('Dress code','ed-dress',dt.dress,'e.g. Black tie')}
+    ${edField('Parking','ed-parking',dt.parking,'e.g. Valet at main entrance')}
+    <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px">Notes for guests</div>
+    <textarea id="ed-notes" class="finp" rows="2" placeholder="Anything else guests should know…" style="font-size:13px;margin-bottom:14px;resize:none">${dt.notes||''}</textarea>
+    <button onclick="saveEventDetails()" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700">Save details</button>
+  </div>`;
+  document.getElementById('app').appendChild(p);
+};
+function edField(label,id,val,ph){
+  return `<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px">${label}</div>
+    <input id="${id}" class="finp" value="${(val||'').replace(/"/g,'&quot;')}" placeholder="${ph}" style="font-size:13px;margin-bottom:12px">`;
+}
+window.saveEventDetails=function(){
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  window._seating.details={
+    venue:g('ed-venue'),address:g('ed-address'),date:g('ed-date'),time:g('ed-time'),
+    building:g('ed-building'),dress:g('ed-dress'),parking:g('ed-parking'),notes:g('ed-notes')
+  };
+  markDirty();
+  document.getElementById('event-details')?.remove();
+  renderSeating();
+  ts('📍 Event details saved');
+};
+
 // ─── BULK UPLOAD guest list (Excel / CSV) ───
 window.openGuestUpload=function(){
   document.getElementById('guest-upload')?.remove();
