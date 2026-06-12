@@ -10557,7 +10557,7 @@ window.addEventListener('load',()=>{
   const profileId=params.get('profile');
   if(profileId){_publicProfileId=profileId;CS='public-profile';}
   const seatEvent=params.get('seat');
-  if(seatEvent){window._findSeatEventId=seatEvent;window._findSeatCode=params.get('g')||'';CS='find-seat';}
+  if(seatEvent){window._findSeatEventId=seatEvent;window._findSeatCode=params.get('g')||'';CS='find-seat';render();}
 });
 
 // ─── DMCA PAGE ───────────────────────────────────────────────────
