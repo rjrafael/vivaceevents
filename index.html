@@ -10974,8 +10974,8 @@ function renderSeating(){
 
     <button onclick="saveSeating()" id="seat-save-btn" class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-bottom:8px">💾 Save seating plan</button>
     <button onclick="openSeatingPrint()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0C447C;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">🖨️ Print / Export PDF</button>
-    <button onclick="showSeatingQR()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#7B3FBF;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">📱 Guest QR code — find your seat</button>
-    <button onclick="showGuestLinks()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#0F9AA8;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">🔐 Personal guest links (secure)</button>
+    <button onclick="showGuestLinks()" style="width:100%;padding:14px;font-size:14px;font-weight:700;background:#0F9AA8;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:8px">🔐 Send guests their seat (secure individual codes)</button>
+    <button onclick="showSeatingQR()" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#fff;color:#7B3FBF;border:1.5px solid #C9A9E8;border-radius:10px;cursor:pointer;font-family:inherit">📱 General event QR (for staff / check-in)</button>
   </div>`;
   document.getElementById('app').appendChild(m);
   setupSeatingDrag();
@@ -11639,10 +11639,49 @@ window.showGuestLinks=async function(){
       <div style="font-size:16px;font-weight:700;color:#111">🔐 Personal guest links</div>
       <button onclick="document.getElementById('guest-links').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Each guest has a private link that opens straight to <b>their own seat only</b>. Send each person their link (text, email, or print on their invitation). Nobody can see anyone else's seat.</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">Each guest has a private link that opens straight to <b>their own seat only</b>. Nobody can see anyone else's seat.</div>
+    <button onclick="printAllGuestCards()" class="bt" style="width:100%;padding:13px;font-size:13px;font-weight:700;background:#0C447C;margin-bottom:8px">🖨️ Print all QR cards (one per guest)</button>
+    ${navigator.share?`<button onclick="shareAllGuestLinks()" style="width:100%;padding:12px;font-size:13px;font-weight:600;background:#fff;color:#1D9E75;border:1.5px solid #B7E0D2;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:14px">📤 Share the full list</button>`:'<div style="margin-bottom:8px"></div>'}
+    <div style="font-size:11px;font-weight:700;color:#999;margin-bottom:8px">OR SEND INDIVIDUALLY:</div>
     ${list}
   </div>`;
   document.getElementById('app').appendChild(p);
+};
+
+// METHOD 1 — print one QR card per guest (cut & place on each seat)
+window.printAllGuestCards=function(){
+  const base='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId)+'&g=';
+  const rows=[];
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push({name:g.name,table:t.name,code:g.code});}));
+  if(rows.length===0){ts('Seat some guests first');return;}
+  const w=window.open('','_blank');
+  if(!w){ts('Pop-up blocked — allow pop-ups');return;}
+  const cards=rows.map(r=>{
+    const url=base+r.code;
+    const qr='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+    return `<div style="display:inline-block;width:230px;border:1px dashed #bbb;border-radius:12px;padding:16px;margin:8px;text-align:center;vertical-align:top;page-break-inside:avoid">
+      <div style="font-size:11px;color:#1D9E75;font-weight:700;margin-bottom:6px">Vivace Events</div>
+      <div style="font-size:16px;font-weight:800;color:#111;margin-bottom:2px">${r.name}</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px">Scan to find your seat</div>
+      <img src="${qr}" style="width:150px;height:150px"><br>
+      <div style="font-size:10px;color:#bbb;margin-top:8px">${r.table}</div>
+    </div>`;
+  }).join('');
+  w.document.write(`<html><head><title>Guest Seat Cards</title></head>
+    <body style="font-family:system-ui,sans-serif;text-align:center;padding:14px">
+      <div style="font-size:20px;font-weight:800;color:#111;margin-bottom:4px">Guest Seat Cards</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Cut out each card and place on the guest's seat or invitation. Each scans only to that guest's own seat.</div>
+      ${cards}
+    </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
+};
+
+window.shareAllGuestLinks=function(){
+  const base='https://vivaceevents.com/?seat='+encodeURIComponent(window._seatingEventId)+'&g=';
+  const rows=[];
+  window._seating.tables.forEach(t=>t.guests.forEach(g=>{if(g&&g.code)rows.push(g.name+': '+base+g.code);}));
+  if(navigator.share){navigator.share({title:'Guest seat links',text:rows.join('\n')}).catch(()=>{});}
 };
 
 window.copyGuestLink=function(url){
