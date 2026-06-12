@@ -1202,7 +1202,7 @@ function getScr(){
   if(CS==='course-builder'){setTimeout(()=>loadCourses(),100);return courseBuilderHTML();}
   if(CS==='public-profile')return publicProfileHTML();
   if(CS==='recurring-gigs'){setTimeout(()=>loadRecurringGigs(),100);return recurringGigsHTML();}
-  if(CS==='organizer'){setTimeout(()=>loadOrganizerEvents(),100);return organizerHTML();}
+  if(CS==='organizer'){if(!window._orgRendering){setTimeout(()=>loadOrganizerEvents(),100);}return organizerHTML();}
   if(CS==='dmca')return dmcaHTML();
   if(CS==='policy')return policyHTML();
   return feedHTML();
@@ -10538,6 +10538,8 @@ async function loadOrganizerEvents(){
     var evs=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
     evs.sort(function(a,b){return (b.timestamp&&b.timestamp.seconds?b.timestamp.seconds:0)-(a.timestamp&&a.timestamp.seconds?a.timestamp.seconds:0);});
     window._orgEvents=evs;
+    // If we're currently on the organizer page, re-render now that events are loaded
+    if(typeof CS!=='undefined'&&CS==='organizer'){window._orgRendering=true;render();window._orgRendering=false;}
   }catch(e){console.error('loadOrganizerEvents:',e.code,e.message);window._orgEvents=[];}
 }
 
@@ -10717,28 +10719,28 @@ function tableShapeSVG(t,idx){
   const color=t.color||SEAT_TABLE_COLORS[idx%SEAT_TABLE_COLORS.length];
   const filled=t.guests.filter(Boolean).length;
   let inner='';
-  const W=150,H=150,cx=W/2,cy=H/2;
-  // draw seats around shape
+  const W=180,H=180,cx=W/2,cy=H/2;
+  // draw seats around shape — kept well inside the padded viewBox so nothing clips
   const n=t.seats;
   for(let i=0;i<n;i++){
     const ang=(i/n)*2*Math.PI - Math.PI/2;
-    const rx=t.shape==='rectangle'?64:52, ry=t.shape==='rectangle'?40:52;
-    const sx=cx+Math.cos(ang)*(rx+12), sy=cy+Math.sin(ang)*(ry+12);
+    const rx=t.shape==='rectangle'?58:48, ry=t.shape==='rectangle'?36:48;
+    const sx=cx+Math.cos(ang)*(rx+14), sy=cy+Math.sin(ang)*(ry+14);
     const g=t.guests[i];
     const seatColor=g?color:'#e5e5e5';
     const initials=g?g.name.substring(0,2).toUpperCase():'';
     inner+=`<g style="cursor:pointer" onclick="seatClick(${idx},${i})">
-      <circle cx="${sx}" cy="${sy}" r="11" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
-      ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${initials}</text>`:''}
+      <circle cx="${sx}" cy="${sy}" r="12" fill="${seatColor}" stroke="#fff" stroke-width="1.5"></circle>
+      ${g?`<text x="${sx}" y="${sy+3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">${initials}</text>`:''}
     </g>`;
   }
   // table shape
   let shape='';
-  if(t.shape==='round') shape=`<circle cx="${cx}" cy="${cy}" r="40" fill="${color}22" stroke="${color}" stroke-width="2"></circle>`;
-  else if(t.shape==='square') shape=`<rect x="${cx-38}" y="${cy-38}" width="76" height="76" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
-  else shape=`<rect x="${cx-56}" y="${cy-32}" width="112" height="64" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
-  return `<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:8px;text-align:center">
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:160px;height:auto">${shape}
+  if(t.shape==='round') shape=`<circle cx="${cx}" cy="${cy}" r="38" fill="${color}22" stroke="${color}" stroke-width="2"></circle>`;
+  else if(t.shape==='square') shape=`<rect x="${cx-36}" y="${cy-36}" width="72" height="72" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
+  else shape=`<rect x="${cx-52}" y="${cy-30}" width="104" height="60" rx="8" fill="${color}22" stroke="${color}" stroke-width="2"></rect>`;
+  return `<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:6px;text-align:center;overflow:hidden">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:170px;height:auto;display:block;margin:0 auto">${shape}
       <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="13" font-weight="800" fill="${color}">${t.name}</text>
       <text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="9" fill="#999">${filled}/${t.seats}</text>
       ${inner}</svg>
