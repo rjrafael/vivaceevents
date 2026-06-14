@@ -10419,7 +10419,7 @@ async function loadFindSeat(){
       ${detailsBlock}
       <div id="rsvp-section" style="background:#fff;border:1px solid #eee;border-radius:16px;padding:18px 16px;margin-bottom:14px">
         <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:4px">Will you attend?</div>
-        <div style="font-size:12px;color:#888;margin-bottom:14px">Please let the host know</div>
+        <div style="font-size:12px;color:#888;margin-bottom:14px">Tap your answer, then send it</div>
         <div style="display:flex;gap:8px;margin-bottom:6px">
           <button onclick="setRsvp('yes')" id="rsvp-yes" style="flex:1;padding:12px 6px;font-size:13px;font-weight:700;background:#E8F3EF;color:#0F6E56;border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit">✅ Yes</button>
           <button onclick="setRsvp('maybe')" id="rsvp-maybe" style="flex:1;padding:12px 6px;font-size:13px;font-weight:700;background:#FFF4E6;color:#B26B00;border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit">🤔 Maybe</button>
@@ -10430,15 +10430,15 @@ async function loadFindSeat(){
           <input id="rsvp-diet" class="finp" placeholder="e.g. vegetarian, no nuts" style="font-size:13px;margin-bottom:10px">
           <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:4px;text-align:left">👥 Guests with you (optional)</div>
           <input id="rsvp-plus" type="number" min="0" class="finp" placeholder="0" style="font-size:13px;margin-bottom:12px">
-          <button onclick="submitRsvp()" class="bt" style="width:100%;padding:12px;font-size:13px;font-weight:700">Send my response</button>
         </div>
-        <div id="rsvp-done" style="display:none;font-size:13px;color:#0F6E56;font-weight:700;padding:8px 0">✓ Thank you! Your response was sent.</div>
+        <button id="rsvp-send" onclick="submitRsvp()" disabled class="bt" style="width:100%;padding:13px;font-size:14px;font-weight:700;margin-top:12px;opacity:0.5;cursor:not-allowed">Send my response</button>
       </div>
+      <div id="rsvp-receipt" style="display:none;background:#E8F3EF;border:1px solid #B7E0D2;border-radius:16px;padding:18px 16px;margin-bottom:14px;text-align:left"></div>
       <div style="font-size:12px;color:#aaa">Have a wonderful evening 🎶</div>
     </div>`;
     window._rsvpData={eventId:window._findSeatEventId,code:found.code||window._findSeatCode,name:found.name,table:found.table};
     loadExistingRsvp();
-  }catch(e){body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
+  }catch(e){console.error('loadFindSeat:',e);body.innerHTML=`<div style="text-align:center;padding:40px 0;color:#aaa">Could not load seating.</div>`;}
 }
 
 window._rsvpChoice=null;
@@ -10450,24 +10450,48 @@ window.setRsvp=function(choice){
   });
   const extra=document.getElementById('rsvp-extra');
   if(extra)extra.style.display=choice==='no'?'none':'block';
-  if(choice==='no')submitRsvp();
+  // enable the send button now that a choice is made (NO auto-submit — user must press Send)
+  const send=document.getElementById('rsvp-send');
+  if(send){send.disabled=false;send.style.opacity='1';send.style.cursor='pointer';}
+};
+
+function rsvpLabel(resp){return resp==='yes'?'✅ Yes, attending':resp==='maybe'?'🤔 Maybe':resp==='no'?"❌ Not attending":resp;}
+function fmtRsvpDate(iso){try{const d=new Date(iso);return d.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})+' at '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});}catch(_){return iso;}}
+
+function showRsvpReceipt(resp,diet,plus,iso){
+  const sec=document.getElementById('rsvp-section');if(sec)sec.style.display='none';
+  const r=document.getElementById('rsvp-receipt');if(!r)return;
+  r.style.display='block';
+  r.innerHTML=`<div style="font-size:13px;font-weight:700;color:#0F6E56;margin-bottom:10px">✓ Your response is recorded</div>
+    <div style="font-size:12px;color:#555;margin-bottom:3px">You answered:</div>
+    <div style="font-size:18px;font-weight:800;color:#111;margin-bottom:10px">${rsvpLabel(resp)}</div>
+    ${plus?`<div style="font-size:13px;color:#444;margin-bottom:3px">👥 Bringing ${plus} guest${plus>1?'s':''}</div>`:''}
+    ${diet?`<div style="font-size:13px;color:#444;margin-bottom:3px">🍽️ ${diet}</div>`:''}
+    <div style="font-size:11px;color:#888;margin-top:8px;padding-top:8px;border-top:1px solid #cfe7dd">Recorded on ${fmtRsvpDate(iso)}</div>
+    <button onclick="editRsvp()" style="width:100%;padding:10px;font-size:12px;font-weight:600;background:#fff;color:#0F6E56;border:1.5px solid #B7E0D2;border-radius:9px;cursor:pointer;font-family:inherit;margin-top:12px">Change my response</button>`;
+}
+
+window.editRsvp=function(){
+  const sec=document.getElementById('rsvp-section');if(sec)sec.style.display='block';
+  const r=document.getElementById('rsvp-receipt');if(r)r.style.display='none';
 };
 
 window.submitRsvp=async function(){
-  if(!window._rsvpChoice)return;
+  if(!window._rsvpChoice){alert('Please tap Yes, Maybe, or No first.');return;}
   const r=window._rsvpData;
   const diet=(document.getElementById('rsvp-diet')?.value||'').trim();
   const plus=parseInt(document.getElementById('rsvp-plus')?.value||'0',10)||0;
+  const send=document.getElementById('rsvp-send');
+  if(send){send.disabled=true;send.textContent='Sending…';}
   try{
     const id=r.eventId+'_'+r.code;
+    const iso=new Date().toISOString();
     await setDoc(doc(db,'event_rsvp',id),{
       eventId:r.eventId,code:r.code,name:r.name,table:r.table,
-      response:window._rsvpChoice,dietary:diet,plusOnes:plus,at:new Date().toISOString()
+      response:window._rsvpChoice,dietary:diet,plusOnes:plus,at:iso
     });
-    const sec=document.getElementById('rsvp-section');
-    if(sec){['rsvp-yes','rsvp-maybe','rsvp-no','rsvp-extra'].forEach(i=>{const el=document.getElementById(i);if(el)el.style.display='none';});
-      const done=document.getElementById('rsvp-done');if(done)done.style.display='block';}
-  }catch(e){console.error('rsvp:',e);alert('Could not send — please try again.');}
+    showRsvpReceipt(window._rsvpChoice,diet,plus,iso);
+  }catch(e){console.error('rsvp:',e);alert('Could not send — please try again.');if(send){send.disabled=false;send.textContent='Send my response';}}
 };
 
 async function loadExistingRsvp(){
@@ -10477,9 +10501,11 @@ async function loadExistingRsvp(){
     if(snap.exists()){
       const d=snap.data();
       window._rsvpChoice=d.response;
+      // pre-fill the form (in case they edit) AND show their existing receipt
       setRsvp(d.response);
       if(d.dietary&&document.getElementById('rsvp-diet'))document.getElementById('rsvp-diet').value=d.dietary;
       if(d.plusOnes&&document.getElementById('rsvp-plus'))document.getElementById('rsvp-plus').value=d.plusOnes;
+      showRsvpReceipt(d.response,d.dietary,d.plusOnes,d.at);
     }
   }catch(e){}
 }
