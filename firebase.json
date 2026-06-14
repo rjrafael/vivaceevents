@@ -3,6 +3,14 @@
     "public": ".",
     "cleanUrls": true,
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "functions/**"],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+        ]
+      }
+    ],
     "rewrites": [
       { "source": "/privacy", "destination": "/privacy/index.html" },
       { "source": "/data-deletion", "destination": "/data-deletion.html" },
