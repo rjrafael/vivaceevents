@@ -11330,7 +11330,9 @@ function renderRaffleSetup(){
 
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
       '<span style="font-size:13px;font-weight:700;color:#444">How many winners?</span>'+
-      '<input id="raffle-target" type="number" min="1" max="'+Math.max(1,elig.length)+'" value="'+cfg.target+'" oninput="raffleSetTarget(this.value)" class="finp" style="width:80px;font-size:14px;text-align:center">'+
+      '<button type="button" onclick="raffleStepTarget(-1)" aria-label="fewer winners" style="width:42px;height:42px;font-size:24px;font-weight:700;border:1px solid #ccc;background:#f5f5f5;border-radius:10px;cursor:pointer;line-height:1;color:#444;flex-shrink:0">−</button>'+
+      '<input id="raffle-target" type="text" inputmode="numeric" value="'+cfg.target+'" oninput="raffleSetTarget(this.value)" onchange="raffleNormalizeTarget()" class="finp" style="width:58px;font-size:18px;font-weight:700;text-align:center;padding:8px 4px">'+
+      '<button type="button" onclick="raffleStepTarget(1)" aria-label="more winners" style="width:42px;height:42px;font-size:24px;font-weight:700;border:1px solid #ccc;background:#f5f5f5;border-radius:10px;cursor:pointer;line-height:1;color:#444;flex-shrink:0">+</button>'+
     '</div>'+
 
     '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:#444;margin-bottom:18px;cursor:pointer">'+
@@ -11343,7 +11345,10 @@ function renderRaffleSetup(){
 
 window.raffleToggleGroup=function(gid){const s=window._raffleCfg.excludeGroups; if(s.has(gid))s.delete(gid); else s.add(gid); renderRaffleSetup();};
 window.raffleToggleName=function(i){const seated=raffleSeated();const p=seated[i];if(!p)return;const s=window._raffleCfg.excludeNames; if(s.has(p.name))s.delete(p.name); else s.add(p.name); renderRaffleSetup();};
-window.raffleSetTarget=function(v){let n=parseInt(v,10);if(isNaN(n)||n<1)n=1;window._raffleCfg.target=n;};
+function raffleMaxWinners(){return Math.max(1, raffleEligible().length);}
+window.raffleSetTarget=function(v){let n=parseInt(v,10);const mx=raffleMaxWinners();if(isNaN(n)||n<1)n=1;if(n>mx)n=mx;window._raffleCfg.target=n;};
+window.raffleStepTarget=function(d){const mx=raffleMaxWinners();let n=(window._raffleCfg.target||1)+d;if(n<1)n=1;if(n>mx)n=mx;window._raffleCfg.target=n;const el=document.getElementById('raffle-target');if(el)el.value=n;};
+window.raffleNormalizeTarget=function(){const el=document.getElementById('raffle-target');if(el)el.value=window._raffleCfg.target;};
 window.raffleSetRemove=function(b){window._raffleCfg.removeWinners=b;};
 window.raffleSetTitle=function(v){window._raffleCfg.title=v;};
 window.raffleSetTheme=function(k){window._raffleCfg.theme=k;renderRaffleSetup();};
