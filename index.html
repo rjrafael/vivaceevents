@@ -11243,6 +11243,8 @@ window.openRaffle=function(){
     const used=new Set(); seated.forEach(function(p){p.groups.forEach(function(g){used.add(g);});});
     const exG=new Set(); RAFFLE_DEFAULT_EXCLUDE.forEach(function(g){if(used.has(g))exG.add(g);});
     window._raffleCfg={title:'',theme:'vivace',excludeGroups:exG,excludeNames:new Set(),target:1,removeWinners:true,logo:null};
+  } else {
+    window._raffleCfg.theme='vivace'; // always default to Vivace on a fresh open
   }
   document.getElementById('raffle-setup')?.remove();
   const p=document.createElement('div');p.className='modal-bg';p.id='raffle-setup';p.style.zIndex='10002';
@@ -11297,7 +11299,7 @@ function renderRaffleSetup(){
   }).join('');
 
   body.innerHTML=
-    '<div style="font-size:17px;font-weight:700;margin-bottom:2px">🎲 Event raffle</div>'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:2px">🎲 Event raffle <span style="font-size:10px;color:#bbb;font-weight:400">v2.1</span></div>'+
     '<div style="font-size:12px;color:#888;margin-bottom:14px">Draws from your seating plan — no tickets. Optional, nothing saved unless you draw.</div>'+
 
     '<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:5px">Raffle name (shown on screen)</div>'+
