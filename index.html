@@ -11062,6 +11062,8 @@ function renderSeating(){
 
     <button onclick="showRsvpDashboard()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#FFF4E6;color:#B26B00;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">📋 RSVP responses (who's coming)</button>
 
+    <button onclick="openRaffle()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:#0e1712;color:#E0C068;border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">🎲 Raffle / prize draw (spin for winners)</button>
+
     <button onclick="openEventDetails()" style="width:100%;padding:11px;font-size:13px;font-weight:700;background:${(d.details&&d.details.venue)?'#E8F3EF':'#FFF4E6'};color:${(d.details&&d.details.venue)?'#0F6E56':'#B26B00'};border:none;border-radius:10px;cursor:pointer;font-family:inherit;margin-bottom:12px">📍 ${(d.details&&d.details.venue)?'Event details ✓ ('+d.details.venue+')':'Add event details (venue, time, parking)'}</button>
 
     ${(()=>{const used=new Set();d.tables.forEach(t=>t.guests.forEach(g=>{guestGroups(g).forEach(gid=>used.add(gid));}));if(used.size===0)return '';const chips=allGroups().filter(grp=>used.has(grp.id)).map(grp=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#555;margin-right:10px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid ${grp.color}"></span>${grp.label}</span>`).join('');return `<div style="background:#fafafa;border-radius:9px;padding:8px 10px;margin-bottom:12px">${chips}</div>`;})()}
@@ -11167,6 +11169,292 @@ window.dropGuestOnTable=function(guestIdx,tableIdx){
   renderSeating();
   ts(g.name+' seated at '+t.name);
 };
+
+
+// ═══════════════════════════════════════════════════════════════
+// 🎲 EVENT RAFFLE / PRIZE DRAW  (optional per event — reuses seated guests)
+// Off by default. Pulls names straight from the seating plan. No tickets.
+// Host auto-handled via group exclusions. Winners removed so none win twice.
+// "Powered by Vivace Events ♪"
+// ═══════════════════════════════════════════════════════════════
+window._raffleCfg=null; // {excludeGroups:Set, excludeNames:Set, target:int, removeWinners:bool}
+window._raffleRun=null; // {pool:[], drawn:[], rot:number, spinning:bool}
+
+const RAFFLE_DEFAULT_EXCLUDE=['staff','musician','singer','dancer','mc','performer','press','speaker'];
+const RAFFLE_SEG_COLORS=['#16A35A','#C9A84C']; // green / gold alternating
+
+// inject raffle keyframes once
+(function(){
+  if(document.getElementById('raffle-keyframes'))return;
+  const s=document.createElement('style');s.id='raffle-keyframes';
+  s.textContent='@keyframes rafflePop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.18);opacity:1}100%{transform:scale(1);opacity:1}}@keyframes raffleFall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(230px) rotate(540deg);opacity:0}}';
+  document.head.appendChild(s);
+})();
+
+function raffleEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// Every seated guest -> {name, table, groups[]}
+function raffleSeated(){
+  const out=[]; const d=window._seating; if(!d||!d.tables)return out;
+  d.tables.forEach(function(t){(t.guests||[]).forEach(function(g){
+    if(g&&g.name)out.push({name:g.name,table:(t.name||''),groups:guestGroups(g)});
+  });});
+  return out;
+}
+
+// Monogram for the center hub from the event title (fallback "VE")
+function raffleMonogram(){
+  const title=(window._seatingTitle||'Event').trim();
+  const words=title.split(/\s+/).filter(Boolean);
+  let m=''; for(let i=0;i<words.length&&m.length<3;i++){m+=words[i][0];}
+  return (m||'VE').toUpperCase();
+}
+
+// Apply current exclusions -> eligible list
+function raffleEligible(){
+  if(!window._raffleCfg)return [];
+  const exG=window._raffleCfg.excludeGroups, exN=window._raffleCfg.excludeNames;
+  return raffleSeated().filter(function(p){
+    if(exN.has(p.name))return false;
+    for(let i=0;i<p.groups.length;i++){if(exG.has(p.groups[i]))return false;}
+    return true;
+  });
+}
+
+// ─── SETUP SCREEN ───────────────────────────────────────────────
+window.openRaffle=function(){
+  const seated=raffleSeated();
+  if(seated.length===0){ts('Seat some guests first — the raffle draws from your seating plan');return;}
+  // init config once
+  if(!window._raffleCfg){
+    const used=new Set(); seated.forEach(function(p){p.groups.forEach(function(g){used.add(g);});});
+    const exG=new Set(); RAFFLE_DEFAULT_EXCLUDE.forEach(function(g){if(used.has(g))exG.add(g);});
+    window._raffleCfg={excludeGroups:exG,excludeNames:new Set(),target:1,removeWinners:true};
+  }
+  document.getElementById('raffle-setup')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='raffle-setup';p.style.zIndex='10002';
+  p.innerHTML='<div class="modal" id="raffle-setup-body" style="max-width:380px;max-height:88vh;overflow-y:auto"></div>';
+  document.getElementById('app').appendChild(p);
+  renderRaffleSetup();
+};
+
+function renderRaffleSetup(){
+  const body=document.getElementById('raffle-setup-body'); if(!body)return;
+  const seated=raffleSeated();
+  const cfg=window._raffleCfg;
+  const usedGroups=new Set(); seated.forEach(function(p){p.groups.forEach(function(g){usedGroups.add(g);});});
+  const elig=raffleEligible();
+  // breakdown counts
+  const total=seated.length;
+  const exByGroup=seated.filter(function(p){if(cfg.excludeNames.has(p.name))return false;for(let i=0;i<p.groups.length;i++){if(cfg.excludeGroups.has(p.groups[i]))return true;}return false;}).length;
+  const exByName=seated.filter(function(p){return cfg.excludeNames.has(p.name);}).length;
+  // group toggles
+  const groupChips=allGroups().filter(function(g){return usedGroups.has(g.id);}).map(function(g){
+    const off=cfg.excludeGroups.has(g.id);
+    return '<span onclick="raffleToggleGroup(\''+g.id+'\')" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px;cursor:pointer;margin:0 6px 6px 0;'+(off?'background:#fdeaea;color:#b23;border:1px solid #f3c0c0;text-decoration:line-through':'background:#E8F3EF;color:#0F6E56;border:1px solid #B7E0D2')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+g.color+'"></span>'+raffleEsc(g.label)+(off?' ✕':'')+'</span>';
+  }).join('');
+  // individual names (tap to exclude)
+  const nameRows=seated.map(function(p,i){
+    const off=cfg.excludeNames.has(p.name);
+    const autoOff=!off&&p.groups.some(function(g){return cfg.excludeGroups.has(g);});
+    return '<span onclick="raffleToggleName('+i+')" title="'+raffleEsc(p.name)+'" style="display:inline-block;font-size:11px;padding:4px 9px;border-radius:14px;cursor:pointer;margin:0 5px 5px 0;'+(off?'background:#fdeaea;color:#b23;text-decoration:line-through':(autoOff?'background:#f3f3f3;color:#aaa;text-decoration:line-through':'background:#f0f7f4;color:#2c6'))+'">'+raffleEsc(p.name)+'</span>';
+  }).join('');
+
+  body.innerHTML=
+    '<div style="font-size:17px;font-weight:700;margin-bottom:2px">🎲 Event raffle</div>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:14px">Draws from your seating plan — no tickets needed. Optional, nothing is saved unless you draw.</div>'+
+
+    '<div style="background:#0e1712;border-radius:12px;padding:14px;margin-bottom:14px;color:#E8E3CF">'+
+      '<div style="font-size:11px;color:#9FD9B8;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Eligible pool</div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span style="color:#cfc">Seated guests</span><span>'+total+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;color:#e0a0a0"><span>Excluded by role</span><span>−'+exByGroup+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#e0a0a0"><span>Excluded by name</span><span>−'+exByName+'</span></div>'+
+      '<div style="border-top:1px solid #2c4a39;padding-top:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#9FD9B8;font-weight:700">Eligible to win</span><span style="font-size:24px;font-weight:700;color:#E0C068">'+elig.length+'</span></div>'+
+    '</div>'+
+
+    '<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:7px">Exclude roles (working guests cannot win)</div>'+
+    '<div style="margin-bottom:14px">'+(groupChips||'<span style="font-size:12px;color:#aaa">No role tags on your guests yet.</span>')+'</div>'+
+
+    '<details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:#666;cursor:pointer">Or exclude specific people (tap a name)</summary>'+
+      '<div style="max-height:150px;overflow-y:auto;margin-top:8px;padding:8px;background:#fafafa;border-radius:9px">'+nameRows+'</div>'+
+    '</details>'+
+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+      '<span style="font-size:13px;font-weight:700;color:#444">How many winners?</span>'+
+      '<input id="raffle-target" type="number" min="1" max="'+Math.max(1,elig.length)+'" value="'+cfg.target+'" oninput="raffleSetTarget(this.value)" class="finp" style="width:80px;font-size:14px;text-align:center">'+
+    '</div>'+
+
+    '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:#444;margin-bottom:18px;cursor:pointer">'+
+      '<input type="checkbox" id="raffle-remove" '+(cfg.removeWinners?'checked':'')+' onchange="raffleSetRemove(this.checked)" style="width:17px;height:17px"> Remove each winner from the pool (no double-wins)'+
+    '</label>'+
+
+    '<button onclick="startRaffle()" '+(elig.length===0?'disabled':'')+' class="bt" style="width:100%;padding:14px;font-size:15px;font-weight:700;background:#C9A84C;color:#1a1206;margin-bottom:8px'+(elig.length===0?';opacity:.5':'')+'">▶ Start raffle · '+elig.length+' eligible</button>'+
+    '<button onclick="document.getElementById(\'raffle-setup\').remove()" class="bg" style="width:100%;padding:11px;font-size:13px">Cancel</button>';
+}
+
+window.raffleToggleGroup=function(gid){const s=window._raffleCfg.excludeGroups; if(s.has(gid))s.delete(gid); else s.add(gid); renderRaffleSetup();};
+window.raffleToggleName=function(i){const seated=raffleSeated();const p=seated[i];if(!p)return;const s=window._raffleCfg.excludeNames; if(s.has(p.name))s.delete(p.name); else s.add(p.name); renderRaffleSetup();};
+window.raffleSetTarget=function(v){let n=parseInt(v,10);if(isNaN(n)||n<1)n=1;window._raffleCfg.target=n;};
+window.raffleSetRemove=function(b){window._raffleCfg.removeWinners=b;};
+
+// ─── STAGE SCREEN (big-screen draw) ─────────────────────────────
+window.startRaffle=function(){
+  const elig=raffleEligible();
+  if(elig.length===0){ts('No eligible guests');return;}
+  let target=window._raffleCfg.target; if(target>elig.length)target=elig.length;
+  window._raffleRun={pool:elig.slice(),drawn:[],rot:0,spinning:false,target:target};
+  document.getElementById('raffle-setup')?.remove();
+  document.getElementById('raffle-stage')?.remove();
+  const p=document.createElement('div');p.className='modal-bg';p.id='raffle-stage';p.style.zIndex='10003';p.style.background='rgba(0,0,0,.85)';
+  p.innerHTML='<div id="raffle-stage-body" style="width:100%;max-width:520px;margin:auto"></div>';
+  document.getElementById('app').appendChild(p);
+  renderRaffleStage();
+};
+
+function renderRaffleStage(){
+  const host=document.getElementById('raffle-stage-body'); if(!host)return;
+  const run=window._raffleRun;
+  const mono=raffleEsc(raffleMonogram());
+  const evname=raffleEsc(window._seatingTitle||'Event');
+  const remaining=run.pool.length;
+  const useWheel=remaining<=12&&remaining>=2;
+  const progress=run.target>1?('Winner '+(run.drawn.length+ (run.drawn.length<run.target?1:0))+' of '+run.target):'';
+
+  let centerHTML;
+  if(useWheel){
+    centerHTML='<div style="position:relative;width:300px;height:300px;margin:0 auto">'+
+      '<div style="position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:24px solid #E0C068;z-index:5"></div>'+
+      '<svg id="raffle-wheel" width="300" height="300" viewBox="0 0 300 300" style="transition:transform 4.5s cubic-bezier(.17,.67,.2,1)"></svg>'+
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88px;height:88px;border-radius:50%;background:#0e1712;border:3px solid #C9A84C;display:flex;align-items:center;justify-content:center;z-index:4"><span style="font-size:26px;font-weight:700;color:#E0C068">'+mono+'</span></div>'+
+    '</div>';
+  } else {
+    centerHTML='<div style="position:relative;width:300px;height:160px;margin:0 auto;display:flex;align-items:center;justify-content:center">'+
+      '<div style="width:96px;height:96px;border-radius:50%;background:#0e1712;border:3px solid #C9A84C;display:flex;align-items:center;justify-content:center"><span style="font-size:30px;font-weight:700;color:#E0C068">'+mono+'</span></div>'+
+      '<div id="raffle-cycler" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:30px;font-weight:700;color:#F1ECDA;text-align:center;width:300px;opacity:0"></div>'+
+    '</div>';
+  }
+
+  const allDrawn=run.drawn.length>=run.target;
+  const boardHTML=run.drawn.map(function(w,i){
+    return '<div style="background:#13251b;border:1px solid '+(i===run.drawn.length-1?'#C9A84C':'#244a34')+';border-radius:10px;padding:9px 11px;display:flex;align-items:center;gap:9px"><div style="width:24px;height:24px;border-radius:50%;background:#C9A84C;color:#1a1206;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div><div><div style="font-size:13px;font-weight:600;color:#F1ECDA">'+raffleEsc(w.name)+'</div><div style="font-size:10px;color:#8aa595">'+raffleEsc(w.table||'')+'</div></div></div>';
+  }).join('');
+
+  host.innerHTML=
+    '<div style="background:#0e1712;border:1px solid #1f3a2c;border-radius:18px;padding:22px 18px;text-align:center;position:relative;overflow:hidden">'+
+      '<div style="display:flex;align-items:center;justify-content:center;gap:9px;color:#F1ECDA;font-size:16px;font-weight:600;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:7px;background:#15331f;border:1px solid #C9A84C;display:inline-flex;align-items:center;justify-content:center;color:#D9B65E;font-size:12px;font-weight:700">'+mono+'</span>'+evname+'</div>'+
+      '<div style="font-size:11px;color:#C9A84C;letter-spacing:.1em;text-transform:uppercase;min-height:15px;margin-bottom:10px">'+(allDrawn?'🏆 All winners drawn':progress)+'</div>'+
+
+      '<div id="raffle-confetti" style="position:absolute;top:130px;left:0;width:100%;height:0;pointer-events:none;z-index:6"></div>'+
+      centerHTML+
+
+      '<div id="raffle-reveal" style="min-height:54px;margin:12px 0;display:flex;flex-direction:column;align-items:center;justify-content:center"></div>'+
+
+      (allDrawn?
+        '<button onclick="raffleRestart()" class="bt" style="width:100%;padding:13px;font-size:15px;font-weight:700;background:#C9A84C;color:#1a1206;margin-bottom:8px">🎲 New raffle</button>'
+        :'<button id="raffle-draw-btn" onclick="raffleSpin()" class="bt" style="width:100%;padding:14px;font-size:16px;font-weight:700;background:#C9A84C;color:#1a1206;letter-spacing:.04em;margin-bottom:8px">🎲 '+(run.drawn.length===0?'DRAW WINNER':'DRAW NEXT')+'</button>')+
+
+      (run.drawn.length>0?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:10px 0;text-align:left">'+boardHTML+'</div>':'')+
+
+      '<div style="font-size:11px;color:#5f7568;margin-top:6px">Eligible remaining: '+run.pool.length+' · Powered by <b style="color:#9FD9B8;font-weight:600">Vivace Events</b> ♪</div>'+
+
+      '<button onclick="document.getElementById(\'raffle-stage\').remove()" style="position:absolute;top:12px;right:14px;background:transparent;border:none;color:#5f7568;font-size:20px;cursor:pointer">✕</button>'+
+    '</div>';
+
+  if(useWheel)raffleBuildWheel();
+}
+
+function raffleBuildWheel(){
+  const wheel=document.getElementById('raffle-wheel'); if(!wheel)return;
+  const pool=window._raffleRun.pool, N=pool.length, seg=360/N, cx=150,cy=150,r=145, ns='http://www.w3.org/2000/svg';
+  function pt(a,rad){return (cx+rad*Math.cos(a*Math.PI/180))+' '+(cy+rad*Math.sin(a*Math.PI/180));}
+  let html='';
+  for(let i=0;i<N;i++){
+    const a1=i*seg,a2=(i+1)*seg,mid=a1+seg/2,isGold=i%2===1,fill=isGold?'#C9A84C':'#16A35A';
+    html+='<path d="M '+cx+' '+cy+' L '+pt(a1,r)+' A '+r+' '+r+' 0 0 1 '+pt(a2,r)+' Z" fill="'+fill+'" stroke="#0e1712" stroke-width="2"/>';
+    const tx=cx+(r*0.6)*Math.cos(mid*Math.PI/180), ty=cy+(r*0.6)*Math.sin(mid*Math.PI/180);
+    let rot=mid; if(mid>90&&mid<270)rot+=180;
+    const nm=raffleEsc(pool[i].name.length>12?pool[i].name.slice(0,11)+'…':pool[i].name);
+    html+='<text x="'+tx+'" y="'+ty+'" text-anchor="middle" dominant-baseline="central" transform="rotate('+rot+' '+tx+' '+ty+')" fill="'+(isGold?'#1a1206':'#fff')+'" font-size="13" font-weight="600" font-family="inherit">'+nm+'</text>';
+  }
+  wheel.innerHTML=html;
+}
+
+window.raffleSpin=function(){
+  const run=window._raffleRun; if(!run||run.spinning||run.pool.length===0)return;
+  run.spinning=true;
+  const btn=document.getElementById('raffle-draw-btn'); if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  const idx=Math.floor(Math.random()*run.pool.length);
+  const winner=run.pool[idx];
+  const useWheel=run.pool.length<=12&&run.pool.length>=2;
+
+  if(useWheel){
+    const wheel=document.getElementById('raffle-wheel');
+    const seg=360/run.pool.length;
+    // land the chosen segment under the top pointer (270deg)
+    const targetMid=idx*seg+seg/2;
+    const base=360*(5+Math.floor(Math.random()*3));
+    const landing=270-targetMid; // degrees so that mid sits at pointer
+    run.rot+=base+(((landing - (run.rot%360))%360)+360)%360;
+    if(wheel)wheel.style.transform='rotate('+run.rot+'deg)';
+    setTimeout(function(){raffleResolve(idx,winner);},4600);
+  } else {
+    // name cycler for big pools
+    const cyc=document.getElementById('raffle-cycler');
+    if(cyc)cyc.style.opacity='1';
+    let ticks=0; const totalTicks=22;
+    const iv=setInterval(function(){
+      const rp=run.pool[Math.floor(Math.random()*run.pool.length)];
+      if(cyc)cyc.textContent=rp.name;
+      ticks++;
+      if(ticks>=totalTicks){clearInterval(iv); if(cyc)cyc.textContent=winner.name; setTimeout(function(){raffleResolve(idx,winner);},250);}
+    },90);
+  }
+};
+
+function raffleResolve(idx,winner){
+  const run=window._raffleRun;
+  run.drawn.push(winner);
+  if(window._raffleCfg.removeWinners){run.pool.splice(idx,1);}
+  raffleConfetti(); raffleChime();
+  const reveal=document.getElementById('raffle-reveal');
+  if(reveal){
+    reveal.innerHTML='<div style="font-size:12px;color:#9FD9B8;letter-spacing:.16em;text-transform:uppercase">🎉 Winner #'+run.drawn.length+'</div>'+
+      '<div style="font-size:30px;font-weight:700;color:#F1ECDA;animation:rafflePop .6s ease-out">'+raffleEsc(winner.name)+'</div>'+
+      '<div style="font-size:13px;color:#C9A84C;margin-top:2px">'+raffleEsc(winner.table||'')+' · from your seating list</div>';
+  }
+  run.spinning=false;
+  setTimeout(function(){renderRaffleStage();},1500);
+}
+
+function raffleConfetti(){
+  const box=document.getElementById('raffle-confetti'); if(!box)return;
+  const colors=['#16A35A','#C9A84C','#E0C068','#9FD9B8','#ffffff'];
+  for(let i=0;i<18;i++){
+    const d=document.createElement('div');
+    d.style.cssText='position:absolute;width:8px;height:12px;border-radius:2px;left:'+(38+Math.random()*24)+'%;background:'+colors[i%colors.length]+';transform:translateX('+(Math.random()*140-70)+'px);animation:raffleFall 1.3s ease-in forwards;animation-delay:'+(Math.random()*.15)+'s';
+    box.appendChild(d);
+    (function(el){setTimeout(function(){el.remove();},1600);})(d);
+  }
+}
+
+function raffleChime(){
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    [[660,0],[880,.12],[1320,.24]].forEach(function(p){
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.frequency.value=p[0];o.type='triangle';o.connect(g);g.connect(ac.destination);
+      const t=ac.currentTime+p[1];
+      g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.22,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.25);
+      o.start(t);o.stop(t+.27);
+    });
+  }catch(e){}
+}
+
+window.raffleRestart=function(){
+  document.getElementById('raffle-stage')?.remove();
+  openRaffle();
+};
+
 
 window.addTable=function(){
   const shape=document.getElementById('seat-shape').value;
