@@ -11194,7 +11194,7 @@ function raffleEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,function(
 (function(){
   if(document.getElementById('raffle-keyframes'))return;
   const s=document.createElement('style');s.id='raffle-keyframes';
-  s.textContent='@keyframes rafflePop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.18);opacity:1}100%{transform:scale(1);opacity:1}}@keyframes raffleFall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(240px) rotate(540deg);opacity:0}}@media (prefers-reduced-motion: no-preference){@keyframes raffleChase{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.22;transform:scale(.65)}}@keyframes raffleTwinkle{0%,100%{opacity:.15}50%{opacity:1}}}';
+  s.textContent='@keyframes rafflePop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.18);opacity:1}100%{transform:scale(1);opacity:1}}@keyframes raffleFall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(240px) rotate(540deg);opacity:0}}@media (prefers-reduced-motion: no-preference){@keyframes raffleChase{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.22;transform:scale(.65)}}@keyframes raffleTwinkle{0%,100%{opacity:.15}50%{opacity:1}}}#raffle-stage{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}#raffle-stage button{-webkit-tap-highlight-color:transparent}';
   document.head.appendChild(s);
 })();
 
@@ -11432,7 +11432,7 @@ function renderRaffleStage(){
         '<span onclick="raffleFullscreen()" style="font-size:11px;color:'+t.sub+';cursor:pointer">⛶ Fullscreen</span>'+
         '<span style="font-size:11px;color:'+t.sub+';opacity:.7">Eligible left: '+run.pool.length+'</span>'+
       '</div>'+
-      '<div style="font-size:11px;color:'+t.sub+';margin-top:8px;opacity:.85">Powered by <b style="font-weight:700">Vivace Events</b> ♪</div>'+
+      '<div style="font-size:11px;margin-top:8px;opacity:.92"><span style="color:'+t.sub+'">Powered by </span><span style="font-weight:700;color:'+t.text+'">Vivace</span><span style="font-weight:700;color:#2ecc71"> Events</span><span style="color:'+t.sub+'"> ♪</span></div>'+
       '</div>'+
 
       '<button onclick="raffleCloseGuard()" style="position:absolute;top:12px;right:14px;background:transparent;border:none;color:'+t.sub+';font-size:20px;cursor:pointer;z-index:4">✕</button>'+
